@@ -72,6 +72,148 @@ amux detect --all --json          # probe installations
 amux detect-host                  # is this shell already inside a harness?
 ```
 
+## Features
+
+### Unified event stream
+Every harness — regardless of wire format (JSONL, stream-json envelopes, SSE, app-server frames, ANSI) — is normalized into the same `AgentEvent` union: `text_delta`, `thinking_delta`, `tool_call_start`, `tool_input_delta`, `tool_call_ready`, `tool_result`, `message_stop`, `cost`, `error`. Write your UI once; swap harnesses without touching render code.
+
+### Sessions
+`client.sessions(agent)` lists, reads, resumes, forks, and watches persistent harness sessions from their on-disk stores (`~/.claude/projects`, `~/.codex/sessions`, `~/.gemini/sessions`, …). `RunOptions.sessionId` reconnects; `forkSessionId` branches a new session from an existing transcript. `noSession: true` runs ephemerally.
+
+### Invocation modes
+One option flips where the subprocess actually runs: `local`, `docker` (with volumes/image/env), `ssh` (identity file, remote cwd), or `k8s` (namespace, image, pod spec overlay). The adapter contract is unchanged — streaming, sessions, and cost events still flow back over the chosen transport.
+
+### Hooks
+`amux hooks install` wires a command to a harness event (`PreToolUse`, `PostToolUse`, `Stop`, `UserPromptSubmit`, …). Native hooks are written into the harness's own config (e.g. `~/.claude/settings.json`); harnesses without native hook support get a virtual hook layer driven off the event stream. Same UX, different mechanism.
+
+### MCP plugins
+`amux plugins install <server> --agent claude` adds an MCP server entry in the harness's config file. Supported on claude, codex, gemini, cursor, opencode, openclaw (and qwen via MCP-compatible config). `list` / `uninstall` work symmetrically.
+
+### Auth & install detection
+`amux doctor` reports each harness's binary presence, version, auth state (env var, config file, browser token), and config directory health. `amux detect --all --json` is the machine-readable form. `amux install <agent>` / `update <agent>` dispatches to the adapter-declared install method (npm, brew, curl script).
+
+### Capabilities & models
+Every adapter declares an `AgentCapabilities` record (streaming, thinking, parallel tools, MCP, PTY requirement, image IO, skills, subagents, platforms) and a `ModelCapabilities[]` list (context window, pricing, thinking budgets, tool support). Build agent pickers, cost estimators, and feature-gated UIs directly off the declared capability surface.
+
+### Cost tracking
+Adapters that expose pricing/usage emit `cost` events (input/output tokens, cache reads, USD). `amux run --json` surfaces them on stdout; the SDK bubbles them through `handle.events()` alongside text.
+
+### Profiles
+`RunOptions` presets under a name. `amux profiles` lists them; `amux run --profile fast-claude` applies one. Layerable over explicit flags.
+
+### Mock harness
+`@a5c-ai/agent-mux-harness-mock` ships deterministic scenario scripts (`claudeCodeSuccess`, `codexToolError`, …) and a `MockProcess` that replays them without any real binary, API key, or network. Pair with `WorkspaceSandbox` to test file-operation side effects. `amux run --use-mock-harness` drives the full CLI against mocks.
+
+### Remote bootstrap
+`amux remote install <host> --harness <agent>` uploads the SDK, installs the harness on the target, and verifies. Works over ssh and k8s; used to stand up stateless runners.
+
+### Host detection
+`amux detect-host` returns which harness (if any) this shell is already running inside — useful for adapters that want to refuse re-entry or skip re-auth.
+
+## SDK examples
+
+### Real-time streaming: text, thinking, tools, cost
+
+```ts
+import { createClient } from '@a5c-ai/agent-mux';
+
+const client = createClient();
+const handle = client.run({
+  agent: 'claude-code',
+  prompt: 'Refactor src/api.ts to use async/await',
+  model: 'claude-sonnet-4-20250514',
+});
+
+let totalUsd = 0;
+for await (const event of handle.events()) {
+  switch (event.type) {
+    case 'text_delta':
+      process.stdout.write(event.delta);
+      break;
+    case 'thinking_delta':
+      process.stderr.write(`\x1b[90m${event.delta}\x1b[0m`);
+      break;
+    case 'tool_call_start':
+      console.log(`\n→ ${event.toolName}(${event.toolCallId})`);
+      break;
+    case 'tool_input_delta':
+      process.stdout.write(event.delta);
+      break;
+    case 'tool_result':
+      console.log(`\n← ${event.toolCallId} (${event.durationMs}ms)`);
+      break;
+    case 'cost':
+      totalUsd = event.cost.totalUsd ?? totalUsd;
+      console.log(`\n$${totalUsd.toFixed(4)} so far`);
+      break;
+    case 'error':
+      console.error(`error: ${event.message}`);
+      break;
+  }
+}
+await handle.done;
+```
+
+### Non-realtime: read cost/tokens from a completed session
+
+```ts
+const sessions = client.sessions('claude-code');
+const list = await sessions.list();
+const last = list[0];
+const full = await sessions.read(last.sessionId);
+
+const totals = full.events.reduce(
+  (acc, ev) => {
+    if (ev.type === 'cost') {
+      acc.usd += ev.cost.totalUsd ?? 0;
+      acc.inputTokens += ev.cost.inputTokens ?? 0;
+      acc.outputTokens += ev.cost.outputTokens ?? 0;
+    }
+    return acc;
+  },
+  { usd: 0, inputTokens: 0, outputTokens: 0 },
+);
+console.log(`Session ${last.sessionId}: $${totals.usd.toFixed(4)} / ${totals.inputTokens}→${totals.outputTokens} tok`);
+```
+
+### Resume vs. fork
+
+```ts
+// Reconnect to an existing session
+const resumed = client.run({ agent: 'claude-code', sessionId: last.sessionId, prompt: 'continue' });
+
+// Branch a new session from an existing transcript
+const forked = client.run({ agent: 'claude-code', forkSessionId: last.sessionId, prompt: 'try a different approach' });
+```
+
+### Live cost meter with a hard budget
+
+```ts
+async function runWithBudget(agent: string, prompt: string, maxUsd: number) {
+  const handle = client.run({ agent, prompt });
+  let spent = 0;
+  for await (const ev of handle.events()) {
+    if (ev.type === 'cost') {
+      spent = ev.cost.totalUsd ?? spent;
+      if (spent > maxUsd) { await handle.stop('budget exceeded'); break; }
+    }
+  }
+  return spent;
+}
+```
+
+### CLI equivalents
+
+```bash
+# Realtime: filter cost events from JSON stream
+amux run --agent claude-code --prompt '...' --json | jq 'select(.type=="cost")'
+
+# Non-realtime: sum cost from a stored session
+amux sessions list --agent claude-code --json
+amux sessions read --agent claude-code --id <sid> --json \
+  | jq '[.events[]|select(.type=="cost")|.cost.totalUsd]|add'
+```
+
 ## Invocation modes
 
 A single `RunOptions.invocation` (or CLI `--mode`) picks where the harness runs:
