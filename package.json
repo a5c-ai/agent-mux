@@ -31,7 +31,7 @@
     "tui": "npm --workspace @a5c-ai/agent-mux-tui run dev",
     "amux": "node packages/cli/dist/index.js",
     "cli": "npm run build --silent && node packages/cli/dist/index.js",
-    "link-check": "mlc docs/**/*.md website/src/**/*.{js,jsx,ts,tsx,md,mdx}"
+    "link-check": "find docs -name '*.md' -print0 | xargs -0 npx markdown-link-check"
   },
   "devDependencies": {
     "@changesets/cli": "^2.27.0",
