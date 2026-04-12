@@ -6,7 +6,7 @@ services:
       dockerfile: docker/e2e/Dockerfile.mock
     environment:
       USE_MOCK_HARNESS: "true"
-    command: ["run", "claude", "--use-mock-harness", "--mock-scenario", "claude-basic", "--prompt", "hello"]
+    command: ["run", "claude", "--use-mock-harness", "--mock-scenario", "claude-basic", "hello"]
 
   mock-e2e-codex:
     build:
@@ -14,7 +14,7 @@ services:
       dockerfile: docker/e2e/Dockerfile.mock
     environment:
       USE_MOCK_HARNESS: "true"
-    command: ["run", "codex", "--use-mock-harness", "--mock-scenario", "codex-basic", "--prompt", "hello"]
+    command: ["run", "codex", "--use-mock-harness", "--mock-scenario", "codex-basic", "hello"]
 
   mock-e2e-cursor:
     build:
@@ -22,7 +22,7 @@ services:
       dockerfile: docker/e2e/Dockerfile.mock
     environment:
       USE_MOCK_HARNESS: "true"
-    command: ["run", "cursor", "--use-mock-harness", "--mock-scenario", "cursor-basic", "--prompt", "hello"]
+    command: ["run", "cursor", "--use-mock-harness", "--mock-scenario", "cursor-basic", "hello"]
 
   mock-e2e-gemini:
     build:
@@ -30,7 +30,7 @@ services:
       dockerfile: docker/e2e/Dockerfile.mock
     environment:
       USE_MOCK_HARNESS: "true"
-    command: ["run", "gemini", "--use-mock-harness", "--mock-scenario", "gemini-basic", "--prompt", "hello"]
+    command: ["run", "gemini", "--use-mock-harness", "--mock-scenario", "gemini-basic", "hello"]
 
   mock-e2e-opencode:
     build:
@@ -38,7 +38,7 @@ services:
       dockerfile: docker/e2e/Dockerfile.mock
     environment:
       USE_MOCK_HARNESS: "true"
-    command: ["run", "opencode", "--use-mock-harness", "--mock-scenario", "opencode-basic", "--prompt", "hello"]
+    command: ["run", "opencode", "--use-mock-harness", "--mock-scenario", "opencode-basic", "hello"]
 
   mock-e2e-openclaw:
     build:
@@ -46,7 +46,7 @@ services:
       dockerfile: docker/e2e/Dockerfile.mock
     environment:
       USE_MOCK_HARNESS: "true"
-    command: ["run", "openclaw", "--use-mock-harness", "--mock-scenario", "openclaw-basic", "--prompt", "hello"]
+    command: ["run", "openclaw", "--use-mock-harness", "--mock-scenario", "openclaw-basic", "hello"]
 
   mock-e2e-copilot:
     build:
@@ -54,7 +54,7 @@ services:
       dockerfile: docker/e2e/Dockerfile.mock
     environment:
       USE_MOCK_HARNESS: "true"
-    command: ["run", "copilot", "--use-mock-harness", "--mock-scenario", "copilot-basic", "--prompt", "hello"]
+    command: ["run", "copilot", "--use-mock-harness", "--mock-scenario", "copilot-basic", "hello"]
 
   mock-e2e-hermes:
     build:
@@ -62,7 +62,7 @@ services:
       dockerfile: docker/e2e/Dockerfile.mock
     environment:
       USE_MOCK_HARNESS: "true"
-    command: ["run", "hermes", "--use-mock-harness", "--mock-scenario", "hermes-basic", "--prompt", "hello"]
+    command: ["run", "hermes", "--use-mock-harness", "--mock-scenario", "hermes-basic", "hello"]
 
   mock-e2e-pi:
     build:
@@ -70,7 +70,7 @@ services:
       dockerfile: docker/e2e/Dockerfile.mock
     environment:
       USE_MOCK_HARNESS: "true"
-    command: ["run", "pi", "--use-mock-harness", "--mock-scenario", "pi-basic", "--prompt", "hello"]
+    command: ["run", "pi", "--use-mock-harness", "--mock-scenario", "pi-basic", "hello"]
 
   mock-e2e-omp:
     build:
@@ -78,7 +78,7 @@ services:
       dockerfile: docker/e2e/Dockerfile.mock
     environment:
       USE_MOCK_HARNESS: "true"
-    command: ["run", "omp", "--use-mock-harness", "--mock-scenario", "omp-basic", "--prompt", "hello"]
+    command: ["run", "omp", "--use-mock-harness", "--mock-scenario", "omp-basic", "hello"]
 
   mock-e2e-agent-mux-remote:
     build:
@@ -86,7 +86,7 @@ services:
       dockerfile: docker/e2e/Dockerfile.mock
     environment:
       USE_MOCK_HARNESS: "true"
-    command: ["run", "agent-mux-remote", "--use-mock-harness", "--mock-scenario", "agent-mux-remote-basic", "--prompt", "hello"]
+    command: ["run", "agent-mux-remote", "--use-mock-harness", "--mock-scenario", "agent-mux-remote-basic", "hello"]
 
   # ---------------- Real matrix (credentials required) ----------------
   real-e2e-claude:
