@@ -10,6 +10,9 @@ node_modules/
 **/dist/**
 **/node_modules/**
 .amux/*.tsbuildinfo
+*.tsbuildinfo
+**/.a5c/cache/**
+**/.a5c/runs/**
 website/.docusaurus/
 website/build/
 website/node_modules/
