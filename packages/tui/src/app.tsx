@@ -23,6 +23,9 @@ export function App({ client, plugins, defaultAgent = 'claude-code' }: AppProps)
   const [status, setStatus] = useState<string>('');
   const [activeId, setActiveId] = useState<string>('chat');
   const [promptMode, setPromptMode] = useState<boolean>(false);
+  const [pendingResume, setPendingResume] = useState<
+    { agent: string; sessionId: string } | null
+  >(null);
 
   const { registry, stream } = useMemo(() => {
     const r: Registry = createRegistry();
@@ -33,6 +36,10 @@ export function App({ client, plugins, defaultAgent = 'claude-code' }: AppProps)
       (ev) => {
         if (ev.type === 'status') setStatus(ev.message);
         if (ev.type === 'view:switch') setActiveId(ev.id);
+        if (ev.type === 'session:select') {
+          setPendingResume({ agent: ev.agent, sessionId: ev.sessionId });
+          setStatus(`Resuming ${ev.agent}/${ev.sessionId} — press p to send next message`);
+        }
       },
       s,
     );
@@ -74,6 +81,15 @@ export function App({ client, plugins, defaultAgent = 'claude-code' }: AppProps)
   const active = registry.views.find((v) => v.id === activeId) ?? registry.views[0];
   const ActiveView = active?.component;
 
+  const viewEmit = (ev: Parameters<TuiViewProps['emit']>[0]) => {
+    if (ev.type === 'status') setStatus(ev.message);
+    else if (ev.type === 'view:switch') setActiveId(ev.id);
+    else if (ev.type === 'session:select') {
+      setPendingResume({ agent: ev.agent, sessionId: ev.sessionId });
+      setStatus(`Resuming ${ev.agent}/${ev.sessionId} — press p to send next message`);
+    } else if (ev.type === 'event') stream.push(ev.event);
+  };
+
   // Inject renderers+stream into whichever view is active by using a thin wrapper.
   const ViewWithRenderers = ActiveView
     ? (props: TuiViewProps) => {
@@ -94,7 +110,13 @@ export function App({ client, plugins, defaultAgent = 'claude-code' }: AppProps)
     }
 
     try {
-      const handle = client.run({ agent: defaultAgent as never, prompt });
+      const runOpts: { agent: string; prompt: string; sessionId?: string } = {
+        agent: pendingResume?.agent ?? defaultAgent,
+        prompt,
+      };
+      if (pendingResume) runOpts.sessionId = pendingResume.sessionId;
+      setPendingResume(null);
+      const handle = client.run(runOpts as never);
       for await (const ev of handle) {
         stream.push(ev as AgentEvent);
       }
@@ -115,7 +137,7 @@ export function App({ client, plugins, defaultAgent = 'claude-code' }: AppProps)
       </Box>
       <Box borderStyle="single" flexDirection="column" paddingX={1}>
         {ViewWithRenderers ? (
-          <ViewWithRenderers client={client} active={true} eventStream={stream} />
+          <ViewWithRenderers client={client} active={true} eventStream={stream} emit={viewEmit} />
         ) : (
           <Text dimColor>No views registered.</Text>
         )}

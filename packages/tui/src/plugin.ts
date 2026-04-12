@@ -25,6 +25,7 @@ export interface TuiViewProps {
   client: AgentMuxClient;
   active: boolean;
   eventStream: EventStream;
+  emit: (event: TuiInternalEvent) => void;
 }
 
 export interface EventRenderer {
@@ -44,7 +45,8 @@ export type TuiInternalEvent =
   | { type: 'view:switch'; id: string }
   | { type: 'run:attach'; handle: RunHandle }
   | { type: 'status'; message: string }
-  | { type: 'event'; event: AgentEvent };
+  | { type: 'event'; event: AgentEvent }
+  | { type: 'session:select'; agent: string; sessionId: string };
 
 export interface TuiPlugin {
   name: string;
