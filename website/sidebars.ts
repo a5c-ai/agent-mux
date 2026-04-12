@@ -19,6 +19,8 @@ const sidebars: SidebarsConfig = {
         'tutorials/plugins',
         'tutorials/multi-agent',
         'tutorials/cost-tracking',
+        'tutorials/sessions',
+        'tutorials/remote-bootstrap',
       ],
     },
     {
