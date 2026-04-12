@@ -1,6 +1,6 @@
 # agent-mux
 
-`@a5c-ai/agent-mux` is a unified TypeScript SDK and CLI (`amux`) for driving heterogeneous coding-agent harnesses — Claude Code, Codex, Gemini, Copilot, Cursor, OpenCode, pi, omp, openclaw, hermes — through one contract.
+`@a5c-ai/agent-mux` is a unified TypeScript SDK and CLI (`amux`) for driving heterogeneous coding-agent harnesses — Claude Code, Codex, Gemini, Copilot, Cursor, OpenCode, pi, omp, openclaw, hermes, qwen — through one contract.
 
 It spawns real subprocesses, normalizes their streaming output into a shared `AgentEvent` stream, and exposes each harness's sessions, config, auth, and plugins through a single `AgentMuxClient` interface. Invocations can run locally, in Docker, over SSH, or in a Kubernetes pod with no code change.
 
@@ -54,12 +54,13 @@ await handle.done;
 | `codex` | `codex` | `~/.codex/sessions` |
 | `gemini` | `gemini` | `~/.gemini/sessions` |
 | `copilot` | `gh copilot` | `~/.config/github-copilot/sessions` |
-| `cursor` | `cursor` | `~/.cursor/sessions` |
+| `cursor` | `cursor-agent` | `~/.cursor/sessions` |
 | `opencode` | `opencode` | `~/.local/share/opencode` |
 | `pi` | `pi` | `~/.pi/agent/sessions` |
 | `omp` | `omp` | `~/.omp/agent/sessions` |
 | `openclaw` | `openclaw` | `~/.openclaw/sessions` |
 | `hermes` | `hermes` | `~/.hermes/sessions` |
+| `qwen` | `qwen` | `~/.qwen/sessions` |
 | `agent-mux-remote` | `amux` | (transport-delegated) |
 
 Install or update any of them through `amux`:

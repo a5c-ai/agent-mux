@@ -76,7 +76,7 @@ export class ClaudeAdapter extends BaseAgentAdapter {
       { type: 'api_key', name: 'API Key', description: 'ANTHROPIC_API_KEY environment variable' },
       { type: 'browser_login', name: 'Browser Login', description: 'Interactive browser-based login' },
     ],
-    authFiles: ['.claude/settings.json'],
+    authFiles: ['.claude.json', '.claude/settings.json'],
     installMethods: [
       { platform: 'all', type: 'npm', command: 'npm install -g @anthropic-ai/claude-code' },
     ],

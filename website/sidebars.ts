@@ -50,6 +50,7 @@ const sidebars: SidebarsConfig = {
         '02-agents/pi',
         '02-agents/omp',
         '02-agents/agent-mux-remote',
+        '02-agents/qwen',
       ],
     },
     {
