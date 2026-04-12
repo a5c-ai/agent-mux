@@ -1,0 +1,24 @@
+{
+  "id": "tutorials/plugins",
+  "title": "Plugins (MCP)",
+  "description": "agent-mux normalizes plugin management across adapters that support the Model Context Protocol. Under the hood it writes to each agent's MCP config file.",
+  "source": "@site/../docs/tutorials/plugins.md",
+  "sourceDirName": "tutorials",
+  "slug": "/tutorials/plugins",
+  "permalink": "/agent-mux/docs/tutorials/plugins",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/a5c-ai/agent-mux/edit/main/../docs/tutorials/plugins.md",
+  "tags": [],
+  "version": "current",
+  "frontMatter": {},
+  "sidebar": "docs",
+  "previous": {
+    "title": "Hooks",
+    "permalink": "/agent-mux/docs/tutorials/hooks"
+  },
+  "next": {
+    "title": "Multi-Agent Dispatch",
+    "permalink": "/agent-mux/docs/tutorials/multi-agent"
+  }
+}

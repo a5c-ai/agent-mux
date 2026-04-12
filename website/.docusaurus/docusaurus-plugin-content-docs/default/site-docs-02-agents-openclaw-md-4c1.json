@@ -1,0 +1,24 @@
+{
+  "id": "agents/openclaw",
+  "title": "OpenClaw",
+  "description": "Adapter for the OpenClaw CLI.",
+  "source": "@site/../docs/02-agents/openclaw.md",
+  "sourceDirName": "02-agents",
+  "slug": "/agents/openclaw",
+  "permalink": "/agent-mux/docs/agents/openclaw",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/a5c-ai/agent-mux/edit/main/../docs/02-agents/openclaw.md",
+  "tags": [],
+  "version": "current",
+  "frontMatter": {},
+  "sidebar": "docs",
+  "previous": {
+    "title": "OpenCode",
+    "permalink": "/agent-mux/docs/agents/opencode"
+  },
+  "next": {
+    "title": "GitHub Copilot",
+    "permalink": "/agent-mux/docs/agents/copilot"
+  }
+}

@@ -1,5 +1,9 @@
 import type { SidebarsConfig } from '@docusaurus/plugin-content-docs';
 
+// Note: Docusaurus defaults to numberPrefixParser=true, so files like
+// `01-core-types-and-client.md` are exposed as id `core-types-and-client`.
+// Directories are stripped the same way (`02-agents/` -> `agents/`).
+
 const sidebars: SidebarsConfig = {
   docs: [
     'README',
@@ -21,63 +25,63 @@ const sidebars: SidebarsConfig = {
       type: 'category',
       label: 'Core',
       items: [
-        '01-core-types-and-client',
-        '02-run-options-and-profiles',
-        '03-run-handle-and-interaction',
-        '04-agent-events',
+        'core-types-and-client',
+        'run-options-and-profiles',
+        'run-handle-and-interaction',
+        'agent-events',
       ],
     },
     {
       type: 'category',
       label: 'Adapters',
       items: [
-        '05-adapter-system',
-        '06-capabilities-and-models',
-        '12-built-in-adapters',
+        'adapter-system',
+        'capabilities-and-models',
+        'built-in-adapters',
       ],
     },
     {
       type: 'category',
       label: 'Agents',
       items: [
-        '02-agents/claude',
-        '02-agents/codex',
-        '02-agents/cursor',
-        '02-agents/gemini',
-        '02-agents/opencode',
-        '02-agents/openclaw',
-        '02-agents/copilot',
-        '02-agents/hermes',
-        '02-agents/pi',
-        '02-agents/omp',
-        '02-agents/agent-mux-remote',
-        '02-agents/qwen',
+        'agents/claude',
+        'agents/codex',
+        'agents/cursor',
+        'agents/gemini',
+        'agents/opencode',
+        'agents/openclaw',
+        'agents/copilot',
+        'agents/hermes',
+        'agents/pi',
+        'agents/omp',
+        'agents/agent-mux-remote',
+        'agents/qwen',
       ],
     },
     {
       type: 'category',
       label: 'Sessions & Config',
-      items: ['07-session-manager', '08-config-and-auth'],
+      items: ['session-manager', 'config-and-auth'],
     },
     {
       type: 'category',
       label: 'Runtime',
       items: [
-        '10-cli-reference',
-        '11-process-lifecycle-and-platform',
-        '13-invocation-modes',
-        '14-harness-mock',
+        'cli-reference',
+        'process-lifecycle-and-platform',
+        'invocation-modes',
+        'harness-mock',
       ],
     },
     {
       type: 'category',
       label: 'Extensibility',
-      items: ['09-plugin-manager', '15-hooks'],
+      items: ['plugin-manager', 'hooks'],
     },
     {
       type: 'category',
       label: 'Reference',
-      items: ['16-reference-comparison', '19-capabilities-matrix'],
+      items: ['reference-comparison', 'capabilities-matrix'],
     },
   ],
 };

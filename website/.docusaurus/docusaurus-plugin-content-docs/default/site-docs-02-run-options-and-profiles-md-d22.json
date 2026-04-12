@@ -1,0 +1,25 @@
+{
+  "id": "run-options-and-profiles",
+  "title": "RunOptions, Profiles, and Run Configuration",
+  "description": "Specification v1.0 | @a5c-ai/agent-mux",
+  "source": "@site/../docs/02-run-options-and-profiles.md",
+  "sourceDirName": ".",
+  "slug": "/run-options-and-profiles",
+  "permalink": "/agent-mux/docs/run-options-and-profiles",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/a5c-ai/agent-mux/edit/main/../docs/02-run-options-and-profiles.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 2,
+  "frontMatter": {},
+  "sidebar": "docs",
+  "previous": {
+    "title": "Core Types, Client, and Package Identity",
+    "permalink": "/agent-mux/docs/core-types-and-client"
+  },
+  "next": {
+    "title": "RunHandle, InteractionChannel, and Run Lifecycle",
+    "permalink": "/agent-mux/docs/run-handle-and-interaction"
+  }
+}

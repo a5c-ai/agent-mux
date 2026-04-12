@@ -1,0 +1,25 @@
+{
+  "id": "process-lifecycle-and-platform",
+  "title": "Process Lifecycle, Safety, and Cross-Platform Support",
+  "description": "Specification v1.0 | @a5c-ai/agent-mux",
+  "source": "@site/../docs/11-process-lifecycle-and-platform.md",
+  "sourceDirName": ".",
+  "slug": "/process-lifecycle-and-platform",
+  "permalink": "/agent-mux/docs/process-lifecycle-and-platform",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/a5c-ai/agent-mux/edit/main/../docs/11-process-lifecycle-and-platform.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 11,
+  "frontMatter": {},
+  "sidebar": "docs",
+  "previous": {
+    "title": "CLI Reference (amux)",
+    "permalink": "/agent-mux/docs/cli-reference"
+  },
+  "next": {
+    "title": "Invocation Modes",
+    "permalink": "/agent-mux/docs/invocation-modes"
+  }
+}

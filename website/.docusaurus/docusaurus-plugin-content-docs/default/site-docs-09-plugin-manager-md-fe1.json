@@ -1,0 +1,25 @@
+{
+  "id": "plugin-manager",
+  "title": "Plugin Manager and Plugin Ecosystem",
+  "description": "Specification v1.0 | @a5c-ai/agent-mux",
+  "source": "@site/../docs/09-plugin-manager.md",
+  "sourceDirName": ".",
+  "slug": "/plugin-manager",
+  "permalink": "/agent-mux/docs/plugin-manager",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/a5c-ai/agent-mux/edit/main/../docs/09-plugin-manager.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 9,
+  "frontMatter": {},
+  "sidebar": "docs",
+  "previous": {
+    "title": "Harness Mock",
+    "permalink": "/agent-mux/docs/harness-mock"
+  },
+  "next": {
+    "title": "15 — Unified Hooks System",
+    "permalink": "/agent-mux/docs/hooks"
+  }
+}

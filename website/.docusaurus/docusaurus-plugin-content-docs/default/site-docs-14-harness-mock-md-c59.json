@@ -1,0 +1,25 @@
+{
+  "id": "harness-mock",
+  "title": "Harness Mock",
+  "description": "Specification v1.0 | @a5c-ai/agent-mux-harness-mock",
+  "source": "@site/../docs/14-harness-mock.md",
+  "sourceDirName": ".",
+  "slug": "/harness-mock",
+  "permalink": "/agent-mux/docs/harness-mock",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/a5c-ai/agent-mux/edit/main/../docs/14-harness-mock.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 14,
+  "frontMatter": {},
+  "sidebar": "docs",
+  "previous": {
+    "title": "Invocation Modes",
+    "permalink": "/agent-mux/docs/invocation-modes"
+  },
+  "next": {
+    "title": "Plugin Manager and Plugin Ecosystem",
+    "permalink": "/agent-mux/docs/plugin-manager"
+  }
+}

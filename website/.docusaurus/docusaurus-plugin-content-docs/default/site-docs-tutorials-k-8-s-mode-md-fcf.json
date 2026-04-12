@@ -1,0 +1,24 @@
+{
+  "id": "tutorials/k8s-mode",
+  "title": "Kubernetes Invocation Mode",
+  "description": "RunOptions.invocationMode = { kind: 'k8s', ... } runs the agent inside a Kubernetes pod, exec'ing into a container you control.",
+  "source": "@site/../docs/tutorials/k8s-mode.md",
+  "sourceDirName": "tutorials",
+  "slug": "/tutorials/k8s-mode",
+  "permalink": "/agent-mux/docs/tutorials/k8s-mode",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/a5c-ai/agent-mux/edit/main/../docs/tutorials/k8s-mode.md",
+  "tags": [],
+  "version": "current",
+  "frontMatter": {},
+  "sidebar": "docs",
+  "previous": {
+    "title": "Docker Invocation Mode",
+    "permalink": "/agent-mux/docs/tutorials/docker-mode"
+  },
+  "next": {
+    "title": "Hooks",
+    "permalink": "/agent-mux/docs/tutorials/hooks"
+  }
+}

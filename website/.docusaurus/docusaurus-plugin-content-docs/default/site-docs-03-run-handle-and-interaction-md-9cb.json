@@ -1,0 +1,25 @@
+{
+  "id": "run-handle-and-interaction",
+  "title": "RunHandle, InteractionChannel, and Run Lifecycle",
+  "description": "Specification v1.0 | @a5c-ai/agent-mux",
+  "source": "@site/../docs/03-run-handle-and-interaction.md",
+  "sourceDirName": ".",
+  "slug": "/run-handle-and-interaction",
+  "permalink": "/agent-mux/docs/run-handle-and-interaction",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/a5c-ai/agent-mux/edit/main/../docs/03-run-handle-and-interaction.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 3,
+  "frontMatter": {},
+  "sidebar": "docs",
+  "previous": {
+    "title": "RunOptions, Profiles, and Run Configuration",
+    "permalink": "/agent-mux/docs/run-options-and-profiles"
+  },
+  "next": {
+    "title": "AgentEvent Union Type and Event Streaming",
+    "permalink": "/agent-mux/docs/agent-events"
+  }
+}

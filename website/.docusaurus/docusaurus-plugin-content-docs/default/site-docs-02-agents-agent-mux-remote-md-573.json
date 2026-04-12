@@ -1,0 +1,24 @@
+{
+  "id": "agents/agent-mux-remote",
+  "title": "agent-mux-remote",
+  "description": "Meta-adapter that invokes amux on a remote target (SSH host, Docker container, or Kubernetes pod) and bridges its event stream back to the local client. Useful for running any supported agent in an isolated or remote environment.",
+  "source": "@site/../docs/02-agents/agent-mux-remote.md",
+  "sourceDirName": "02-agents",
+  "slug": "/agents/agent-mux-remote",
+  "permalink": "/agent-mux/docs/agents/agent-mux-remote",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/a5c-ai/agent-mux/edit/main/../docs/02-agents/agent-mux-remote.md",
+  "tags": [],
+  "version": "current",
+  "frontMatter": {},
+  "sidebar": "docs",
+  "previous": {
+    "title": "OMP",
+    "permalink": "/agent-mux/docs/agents/omp"
+  },
+  "next": {
+    "title": "Qwen Code",
+    "permalink": "/agent-mux/docs/agents/qwen"
+  }
+}

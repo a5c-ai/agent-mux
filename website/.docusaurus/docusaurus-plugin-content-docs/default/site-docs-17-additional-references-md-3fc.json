@@ -1,0 +1,23 @@
+{
+  "id": "additional-references",
+  "title": "Additional Reference Projects",
+  "description": "Extension of 16-reference-comparison.md. Candidates surfaced via WebSearch on 2026-04-12 across four categories:",
+  "source": "@site/../docs/17-additional-references.md",
+  "sourceDirName": ".",
+  "slug": "/additional-references",
+  "permalink": "/agent-mux/docs/additional-references",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/a5c-ai/agent-mux/edit/main/../docs/17-additional-references.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 17,
+  "frontMatter": {
+    "title": "Additional Reference Projects",
+    "process": "find-more-references",
+    "date": "2026-04-12T00:00:00.000Z",
+    "target": "a5c-ai/agent-mux",
+    "filter": ">100 stars OR commits in last 6 months",
+    "count": 17
+  }
+}

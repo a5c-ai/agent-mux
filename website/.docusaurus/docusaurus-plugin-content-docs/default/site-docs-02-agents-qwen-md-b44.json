@@ -1,0 +1,24 @@
+{
+  "id": "agents/qwen",
+  "title": "Qwen Code",
+  "description": "@qwen-code/qwen-code is Alibaba's",
+  "source": "@site/../docs/02-agents/qwen.md",
+  "sourceDirName": "02-agents",
+  "slug": "/agents/qwen",
+  "permalink": "/agent-mux/docs/agents/qwen",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/a5c-ai/agent-mux/edit/main/../docs/02-agents/qwen.md",
+  "tags": [],
+  "version": "current",
+  "frontMatter": {},
+  "sidebar": "docs",
+  "previous": {
+    "title": "agent-mux-remote",
+    "permalink": "/agent-mux/docs/agents/agent-mux-remote"
+  },
+  "next": {
+    "title": "Session Manager and Session Data Access",
+    "permalink": "/agent-mux/docs/session-manager"
+  }
+}

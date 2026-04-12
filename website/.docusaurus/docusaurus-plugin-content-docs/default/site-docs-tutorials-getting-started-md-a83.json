@@ -1,0 +1,24 @@
+{
+  "id": "tutorials/getting-started",
+  "title": "Getting Started",
+  "description": "This walkthrough installs @a5c-ai/agent-mux, verifies your environment, and runs your first agent.",
+  "source": "@site/../docs/tutorials/getting-started.md",
+  "sourceDirName": "tutorials",
+  "slug": "/tutorials/getting-started",
+  "permalink": "/agent-mux/docs/tutorials/getting-started",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/a5c-ai/agent-mux/edit/main/../docs/tutorials/getting-started.md",
+  "tags": [],
+  "version": "current",
+  "frontMatter": {},
+  "sidebar": "docs",
+  "previous": {
+    "title": "agent-mux docs",
+    "permalink": "/agent-mux/docs/"
+  },
+  "next": {
+    "title": "Mock Harness",
+    "permalink": "/agent-mux/docs/tutorials/mock-harness"
+  }
+}

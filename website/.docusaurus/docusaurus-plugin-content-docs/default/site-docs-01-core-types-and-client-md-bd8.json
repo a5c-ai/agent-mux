@@ -1,0 +1,25 @@
+{
+  "id": "core-types-and-client",
+  "title": "Core Types, Client, and Package Identity",
+  "description": "Specification v1.0 | @a5c-ai/agent-mux",
+  "source": "@site/../docs/01-core-types-and-client.md",
+  "sourceDirName": ".",
+  "slug": "/core-types-and-client",
+  "permalink": "/agent-mux/docs/core-types-and-client",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/a5c-ai/agent-mux/edit/main/../docs/01-core-types-and-client.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 1,
+  "frontMatter": {},
+  "sidebar": "docs",
+  "previous": {
+    "title": "Cost tracking",
+    "permalink": "/agent-mux/docs/tutorials/cost-tracking"
+  },
+  "next": {
+    "title": "RunOptions, Profiles, and Run Configuration",
+    "permalink": "/agent-mux/docs/run-options-and-profiles"
+  }
+}

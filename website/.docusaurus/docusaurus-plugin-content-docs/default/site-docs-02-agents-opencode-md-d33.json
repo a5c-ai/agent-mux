@@ -1,0 +1,24 @@
+{
+  "id": "agents/opencode",
+  "title": "OpenCode",
+  "description": "Adapter for the OpenCode multi-provider agent CLI.",
+  "source": "@site/../docs/02-agents/opencode.md",
+  "sourceDirName": "02-agents",
+  "slug": "/agents/opencode",
+  "permalink": "/agent-mux/docs/agents/opencode",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/a5c-ai/agent-mux/edit/main/../docs/02-agents/opencode.md",
+  "tags": [],
+  "version": "current",
+  "frontMatter": {},
+  "sidebar": "docs",
+  "previous": {
+    "title": "Gemini CLI",
+    "permalink": "/agent-mux/docs/agents/gemini"
+  },
+  "next": {
+    "title": "OpenClaw",
+    "permalink": "/agent-mux/docs/agents/openclaw"
+  }
+}

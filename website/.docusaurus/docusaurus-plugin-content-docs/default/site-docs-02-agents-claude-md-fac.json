@@ -1,0 +1,24 @@
+{
+  "id": "agents/claude",
+  "title": "Claude Code",
+  "description": "Adapter for Anthropic's Claude Code CLI.",
+  "source": "@site/../docs/02-agents/claude.md",
+  "sourceDirName": "02-agents",
+  "slug": "/agents/claude",
+  "permalink": "/agent-mux/docs/agents/claude",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/a5c-ai/agent-mux/edit/main/../docs/02-agents/claude.md",
+  "tags": [],
+  "version": "current",
+  "frontMatter": {},
+  "sidebar": "docs",
+  "previous": {
+    "title": "Built-in Adapter Implementations",
+    "permalink": "/agent-mux/docs/built-in-adapters"
+  },
+  "next": {
+    "title": "OpenAI Codex",
+    "permalink": "/agent-mux/docs/agents/codex"
+  }
+}

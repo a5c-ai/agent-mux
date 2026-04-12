@@ -1,0 +1,24 @@
+{
+  "id": "agents/cursor",
+  "title": "Cursor",
+  "description": "Adapter for the Cursor editor's agent CLI.",
+  "source": "@site/../docs/02-agents/cursor.md",
+  "sourceDirName": "02-agents",
+  "slug": "/agents/cursor",
+  "permalink": "/agent-mux/docs/agents/cursor",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/a5c-ai/agent-mux/edit/main/../docs/02-agents/cursor.md",
+  "tags": [],
+  "version": "current",
+  "frontMatter": {},
+  "sidebar": "docs",
+  "previous": {
+    "title": "OpenAI Codex",
+    "permalink": "/agent-mux/docs/agents/codex"
+  },
+  "next": {
+    "title": "Gemini CLI",
+    "permalink": "/agent-mux/docs/agents/gemini"
+  }
+}

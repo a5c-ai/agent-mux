@@ -1,0 +1,25 @@
+{
+  "id": "capabilities-and-models",
+  "title": "Agent Capabilities, Model Registry, and Thinking Normalization",
+  "description": "Specification v1.0 | @a5c-ai/agent-mux",
+  "source": "@site/../docs/06-capabilities-and-models.md",
+  "sourceDirName": ".",
+  "slug": "/capabilities-and-models",
+  "permalink": "/agent-mux/docs/capabilities-and-models",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/a5c-ai/agent-mux/edit/main/../docs/06-capabilities-and-models.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 6,
+  "frontMatter": {},
+  "sidebar": "docs",
+  "previous": {
+    "title": "Adapter Contract, BaseAgentAdapter, and AdapterRegistry",
+    "permalink": "/agent-mux/docs/adapter-system"
+  },
+  "next": {
+    "title": "Built-in Adapter Implementations",
+    "permalink": "/agent-mux/docs/built-in-adapters"
+  }
+}

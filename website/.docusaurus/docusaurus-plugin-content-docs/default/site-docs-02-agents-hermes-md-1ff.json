@@ -1,0 +1,24 @@
+{
+  "id": "agents/hermes",
+  "title": "Hermes",
+  "description": "Adapter for Nous Research's Hermes agent CLI.",
+  "source": "@site/../docs/02-agents/hermes.md",
+  "sourceDirName": "02-agents",
+  "slug": "/agents/hermes",
+  "permalink": "/agent-mux/docs/agents/hermes",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/a5c-ai/agent-mux/edit/main/../docs/02-agents/hermes.md",
+  "tags": [],
+  "version": "current",
+  "frontMatter": {},
+  "sidebar": "docs",
+  "previous": {
+    "title": "GitHub Copilot",
+    "permalink": "/agent-mux/docs/agents/copilot"
+  },
+  "next": {
+    "title": "Pi",
+    "permalink": "/agent-mux/docs/agents/pi"
+  }
+}

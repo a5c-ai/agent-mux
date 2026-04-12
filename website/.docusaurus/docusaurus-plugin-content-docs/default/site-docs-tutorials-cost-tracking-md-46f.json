@@ -1,0 +1,24 @@
+{
+  "id": "tutorials/cost-tracking",
+  "title": "Cost tracking",
+  "description": "agent-mux emits a cost event whenever an adapter reports usage. You can",
+  "source": "@site/../docs/tutorials/cost-tracking.md",
+  "sourceDirName": "tutorials",
+  "slug": "/tutorials/cost-tracking",
+  "permalink": "/agent-mux/docs/tutorials/cost-tracking",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/a5c-ai/agent-mux/edit/main/../docs/tutorials/cost-tracking.md",
+  "tags": [],
+  "version": "current",
+  "frontMatter": {},
+  "sidebar": "docs",
+  "previous": {
+    "title": "Multi-Agent Dispatch",
+    "permalink": "/agent-mux/docs/tutorials/multi-agent"
+  },
+  "next": {
+    "title": "Core Types, Client, and Package Identity",
+    "permalink": "/agent-mux/docs/core-types-and-client"
+  }
+}

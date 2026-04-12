@@ -9,4 +9,4 @@ dist/
 node_modules/
 **/dist/**
 **/node_modules/**
-.amux/
+.amux/*.tsbuildinfo

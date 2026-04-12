@@ -1,0 +1,25 @@
+{
+  "id": "agent-events",
+  "title": "AgentEvent Union Type and Event Streaming",
+  "description": "Specification v1.0 | @a5c-ai/agent-mux",
+  "source": "@site/../docs/04-agent-events.md",
+  "sourceDirName": ".",
+  "slug": "/agent-events",
+  "permalink": "/agent-mux/docs/agent-events",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/a5c-ai/agent-mux/edit/main/../docs/04-agent-events.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 4,
+  "frontMatter": {},
+  "sidebar": "docs",
+  "previous": {
+    "title": "RunHandle, InteractionChannel, and Run Lifecycle",
+    "permalink": "/agent-mux/docs/run-handle-and-interaction"
+  },
+  "next": {
+    "title": "Adapter Contract, BaseAgentAdapter, and AdapterRegistry",
+    "permalink": "/agent-mux/docs/adapter-system"
+  }
+}

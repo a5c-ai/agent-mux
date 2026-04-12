@@ -1,0 +1,24 @@
+{
+  "id": "tutorials/mock-harness",
+  "title": "Mock Harness",
+  "description": "The mock harness replaces the real CLI spawn with a scripted event stream. Use it for tests, CI, and demos where real credentials or network access are undesirable.",
+  "source": "@site/../docs/tutorials/mock-harness.md",
+  "sourceDirName": "tutorials",
+  "slug": "/tutorials/mock-harness",
+  "permalink": "/agent-mux/docs/tutorials/mock-harness",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/a5c-ai/agent-mux/edit/main/../docs/tutorials/mock-harness.md",
+  "tags": [],
+  "version": "current",
+  "frontMatter": {},
+  "sidebar": "docs",
+  "previous": {
+    "title": "Getting Started",
+    "permalink": "/agent-mux/docs/tutorials/getting-started"
+  },
+  "next": {
+    "title": "Docker Invocation Mode",
+    "permalink": "/agent-mux/docs/tutorials/docker-mode"
+  }
+}

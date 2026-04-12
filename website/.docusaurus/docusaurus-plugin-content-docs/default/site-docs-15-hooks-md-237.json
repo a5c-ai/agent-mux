@@ -1,0 +1,25 @@
+{
+  "id": "hooks",
+  "title": "15 — Unified Hooks System",
+  "description": "agent-mux provides a harness-agnostic hook system that lets one",
+  "source": "@site/../docs/15-hooks.md",
+  "sourceDirName": ".",
+  "slug": "/hooks",
+  "permalink": "/agent-mux/docs/hooks",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/a5c-ai/agent-mux/edit/main/../docs/15-hooks.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 15,
+  "frontMatter": {},
+  "sidebar": "docs",
+  "previous": {
+    "title": "Plugin Manager and Plugin Ecosystem",
+    "permalink": "/agent-mux/docs/plugin-manager"
+  },
+  "next": {
+    "title": "Reference Comparison",
+    "permalink": "/agent-mux/docs/reference-comparison"
+  }
+}
