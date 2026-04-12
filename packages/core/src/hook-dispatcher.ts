@@ -117,6 +117,7 @@ function runExternal(
       if (t) clearTimeout(t);
       resolve({ decision: 'deny', message: err.message, exitCode: 1 });
     });
+    child.stdin.on('error', () => {});
     child.stdin.end(JSON.stringify(payload));
   });
 }

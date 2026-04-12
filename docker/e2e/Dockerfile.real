@@ -16,4 +16,4 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl git ca-cer
 RUN npm install -g @anthropic-ai/claude-code @openai/codex
 WORKDIR /app
 COPY --from=build /app /app
-ENTRYPOINT ["node", "/app/packages/cli/dist/bin/amux.js"]
+ENTRYPOINT ["node", "/app/packages/cli/dist/index.js"]

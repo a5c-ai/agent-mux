@@ -26,14 +26,7 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci --include=dev --workspaces --include-workspace-root
-
-      - name: Debug workspace symlinks
-        run: |
-          ls -la node_modules/@a5c-ai/ || echo "no @a5c-ai folder"
-          ls -la packages/core/src/index.ts
-          echo "--- npm ls workspaces ---"
-          npm ls --workspaces --depth=0 || true
+        run: npm ci
 
       - name: Typecheck
         run: npm run typecheck
