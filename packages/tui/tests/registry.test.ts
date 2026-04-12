@@ -1,12 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import { createRegistry, createContext, loadPlugins } from '../src/registry.js';
+import { EventStream } from '../src/event-stream.js';
 import type { TuiPlugin } from '../src/plugin.js';
 
 describe('tui registry', () => {
   it('collects views, renderers, and commands from plugins', async () => {
     const reg = createRegistry();
     const emitted: unknown[] = [];
-    const ctx = createContext({} as never, reg, (e) => emitted.push(e));
+    const stream = new EventStream();
+    const ctx = createContext({} as never, reg, (e) => emitted.push(e), stream);
 
     const plugin: TuiPlugin = {
       name: 'test',
@@ -32,7 +34,8 @@ describe('tui registry', () => {
   it('emit() forwards status events to the host', () => {
     const reg = createRegistry();
     const emitted: unknown[] = [];
-    const ctx = createContext({} as never, reg, (e) => emitted.push(e));
+    const stream = new EventStream();
+    const ctx = createContext({} as never, reg, (e) => emitted.push(e), stream);
     ctx.emit({ type: 'status', message: 'hi' });
     expect(emitted).toEqual([{ type: 'status', message: 'hi' }]);
   });

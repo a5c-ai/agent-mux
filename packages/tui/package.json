@@ -54,6 +54,8 @@
   },
   "scripts": {
     "build": "tsc --build",
+    "start": "node ./dist/bin/amux-tui.js",
+    "dev": "npm run build && npm start",
     "prepublishOnly": "npm run build",
     "test": "vitest run --config ../../vitest.config.ts"
   },
@@ -63,6 +65,7 @@
     "react": "^18.3.1"
   },
   "devDependencies": {
-    "@types/react": "^18.3.3"
+    "@types/react": "^18.3.3",
+    "ink-testing-library": "^4.0.0"
   }
 }

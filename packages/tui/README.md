@@ -45,9 +45,27 @@ render(<App client={client} plugins={[...builtinPlugins, myPlugin]} />);
 ## Extension points
 
 - `registerView` — top-level tab in the TUI (chat, sessions, config, …)
-- `registerEventRenderer` — per-`AgentEvent` display component
+- `registerEventRenderer` — per-`AgentEvent` display component. The renderer
+  with `id: 'fallback'` is reserved for the built-in dim one-liner that
+  handles any unrecognized event type; other renderers take priority.
 - `registerCommand` — global hotkey command
+- `registerPromptHandler` — overrides the default `p` prompt dispatch. If any
+  plugin registers a prompt handler, it receives the prompt instead of
+  `client.run({ agent: defaultAgent, prompt })`.
 
-The built-in plugins (`text-delta`, `tool-call`, `cost`, `chat-view`,
-`sessions-view`) are all implemented through these same extension points — use
-them as references.
+All extension points get an injected `TuiContext` with:
+- `client: AgentMuxClient` — the SDK client instance
+- `eventStream: EventStream` — shared pub/sub of `AgentEvent`s. Views
+  subscribe to render streaming output; commands can push synthetic events
+  via `ctx.emit({ type: 'event', event })`.
+
+## Running a prompt
+
+Press `p` to open the prompt input, type your message, and press Enter.
+Events from the resulting `client.run()` are pushed into the shared
+`EventStream` and rendered by `chat-view` in registration-priority order
+(specific renderers before the fallback).
+
+The built-in plugins (`text-delta`, `thinking-delta`, `tool-call`,
+`tool-error`, `cost`, `chat-view`, `sessions-view`, `fallback`) are all
+implemented through these same extension points — use them as references.

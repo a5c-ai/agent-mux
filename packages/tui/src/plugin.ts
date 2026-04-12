@@ -1,11 +1,16 @@
 import type { ComponentType } from 'react';
 import type { AgentMuxClient, AgentEvent, RunHandle } from '@a5c-ai/agent-mux';
+import type { EventStream } from './event-stream.js';
+
+export type PromptHandler = (prompt: string) => void | Promise<void>;
 
 export interface TuiContext {
   client: AgentMuxClient;
+  eventStream: EventStream;
   registerView(view: TuiView): void;
   registerEventRenderer(renderer: EventRenderer): void;
   registerCommand(cmd: TuiCommand): void;
+  registerPromptHandler(handler: PromptHandler): void;
   emit(event: TuiInternalEvent): void;
 }
 
@@ -19,6 +24,7 @@ export interface TuiView {
 export interface TuiViewProps {
   client: AgentMuxClient;
   active: boolean;
+  eventStream: EventStream;
 }
 
 export interface EventRenderer {
@@ -37,7 +43,8 @@ export interface TuiCommand {
 export type TuiInternalEvent =
   | { type: 'view:switch'; id: string }
   | { type: 'run:attach'; handle: RunHandle }
-  | { type: 'status'; message: string };
+  | { type: 'status'; message: string }
+  | { type: 'event'; event: AgentEvent };
 
 export interface TuiPlugin {
   name: string;

@@ -1,6 +1,8 @@
 import type { AgentMuxClient } from '@a5c-ai/agent-mux';
+import type { EventStream } from './event-stream.js';
 import type {
   EventRenderer,
+  PromptHandler,
   TuiCommand,
   TuiContext,
   TuiInternalEvent,
@@ -12,23 +14,33 @@ export interface Registry {
   views: TuiView[];
   renderers: EventRenderer[];
   commands: TuiCommand[];
+  promptHandlers: PromptHandler[];
 }
 
 export function createRegistry(): Registry {
-  return { views: [], renderers: [], commands: [] };
+  return { views: [], renderers: [], commands: [], promptHandlers: [] };
 }
 
 export function createContext(
   client: AgentMuxClient,
   registry: Registry,
   emit: (e: TuiInternalEvent) => void,
+  eventStream: EventStream,
 ): TuiContext {
   return {
     client,
+    eventStream,
     registerView: (v) => registry.views.push(v),
     registerEventRenderer: (r) => registry.renderers.push(r),
     registerCommand: (c) => registry.commands.push(c),
-    emit,
+    registerPromptHandler: (h) => registry.promptHandlers.push(h),
+    emit: (e) => {
+      if (e.type === 'event') {
+        eventStream.push(e.event);
+        return;
+      }
+      emit(e);
+    },
   };
 }
 

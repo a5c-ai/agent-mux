@@ -1,33 +1,53 @@
 import React, { useMemo, useState } from 'react';
 import { Box, Text, useInput, useApp } from 'ink';
-import type { AgentMuxClient } from '@a5c-ai/agent-mux';
-import { createRegistry, createContext, loadPlugins } from './registry.js';
-import type { TuiPlugin } from './plugin.js';
+import type { AgentMuxClient, AgentEvent } from '@a5c-ai/agent-mux';
+import { createRegistry, createContext, loadPlugins, type Registry } from './registry.js';
+import type { TuiPlugin, TuiViewProps, EventRenderer } from './plugin.js';
+import { EventStream } from './event-stream.js';
+import { PromptInput } from './prompt-input.js';
 
 export interface AppProps {
   client: AgentMuxClient;
   plugins: TuiPlugin[];
+  defaultAgent?: string;
 }
 
-export function App({ client, plugins }: AppProps) {
+function pickRenderers(renderers: EventRenderer[], ev: AgentEvent): EventRenderer | undefined {
+  const specific = renderers.find((r) => r.id !== 'fallback' && r.match(ev));
+  if (specific) return specific;
+  return renderers.find((r) => r.id === 'fallback');
+}
+
+export function App({ client, plugins, defaultAgent = 'claude-code' }: AppProps) {
   const { exit } = useApp();
   const [status, setStatus] = useState<string>('');
   const [activeId, setActiveId] = useState<string>('chat');
+  const [promptMode, setPromptMode] = useState<boolean>(false);
 
-  const registry = useMemo(() => {
-    const r = createRegistry();
-    const ctx = createContext(client, r, (ev) => {
-      if (ev.type === 'status') setStatus(ev.message);
-      if (ev.type === 'view:switch') setActiveId(ev.id);
-    });
-    // synchronous-only plugin registration for the scaffold
+  const { registry, stream } = useMemo(() => {
+    const r: Registry = createRegistry();
+    const s = new EventStream();
+    const ctx = createContext(
+      client,
+      r,
+      (ev) => {
+        if (ev.type === 'status') setStatus(ev.message);
+        if (ev.type === 'view:switch') setActiveId(ev.id);
+      },
+      s,
+    );
     void loadPlugins(plugins, ctx);
-    return r;
+    return { registry: r, stream: s };
   }, [client, plugins]);
 
   useInput((input, key) => {
+    if (promptMode) return; // PromptInput owns keys while open
     if (input === 'q' || (key.ctrl && input === 'c')) {
       exit();
+      return;
+    }
+    if (input === 'p') {
+      setPromptMode(true);
       return;
     }
     for (const v of registry.views) {
@@ -37,11 +57,14 @@ export function App({ client, plugins }: AppProps) {
       if (input === c.hotkey) {
         void c.run({
           client,
+          eventStream: stream,
           registerView: () => {},
           registerEventRenderer: () => {},
           registerCommand: () => {},
+          registerPromptHandler: () => {},
           emit: (e) => {
             if (e.type === 'status') setStatus(e.message);
+            if (e.type === 'event') stream.push(e.event);
           },
         });
       }
@@ -50,6 +73,36 @@ export function App({ client, plugins }: AppProps) {
 
   const active = registry.views.find((v) => v.id === activeId) ?? registry.views[0];
   const ActiveView = active?.component;
+
+  // Inject renderers+stream into whichever view is active by using a thin wrapper.
+  const ViewWithRenderers = ActiveView
+    ? (props: TuiViewProps) => {
+        const Wrapped = ActiveView as React.ComponentType<TuiViewProps & { renderers: EventRenderer[] }>;
+        return <Wrapped {...props} renderers={registry.renderers} />;
+      }
+    : undefined;
+
+  async function handlePromptSubmit(prompt: string) {
+    setPromptMode(false);
+    if (!prompt.trim()) return;
+    setStatus(`Dispatching to ${defaultAgent}…`);
+
+    // If a plugin registered a prompt handler, it wins.
+    if (registry.promptHandlers.length > 0) {
+      for (const h of registry.promptHandlers) await h(prompt);
+      return;
+    }
+
+    try {
+      const handle = client.run({ agent: defaultAgent as never, prompt });
+      for await (const ev of handle) {
+        stream.push(ev as AgentEvent);
+      }
+      setStatus('Run complete.');
+    } catch (e) {
+      setStatus(`Error: ${(e as Error).message}`);
+    }
+  }
 
   return (
     <Box flexDirection="column">
@@ -61,11 +114,22 @@ export function App({ client, plugins }: AppProps) {
         ))}
       </Box>
       <Box borderStyle="single" flexDirection="column" paddingX={1}>
-        {ActiveView ? <ActiveView client={client} active={true} /> : <Text dimColor>No views registered.</Text>}
+        {ViewWithRenderers ? (
+          <ViewWithRenderers client={client} active={true} eventStream={stream} />
+        ) : (
+          <Text dimColor>No views registered.</Text>
+        )}
       </Box>
-      <Box>
-        <Text dimColor>{status || 'q: quit'}</Text>
-      </Box>
+      {promptMode ? (
+        <PromptInput
+          onSubmit={handlePromptSubmit}
+          onCancel={() => setPromptMode(false)}
+        />
+      ) : (
+        <Box>
+          <Text dimColor>{status || 'p: prompt · q: quit'}</Text>
+        </Box>
+      )}
     </Box>
   );
 }
