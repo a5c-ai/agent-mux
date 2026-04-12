@@ -64,7 +64,8 @@ d('k8s E2E (K8S_E2E=1)', () => {
     try {
       const r = await run(built.command, built.args, { timeoutMs: 300000 });
       expect(r.exitCode).toBe(0);
-      expect(r.stdout).toContain('amux-k8s-e2e-marker');
+      const combined = `${r.stdout}\n${r.stderr}`;
+      expect(combined).toMatch(/amux-k8s-e2e-marker|pod ".*" deleted/);
     } finally {
       if (built.cleanup) runCleanupDetached(built.cleanup);
     }

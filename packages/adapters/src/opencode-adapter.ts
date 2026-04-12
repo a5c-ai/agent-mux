@@ -23,6 +23,7 @@ import type {
 
 import { BaseAgentAdapter } from './base-adapter.js';
 import { mcpListPlugins, mcpInstallPlugin, mcpUninstallPlugin } from './mcp-plugins.js';
+import { readAuthConfigIdentity } from './auth-config.js';
 import {
   listJsonlFiles,
   parseJsonlSessionFile,
@@ -196,6 +197,15 @@ export class OpenCodeAdapter extends BaseAgentAdapter {
         method: 'api_key',
         identity: `openai:...${process.env['OPENAI_API_KEY']!.slice(-4)}`,
       };
+    }
+    const home = os.homedir();
+    const found = await readAuthConfigIdentity([
+      path.join(home, '.config', 'opencode', 'auth.json'),
+      path.join(home, '.opencode', 'auth.json'),
+      path.join(home, '.opencode', 'credentials.json'),
+    ]);
+    if (found) {
+      return { status: 'authenticated', method: 'config_file', identity: found.identity };
     }
     return { status: 'unauthenticated' };
   }

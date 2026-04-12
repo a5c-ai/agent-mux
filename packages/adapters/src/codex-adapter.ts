@@ -26,6 +26,7 @@ import {
   readJsonFile,
   writeJsonFileAtomic,
 } from './session-fs.js';
+import { readAuthConfigIdentity } from './auth-config.js';
 
 export class CodexAdapter extends BaseAgentAdapter {
   readonly agent = 'codex' as const;
@@ -223,6 +224,14 @@ export class CodexAdapter extends BaseAgentAdapter {
         method: 'api_key',
         identity: `sk-...${apiKey.slice(-4)}`,
       };
+    }
+    const codexHome = process.env['CODEX_HOME'] ?? path.join(os.homedir(), '.codex');
+    const found = await readAuthConfigIdentity([
+      path.join(codexHome, 'auth.json'),
+      path.join(codexHome, 'credentials.json'),
+    ]);
+    if (found) {
+      return { status: 'authenticated', method: 'config_file', identity: found.identity };
     }
     return { status: 'unauthenticated' };
   }

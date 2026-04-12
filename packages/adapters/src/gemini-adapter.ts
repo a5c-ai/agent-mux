@@ -23,6 +23,7 @@ import type {
 
 import { BaseAgentAdapter } from './base-adapter.js';
 import { mcpListPlugins, mcpInstallPlugin, mcpUninstallPlugin } from './mcp-plugins.js';
+import { readAuthConfigIdentity } from './auth-config.js';
 import {
   listJsonlFiles,
   parseJsonlSessionFile,
@@ -242,6 +243,15 @@ export class GeminiAdapter extends BaseAgentAdapter {
         method: 'api_key',
         identity: `...${geminiKey.slice(-4)}`,
       };
+    }
+    const home = os.homedir();
+    const found = await readAuthConfigIdentity([
+      path.join(home, '.gemini', 'credentials.json'),
+      path.join(home, '.gemini', 'auth.json'),
+      path.join(home, '.config', 'gemini', 'credentials.json'),
+    ]);
+    if (found) {
+      return { status: 'authenticated', method: 'config_file', identity: found.identity };
     }
     return { status: 'unauthenticated' };
   }

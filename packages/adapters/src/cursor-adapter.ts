@@ -23,6 +23,7 @@ import type {
 
 import { BaseAgentAdapter } from './base-adapter.js';
 import { mcpListPlugins, mcpInstallPlugin, mcpUninstallPlugin } from './mcp-plugins.js';
+import { readAuthConfigIdentity } from './auth-config.js';
 import {
   listJsonlFiles,
   parseJsonlSessionFile,
@@ -188,6 +189,15 @@ export class CursorAdapter extends BaseAgentAdapter {
         method: 'api_key',
         identity: `...${apiKey.slice(-4)}`,
       };
+    }
+    const home = os.homedir();
+    const found = await readAuthConfigIdentity([
+      path.join(home, '.cursor', 'auth.json'),
+      path.join(home, '.cursor', 'credentials.json'),
+      path.join(home, '.config', 'cursor', 'auth.json'),
+    ]);
+    if (found) {
+      return { status: 'authenticated', method: 'config_file', identity: found.identity };
     }
     return { status: 'unauthenticated' };
   }
