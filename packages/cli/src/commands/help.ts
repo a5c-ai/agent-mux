@@ -35,6 +35,8 @@ Commands:
   profiles                Manage named RunOptions presets
   auth                    Check and setup authentication
   plugins                 Manage agent plugins
+  plugin                  Manage native agent plugins
+  mcp                     Manage MCP servers
   detect-host             Detect which agent harness we are running under
   remote                  Install / update amux on a remote host
   hooks                   Manage and dispatch unified agent hooks
@@ -292,6 +294,39 @@ Flags:
   --version <ver>    Pin to specific version
   --global           Install globally
   --json             Output as JSON
+`,
+  plugin: `amux plugin - Native agent plugin management
+
+Usage:
+  amux plugin list <agent>
+  amux plugin install <agent> <plugin>
+  amux plugin enable <agent> <plugin>
+  amux plugin disable <agent> <plugin>
+  amux plugin marketplace <agent> [cmd]
+
+Flags:
+  --help    Show help
+
+Examples:
+  amux plugin list claude
+  amux plugin install claude filesystem-watcher
+  amux plugin marketplace claude
+
+Note: This command delegates to native agent plugin systems.
+      For MCP server management, use "amux mcp" instead.
+`,
+  mcp: `amux mcp - MCP (Model Context Protocol) server management
+
+Usage:
+  amux mcp list <agent>
+  amux mcp install <agent> <server>
+  amux mcp enable <agent> <server>
+  amux mcp disable <agent> <server>
+
+Examples:
+  amux mcp list claude
+  amux mcp install claude filesystem
+  amux mcp enable claude memory
 `,
   hooks: `amux hooks - Unified hook management and dispatch
 

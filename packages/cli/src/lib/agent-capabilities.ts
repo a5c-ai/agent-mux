@@ -51,7 +51,7 @@ export async function detectAgentCapabilities(agent: string): Promise<AgentCapab
     await execAsync(`${config.command} --help`, { timeout: 5000 });
     return {
       supportsPlugins: true,
-      pluginCommands: config.commands,
+      pluginCommands: [...config.commands],
       nativePluginCommand: config.command,
     };
   } catch {

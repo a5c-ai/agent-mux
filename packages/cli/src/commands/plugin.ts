@@ -66,7 +66,6 @@ export async function pluginCommand(
 
   try {
     const result = await execAsync(nativeCommand, {
-      stdio: 'inherit',
       timeout: 30000
     });
 

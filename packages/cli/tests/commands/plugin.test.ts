@@ -50,7 +50,7 @@ describe('plugin command', () => {
     const exitCode = await pluginCommand(mockClient, mockArgs);
 
     expect(exitCode).toBe(ExitCode.SUCCESS);
-    expect(mockExec).toHaveBeenCalledWith('claude plugins list', { stdio: 'inherit', timeout: 30000 }, expect.any(Function));
+    expect(mockExec).toHaveBeenCalledWith('claude plugins list', { timeout: 30000 }, expect.any(Function));
   });
 
   it('should show error for unsupported agent', async () => {
