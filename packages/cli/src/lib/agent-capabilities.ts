@@ -12,7 +12,7 @@ export interface AgentCapabilities {
 const AGENT_PLUGIN_CONFIGS = {
   claude: {
     command: 'claude plugins',
-    commands: ['list', 'install', 'enable', 'disable', 'marketplace'],
+    commands: ['list', 'install', 'enable', 'disable', 'marketplace', 'uninstall', 'update'],
   },
   gemini: {
     command: 'gemini extensions',
