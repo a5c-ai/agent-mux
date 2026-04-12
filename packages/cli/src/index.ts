@@ -33,6 +33,7 @@ import { authCommand } from './commands/auth.js';
 import { modelsCommand } from './commands/models.js';
 import { profilesCommand } from './commands/profiles.js';
 import { pluginsCommand } from './commands/plugins.js';
+import { pluginCommand } from './commands/plugin.js';
 import { mcpCommand } from './commands/mcp.js';
 import { installCommand } from './commands/install.js';
 import { detectHostCommand } from './commands/detect-host.js';
@@ -147,6 +148,9 @@ export async function main(argv?: string[]): Promise<number> {
 
       case 'plugins':
         return await pluginsCommand(client, args);
+
+      case 'plugin':
+        return await pluginCommand(client, args);
 
       case 'mcp':
         return await mcpCommand(client, args);
