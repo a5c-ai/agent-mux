@@ -56,6 +56,8 @@ then perform the same research and analysis as mentioned above for these new ref
 [>] - research a5c-ai/babysitter (staging branch) for the harnesses adapters in sdk there. see if we missed any generic features or functionalities that we can integrate into this sdk. also look for parities and inconsistencies in our implementation compared to the ones in babysitter, and address them accordingly. also look for any caveats and nuances in the implementation of the harnesses adapters in babysitter, such as error handling, edge cases, etc. and make sure we have proper handling for those in our implementation as well.
 → Process: .a5c/processes/babysitter-parity.js
 
+[ ] - create a tui package based on a popular framework like Ink or Blessed, that provides a user interface for interacting with the agent-mux, such as running agents, viewing sessions, managing configurations, etc. this tui should be designed to be extensible and customizable, allowing users to add their own features and functionalities as needed (with plugins). and all almost all (all if possible, except the framework, tui process, embedded sdk dependecy - injected to plugins, etc.) the basic views, layouts, functionalities should be implemented as plugins (messages renderes, diff renderer, tool call rendering, chat, sessesion mgt, ...).
+
 ---
 
 Run remaining [>] / [~] items:

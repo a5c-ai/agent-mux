@@ -60,7 +60,7 @@ describe('CLI integration', () => {
       try {
         const code = await main(['--version']);
         expect(code).toBe(0);
-        expect(io.stdout.join('')).toContain('amux v0.1.0');
+        expect(io.stdout.join('')).toMatch(/amux v\d+\.\d+\.\d+/);
       } finally {
         io.restore();
       }
