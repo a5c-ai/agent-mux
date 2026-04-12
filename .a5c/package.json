@@ -1,0 +1,16 @@
+{
+  "name": "@a5c/local",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@a5c-ai/babysitter-sdk": "^0.0.188-staging.8f218ef5"
+  },
+  "type": "module"
+}

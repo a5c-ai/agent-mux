@@ -1,0 +1,58 @@
+{
+  "name": "@a5c-ai/agent-mux-harness-mock",
+  "version": "0.1.0",
+  "type": "module",
+  "license": "MIT",
+  "description": "Mock harness simulator for testing agent-mux adapters — simulates claude-code, codex, and other CLI harnesses",
+  "author": "a5c-ai",
+  "homepage": "https://github.com/a5c-ai/agent-mux#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/a5c-ai/agent-mux.git",
+    "directory": "packages/harness-mock"
+  },
+  "bugs": {
+    "url": "https://github.com/a5c-ai/agent-mux/issues"
+  },
+  "keywords": [
+    "agent-mux",
+    "mock",
+    "harness",
+    "testing",
+    "fixtures",
+    "ai"
+  ],
+  "engines": {
+    "node": ">=20.9.0"
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "bin": {
+    "mock-harness": "./dist/bin/mock-harness.js"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc --build",
+    "prepublishOnly": "npm run build",
+    "test": "vitest run --config ../../vitest.config.ts"
+  },
+  "dependencies": {
+    "@a5c-ai/agent-mux-core": "0.1.0"
+  }
+}

@@ -1,0 +1,350 @@
+/**
+ * `amux help` and `--help` support.
+ *
+ * @see docs/10-cli-reference.md Section 26
+ */
+
+import { createRequire } from 'node:module';
+
+function readVersion(): string {
+  try {
+    const require = createRequire(import.meta.url);
+    return (require('../../package.json') as { version?: string }).version ?? '0.0.0';
+  } catch {
+    return '0.0.0';
+  }
+}
+
+const VERSION = readVersion();
+
+/** Top-level help text. */
+const MAIN_HELP = `amux - Agent Multiplexer CLI (v${VERSION})
+
+Usage: amux [command] [subcommand] [args] [flags]
+
+Commands:
+  run [agent] [prompt]    Run an agent with a prompt
+  install [agent]         Install an agent CLI (or --all)
+  update [agent]          Update an agent CLI (or --all)
+  detect [agent]          Report installed version/path (or --all)
+  uninstall <agent>       Uninstall an agent CLI
+  adapters                List and inspect registered adapters
+  models                  List and inspect models
+  sessions                Manage agent sessions
+  config                  Read and write agent configuration
+  profiles                Manage named RunOptions presets
+  auth                    Check and setup authentication
+  plugins                 Manage agent plugins
+  detect-host             Detect which agent harness we are running under
+  remote                  Install / update amux on a remote host
+  hooks                   Manage and dispatch unified agent hooks
+  doctor                  Run environment health check
+  version                 Print version
+  help [command]          Show help for a command
+
+Global Flags:
+  --agent, -a <name>      Target agent name
+  --model, -m <model>     Model ID
+  --json                  Output as JSON
+  --debug                 Enable debug output
+  --config-dir <path>     Override config directory
+  --project-dir <path>    Override project config directory
+  --no-color              Disable colored output
+  --version, -V           Print version
+  --help, -h              Show help
+
+Examples:
+  amux run claude "explain this code"
+  amux run --agent gemini --json "list all files"
+  amux adapters list
+  amux models list claude
+  amux sessions list claude
+  amux config get claude model
+`;
+
+/** Command-specific help texts. */
+const COMMAND_HELP: Record<string, string> = {
+  run: `amux run - Run an agent with a prompt
+
+Usage: amux run [<agent>] [<prompt>] [flags]
+
+Flags:
+  --model, -m <model>          Model ID
+  --stream / --no-stream       Enable/disable streaming
+  --thinking-effort <level>    low, medium, high, max
+  --thinking-budget <tokens>   Thinking budget in tokens
+  --temperature <float>        Sampling temperature (0.0-2.0)
+  --max-tokens <int>           Maximum output tokens
+  --max-turns <int>            Maximum agentic turns
+  --session <id>               Resume session by ID
+  --fork <id>                  Fork session by ID
+  --no-session                 Ephemeral run
+  --system <text>              System prompt
+  --system-mode <mode>         prepend, append, replace
+  --cwd <path>                 Working directory
+  --env KEY=VALUE              Environment variable (repeatable)
+  --yolo                       Auto-approve all tool calls
+  --deny                       Auto-deny all approval requests
+  --timeout <ms>               Run timeout in milliseconds
+  --tag <tag>                  Run tag (repeatable)
+  --profile <name>             Named profile to apply
+  --interactive, -i            Enter interactive REPL mode
+  --quiet, -q                  Suppress non-essential output
+  --json                       Emit JSONL event stream
+
+Examples:
+  amux run claude "explain this codebase"
+  amux run codex --yolo --no-session "add tests"
+  amux run --profile fast "review this PR"
+`,
+  adapters: `amux adapters - Adapter discovery
+
+Usage:
+  amux adapters list [flags]
+  amux adapters detect <agent> [flags]
+  amux adapters info <agent> [flags]
+
+Flags:
+  --json    Output as JSON
+
+Examples:
+  amux adapters list
+  amux adapters detect claude
+  amux adapters info gemini
+`,
+  models: `amux models - Model registry
+
+Usage:
+  amux models list <agent> [flags]
+  amux models info <agent> <model> [flags]
+  amux models refresh <agent>
+
+Flags:
+  --json    Output as JSON
+
+Examples:
+  amux models list claude
+  amux models info claude claude-sonnet-4-20250514
+`,
+  sessions: `amux sessions - Session management
+
+Usage:
+  amux sessions list <agent> [flags]
+  amux sessions show <agent> <session-id>
+  amux sessions search <query> [flags]
+  amux sessions export <agent> <session-id> [flags]
+  amux sessions cost
+
+Flags:
+  --since <date>     Filter sessions after this date
+  --until <date>     Filter sessions before this date
+  --model <model>    Filter by model
+  --tag <tag>        Filter by tag (repeatable)
+  --limit <n>        Maximum results
+  --sort <field>     Sort by: date, cost, turns
+  --format <fmt>     Output format: json, jsonl, markdown
+  --json             Output as JSON
+`,
+  config: `amux config - Configuration management
+
+Usage:
+  amux config get <agent> [field]
+  amux config set <agent> <field> <value>
+  amux config schema <agent>
+  amux config validate <agent>
+  amux config reload [agent]
+
+Flags:
+  --scope <scope>    global or project
+  --json             Output as JSON
+
+Examples:
+  amux config get claude
+  amux config get claude model
+  amux config set claude model claude-sonnet-4-20250514
+  amux config schema codex
+`,
+  profiles: `amux profiles - Profile management
+
+Usage:
+  amux profiles list [flags]
+  amux profiles show <name>
+  amux profiles set <name> [run-flags]
+  amux profiles delete <name> [flags]
+  amux profiles apply <name>
+
+Flags:
+  --scope <scope>    global or project
+  --json             Output as JSON
+
+Examples:
+  amux profiles list
+  amux profiles set fast --agent claude --yolo --max-turns 5
+  amux profiles show fast
+  amux profiles delete fast
+`,
+  auth: `amux auth - Authentication
+
+Usage:
+  amux auth check [agent]
+  amux auth setup <agent>
+
+Flags:
+  --json    Output as JSON
+
+Examples:
+  amux auth check
+  amux auth check claude
+  amux auth setup gemini
+`,
+  install: `amux install - Install agent CLI binaries
+
+Usage:
+  amux install <agent> [--force] [--dry-run] [--version <v>] [--json]
+  amux install --all [--force] [--dry-run] [--json]
+  amux uninstall <agent> [--json]
+
+Flags:
+  --all             Install every registered agent
+  --force           Reinstall even if already present
+  --dry-run         Print the planned command without executing
+  --version <v>     Pin to a specific version (npm only)
+  --json            Output as JSON
+
+Examples:
+  amux install claude
+  amux install --all --dry-run
+  amux uninstall codex
+`,
+  update: `amux update - Update an installed agent CLI
+
+Usage:
+  amux update <agent> [--dry-run] [--json]
+  amux update --all [--dry-run] [--json]
+
+Flags:
+  --all       Update every registered agent
+  --dry-run   Print the planned command without executing
+  --json      Output as JSON
+
+Examples:
+  amux update claude
+  amux update --all
+`,
+  detect: `amux detect - Report installed version, path, and status per agent
+
+Usage:
+  amux detect <agent> [--json]
+  amux detect --all [--json]
+
+Flags:
+  --all     Detect every registered agent
+  --json    Output as JSON
+
+Examples:
+  amux detect claude
+  amux detect --all --json
+`,
+  uninstall: `amux uninstall - Uninstall an agent CLI binary
+
+Usage:
+  amux uninstall <agent> [--json]
+`,
+  'detect-host': `amux detect-host - Detect the current agent harness
+
+Usage:
+  amux detect-host [--json]
+
+Inspects env vars, parent process, and TTY signals to report which
+coding-agent harness (claude, codex, gemini, ...) this CLI is running
+inside, if any.
+`,
+  remote: `amux remote - Install / update amux on a remote host
+
+Usage:
+  amux remote install <host> --mode <ssh|docker|k8s|local> [flags]
+  amux remote update  <host> --mode <ssh|docker|k8s|local> [flags]
+
+Flags:
+  --mode <mode>            ssh | docker | k8s | local (required)
+  --harness <agent>        Agent to install after amux (default: claude)
+  --image <img>            Docker image (docker mode)
+  --identity-file <path>   SSH key path (ssh mode)
+  --port <n>               SSH port (ssh mode)
+  --namespace <ns>         Kubernetes namespace (k8s mode)
+  --context <ctx>          Kubernetes context (k8s mode)
+  --force                  Reinstall even if amux is already present
+  --dry-run                Print the planned commands without executing
+  --json                   Output as JSON
+
+Examples:
+  amux remote install host.example.com --mode ssh --dry-run
+  amux remote install my-pod --mode k8s --namespace dev --harness codex
+`,
+  plugins: `amux plugins - Plugin management
+
+Usage:
+  amux plugins list <agent> [flags]
+  amux plugins install <agent> <plugin> [flags]
+  amux plugins uninstall <agent> <plugin>
+
+Flags:
+  --version <ver>    Pin to specific version
+  --global           Install globally
+  --json             Output as JSON
+`,
+  hooks: `amux hooks - Unified hook management and dispatch
+
+Usage:
+  amux hooks discover [--json]              List supported hook types per harness
+  amux hooks list [--agent <a>] [--json]    List registered hooks
+  amux hooks add --id <id> --agent <a> --hook-type <t> --handler <builtin|command|script> --target <t>
+  amux hooks remove <id>
+  amux hooks set <id> [--priority N] [--enabled true|false]
+  amux hooks handle <agent> <hookType>      Dispatch a hook (reads payload JSON from stdin)
+  amux hooks install <agent> <hookType> <command>   Write native hook entry into harness config
+
+Flags:
+  --global / --project     Target scope (default: project)
+  --priority <int>         Sort order (lower = earlier); default 100
+  --enabled <bool>         Enable or disable without removal
+  --json                   Output as JSON
+
+Examples:
+  amux hooks discover
+  amux hooks add --id trace-all --agent '*' --hook-type '*' --handler builtin --target trace
+  amux hooks install claude PreToolUse "amux hooks handle claude PreToolUse"
+`,
+  doctor: `amux doctor - Health check for amux environment
+
+Usage:
+  amux doctor [--json]
+
+Aggregates:
+  - Node.js version (>= 20.9.0)
+  - Installed harness CLIs and versions (per adapter detectInstallation)
+  - Auth status per adapter (detectAuth)
+  - Config file presence per adapter
+  - Hook registry + .amux paths
+
+Use this first when filing a bug. The text report is stable for copy/paste.
+`,
+};
+
+/**
+ * Print help for a command or the main help.
+ */
+export function printHelp(command?: string): void {
+  if (command && COMMAND_HELP[command]) {
+    process.stdout.write(COMMAND_HELP[command] + '\n');
+  } else {
+    process.stdout.write(MAIN_HELP);
+  }
+}
+
+/**
+ * Print version.
+ */
+export function printVersion(): void {
+  process.stdout.write(`amux v${VERSION}\n`);
+}

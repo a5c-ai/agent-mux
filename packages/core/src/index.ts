@@ -1,0 +1,333 @@
+/**
+ * @a5c-ai/agent-mux-core
+ *
+ * Core types, client, and stream engine for agent-mux.
+ * Zero runtime dependencies beyond Node built-ins.
+ */
+
+// Types
+export type {
+  BuiltInAgentName,
+  AgentName,
+  ErrorCode,
+  ValidationFieldError,
+  BaseEvent,
+  GlobalConfig,
+  AuthHintsFile,
+  AuthHintEntry,
+  RunIndexEntry,
+  CostRecord,
+  ProfileData,
+  PluginFormat,
+  RetryPolicy,
+  McpServerConfig,
+  Attachment,
+} from './types.js';
+
+// Errors
+export {
+  AgentMuxError,
+  CapabilityError,
+  ValidationError,
+  AuthError,
+} from './errors.js';
+
+// Retry
+export type { ResolvedRetryPolicy } from './retry.js';
+export { DEFAULT_RETRY_POLICY } from './retry.js';
+
+// Storage
+export type { StoragePaths, StoragePathOptions } from './storage.js';
+export { resolveStoragePaths } from './storage.js';
+
+// Events
+export type {
+  AgentEvent,
+  AgentEventType,
+  AgentEventHandler,
+  EventOfType,
+  SessionStartEvent,
+  SessionResumeEvent,
+  SessionForkEvent,
+  SessionCheckpointEvent,
+  SessionEndEvent,
+  TurnStartEvent,
+  TurnEndEvent,
+  StepStartEvent,
+  StepEndEvent,
+  MessageStartEvent,
+  TextDeltaEvent,
+  MessageStopEvent,
+  ThinkingStartEvent,
+  ThinkingDeltaEvent,
+  ThinkingStopEvent,
+  ToolCallStartEvent,
+  ToolInputDeltaEvent,
+  ToolCallReadyEvent,
+  ToolResultEvent,
+  ToolErrorEvent,
+  FileReadEvent,
+  FileWriteEvent,
+  FileCreateEvent,
+  FileDeleteEvent,
+  FilePatchEvent,
+  ShellStartEvent,
+  ShellStdoutDeltaEvent,
+  ShellStderrDeltaEvent,
+  ShellExitEvent,
+  McpToolCallStartEvent,
+  McpToolResultEvent,
+  McpToolErrorEvent,
+  SubagentSpawnEvent,
+  SubagentResultEvent,
+  SubagentErrorEvent,
+  PluginLoadedEvent,
+  PluginInvokedEvent,
+  PluginErrorEvent,
+  SkillLoadedEvent,
+  SkillInvokedEvent,
+  AgentdocReadEvent,
+  ImageOutputEvent,
+  ImageInputAckEvent,
+  CostEvent,
+  TokenUsageEvent,
+  InputRequiredEvent,
+  ApprovalRequestEvent,
+  ApprovalGrantedEvent,
+  ApprovalDeniedEvent,
+  RateLimitedEvent,
+  ContextLimitWarningEvent,
+  ContextCompactedEvent,
+  RetryEvent,
+  InterruptedEvent,
+  AbortedEvent,
+  PausedEvent,
+  ResumedEvent,
+  TimeoutEvent,
+  TurnLimitEvent,
+  StreamFallbackEvent,
+  AuthErrorEvent,
+  RateLimitErrorEvent,
+  ContextExceededEvent,
+  CrashEvent,
+  ErrorEvent,
+  DebugEvent,
+  LogEvent,
+} from './events.js';
+
+// State Machine
+export type { RunState } from './state-machine.js';
+export {
+  TERMINAL_STATES,
+  VALID_TRANSITIONS,
+  isTerminal,
+  assertTransition,
+} from './state-machine.js';
+
+// Interaction types
+export type {
+  InteractionChannel,
+  PendingInteraction,
+  InteractionDetail,
+  ApprovalDetail,
+  InputDetail,
+  InteractionResponse,
+  ApproveResponse,
+  DenyResponse,
+  TextInputResponse,
+} from './interaction.js';
+
+// Interaction channel implementation
+export { InteractionChannelImpl } from './interaction-channel-impl.js';
+
+// RunHandle types
+export type {
+  RunHandle,
+  RunResult,
+  TokenUsageSummary,
+  RunError,
+} from './run-handle.js';
+
+// RunHandle implementation
+export { RunHandleImpl } from './run-handle-impl.js';
+export type { RunHandleImplOptions } from './run-handle-impl.js';
+
+// Process tracking (zombie prevention)
+export type { ProcessTracker } from './process-tracker.js';
+export { processTracker } from './process-tracker.js';
+
+// Invocation modes
+export type {
+  InvocationMode,
+  InvocationModeType,
+  LocalInvocation,
+  DockerInvocation,
+  SshInvocation,
+  K8sInvocation,
+  HarnessImageEntry,
+} from './invocation.js';
+export { HARNESS_IMAGE_CATALOG, lookupHarnessImage } from './invocation.js';
+export { buildInvocationCommand } from './spawn-runner.js';
+export type { InvocationCommand } from './spawn-runner.js';
+
+// Run Options
+export type { RunOptions } from './run-options.js';
+export {
+  validateRunOptions,
+  PROHIBITED_PROFILE_FIELDS,
+  validateProfileData,
+} from './run-options.js';
+
+// Merge
+export { deepMerge, stripUndefined, resolveRunOptions } from './merge.js';
+
+// Profiles
+export type {
+  ProfileListOptions,
+  ProfileEntry,
+  ResolvedProfile,
+  ProfileSetOptions,
+  ProfileDeleteOptions,
+  ProfileManager,
+} from './profiles.js';
+export { ProfileManagerImpl } from './profiles.js';
+
+// Capabilities
+export type {
+  ThinkingEffortLevel,
+  PluginRegistry,
+  InstallMethod,
+  AuthMethod as AuthMethodDescriptor,
+  AgentCapabilities,
+  ModelCapabilities,
+  ModelValidationResult,
+} from './capabilities.js';
+
+// StreamAssembler
+export type { BlockTerminator } from './stream-assembler.js';
+export { StreamAssembler } from './stream-assembler.js';
+
+// Session types (canonical from dedicated module)
+export type {
+  Session,
+  SessionMessage,
+  SessionToolCall,
+  SessionSummary,
+  FullSession,
+  SessionListOptions,
+  SessionQuery,
+  CostAggregationOptions,
+  CostSummary,
+  CostBreakdown,
+  SessionDiff,
+  DiffOperation,
+} from './session-types.js';
+
+// Auth types (canonical from dedicated module)
+export type {
+  AuthMethod,
+  AuthState,
+  AuthSetupGuidance,
+  AuthSetupStep,
+  AuthEnvVar,
+} from './auth-types.js';
+
+// Config types (canonical from dedicated module)
+export type {
+  AgentConfig,
+  AgentConfigSchema,
+  ConfigField,
+  ValidationResult,
+  ConfigValidationError,
+  ConfigValidationWarning,
+} from './config-types.js';
+
+// Adapter
+export type {
+  InstalledPlugin,
+  PluginInstallOptions,
+  PluginSearchOptions,
+  PluginListing,
+  SpawnArgs,
+  ParseContext,
+  InstalledAgentInfo,
+  AgentAdapterInfo,
+  AgentAdapter,
+  DetectInstallationResult,
+  InstallResult,
+  AdapterInstallOptions,
+  AdapterUpdateOptions,
+  Spawner,
+} from './adapter.js';
+
+// Adapter Registry
+export type { AdapterRegistry } from './adapter-registry.js';
+export { AdapterRegistryImpl } from './adapter-registry.js';
+
+// Model Registry
+export type { ModelRegistry } from './model-registry.js';
+export { ModelRegistryImpl } from './model-registry.js';
+
+// Session Manager
+export type { SessionManager } from './session-manager.js';
+export { SessionManagerImpl } from './session-manager.js';
+
+// Config Manager
+export type { ConfigManager } from './config-manager.js';
+export { ConfigManagerImpl } from './config-manager.js';
+
+// Auth Manager
+export type { AuthManager } from './auth-manager.js';
+export type {
+  AuthMethodType,
+  FullAuthState,
+  FullAuthSetupGuidance,
+} from './auth-manager.js';
+export { AuthManagerImpl } from './auth-manager.js';
+
+// Plugin types (spec §9 — full types from plugin-types.ts)
+export type {
+  InstalledPlugin as PluginInfo,
+  PluginDetail,
+  PluginBrowseOptions,
+} from './plugin-types.js';
+
+// Plugin Manager
+export type { PluginManager } from './plugin-manager.js';
+export { PluginManagerImpl } from './plugin-manager-impl.js';
+
+// Host harness detection
+export type {
+  HostHarnessInfo,
+  HostSignalMap,
+  HostMetadataReader,
+  HostMetadataMap,
+  DetectHostHarnessOptions,
+} from './host-detection.js';
+export { detectHostHarness, DEFAULT_HOST_SIGNALS, DEFAULT_HOST_METADATA } from './host-detection.js';
+
+// Client
+export type {
+  ClientOptions,
+} from './client.js';
+export { AgentMuxClient, createClient } from './client.js';
+
+// Unified hooks system
+export type {
+  UnifiedHookPayload,
+  UnifiedHookResult,
+  HookRegistration,
+  HookScope,
+} from './hooks.js';
+export { HookConfigManager } from './hooks.js';
+export type { BuiltInHookFn, BuiltInHookEntry } from './builtin-hooks.js';
+export { BuiltInHooksRegistry, builtInHooks } from './builtin-hooks.js';
+export type { DispatchOptions } from './hook-dispatcher.js';
+export { HookDispatcher } from './hook-dispatcher.js';
+export type { HookTypeEntry } from './hook-catalog.js';
+export { HOOK_CATALOG, getHookCatalog, isKnownHookType } from './hook-catalog.js';
+export { parseHookPayload, formatHookResult } from './hook-payload.js';
+
+// Atomic filesystem helpers (unified config/session writes).
+export type { AtomicWriteOptions } from './atomic-fs.js';
+export { writeFileAtomic, writeJsonAtomic } from './atomic-fs.js';

@@ -1,0 +1,49 @@
+FROM node:22-slim
+
+LABEL maintainer="a5c-ai" \
+      description="agent-mux with selected harness CLIs preinstalled"
+
+# Comma-separated list of harness agent names to preinstall via `amux install`.
+# Override at build time: --build-arg HARNESSES=claude-code,codex,gemini
+ARG HARNESSES=claude-code,codex
+
+# System deps needed by most harness installers
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    ca-certificates \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy manifests first for layer caching
+COPY package.json package-lock.json* ./
+COPY packages/core/package.json packages/core/
+COPY packages/adapters/package.json packages/adapters/
+COPY packages/cli/package.json packages/cli/
+COPY packages/agent-mux/package.json packages/agent-mux/
+COPY packages/harness-mock/package.json packages/harness-mock/
+
+RUN npm ci 2>/dev/null || npm install
+
+# Copy source and build amux itself
+COPY tsconfig.json ./
+COPY packages/ packages/
+RUN npm run build
+
+# Install amux globally so `amux install` is on PATH
+RUN npm install -g ./packages/agent-mux
+
+# Use the built-in `amux install` to deploy each requested harness.
+# --force skips "already installed" short-circuit; --json for scriptable output.
+RUN for h in $(echo "$HARNESSES" | tr ',' ' '); do \
+      echo "Installing harness: $h" && \
+      amux install "$h" --json || { echo "Failed to install $h"; exit 1; }; \
+    done && \
+    npm cache clean --force
+
+# Workspace mount point
+RUN mkdir -p /workspace
+WORKDIR /workspace
+
+ENTRYPOINT ["amux"]

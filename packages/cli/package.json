@@ -1,0 +1,57 @@
+{
+  "name": "@a5c-ai/agent-mux-cli",
+  "version": "0.1.0",
+  "type": "module",
+  "license": "MIT",
+  "description": "CLI binary (amux) for agent-mux",
+  "author": "a5c-ai",
+  "homepage": "https://github.com/a5c-ai/agent-mux#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/a5c-ai/agent-mux.git",
+    "directory": "packages/cli"
+  },
+  "bugs": {
+    "url": "https://github.com/a5c-ai/agent-mux/issues"
+  },
+  "keywords": [
+    "agent-mux",
+    "amux",
+    "cli",
+    "coding-agent",
+    "ai"
+  ],
+  "engines": {
+    "node": ">=20.9.0"
+  },
+  "bin": {
+    "amux": "./dist/index.js"
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc --build",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@a5c-ai/agent-mux-core": "0.1.0",
+    "@a5c-ai/agent-mux-adapters": "0.1.0"
+  }
+}

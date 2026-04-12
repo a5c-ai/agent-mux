@@ -1,0 +1,12 @@
+.a5c/node_modules/**
+.a5c/cache/**
+node_modules/**
+.a5c/runs/**/tasks
+.a5c/runs/**/journal
+.a5c/runs/**/state
+
+dist/
+node_modules/
+**/dist/**
+**/node_modules/**
+.amux/

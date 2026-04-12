@@ -1,0 +1,14 @@
+{
+  "runId": "01KP123VYCVGG08D1H7NQ06NWB",
+  "request": "integrate-harness",
+  "processId": "integrate-harness",
+  "entrypoint": {
+    "importPath": "../../processes/integrate-harness.js",
+    "exportName": "default"
+  },
+  "processPath": "../../processes/integrate-harness.js",
+  "layoutVersion": "2026.01-storage-preview",
+  "createdAt": "2026-04-12T14:39:15.514Z",
+  "nonInteractive": true,
+  "completionProof": "b3c73f931bae43a9f45a9408b5698628"
+}

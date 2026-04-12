@@ -1,0 +1,54 @@
+{
+  "name": "@a5c-ai/agent-mux-core",
+  "version": "0.1.0",
+  "type": "module",
+  "license": "MIT",
+  "description": "Core types, client, and stream engine for agent-mux",
+  "author": "a5c-ai",
+  "homepage": "https://github.com/a5c-ai/agent-mux#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/a5c-ai/agent-mux.git",
+    "directory": "packages/core"
+  },
+  "bugs": {
+    "url": "https://github.com/a5c-ai/agent-mux/issues"
+  },
+  "keywords": [
+    "agent-mux",
+    "claude",
+    "codex",
+    "coding-agent",
+    "llm",
+    "cli",
+    "harness",
+    "ai"
+  ],
+  "engines": {
+    "node": ">=20.9.0"
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc --build",
+    "prepublishOnly": "npm run build",
+    "test": "vitest run --config ../../vitest.config.ts"
+  }
+}

@@ -1,0 +1,47 @@
+# OMP
+
+Adapter for the **OMP** agent CLI.
+
+## Install
+
+```bash
+npm install -g omp-cli
+```
+
+## Auth
+
+- **Provider API keys** — provider-specific env vars.
+
+Config file: `~/.omp/agent/settings.json`.
+
+## Minimal run
+
+```bash
+amux run omp --prompt "Lint this file"
+```
+
+## Notable flags
+
+- `--model <id>` — default `default`.
+- `--prompt <text>` — forwarded prompt.
+
+## Session files
+
+- Location: `~/.omp/agent/sessions/*.jsonl`
+- JSONL; events `text`, `message`, `tool_call` are recognized.
+
+## Plugins (MCP)
+
+Plugin support: **no** (`supportsMCP: false`, `supportsPlugins: false`).
+
+## Capabilities
+
+Tool calling (not parallel), tool-call streaming, text streaming, 128k context.
+
+## Known limitations
+
+- No parallel tool calls.
+- No thinking / JSON / structured output.
+- No image or file input.
+- Approval mode is not forwarded to the CLI.
+- Global config only (`supportsProjectConfig: false`).

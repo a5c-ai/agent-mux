@@ -1,0 +1,465 @@
+/**
+ * spawn-runner — connects RunHandleImpl to a real Node.js subprocess.
+ *
+ * Responsibilities:
+ *  - spawn the agent process via node:child_process
+ *  - register with ProcessTracker for zombie prevention
+ *  - pipe stdout/stderr through StreamAssembler + adapter.parseEvent
+ *  - wire stdin for InteractionChannel responses
+ *  - enforce timeout / inactivityTimeout
+ *  - translate child exit into RunHandleImpl.complete()
+ *  - support retry policy for transient failure codes
+ */
+
+import { spawn, type ChildProcess } from 'node:child_process';
+
+import type { AgentAdapter, ParseContext, SpawnArgs } from './adapter.js';
+import type { AgentEvent } from './events.js';
+import type { RunOptions } from './run-options.js';
+import { RunHandleImpl } from './run-handle-impl.js';
+import { StreamAssembler } from './stream-assembler.js';
+import { processTracker } from './process-tracker.js';
+import { DEFAULT_RETRY_POLICY } from './retry.js';
+import type { ErrorCode, RetryPolicy } from './types.js';
+import type { InvocationMode } from './invocation.js';
+import {
+  buildInvocationCommand,
+  runCleanupDetached,
+  type InvocationCommandWithCleanup,
+} from './spawn-invocation.js';
+export {
+  buildInvocationCommand,
+  type InvocationCommand,
+  type InvocationCommandWithCleanup,
+  type K8sCleanup,
+} from './spawn-invocation.js';
+
+/** Internal: currently spawned child bound to a handle (for control methods). */
+interface ActiveSpawn {
+  child: ChildProcess;
+  killTimer: NodeJS.Timeout | null;
+}
+
+const isWindows = process.platform === 'win32';
+
+function computeDelay(policy: Required<RetryPolicy>, attempt: number): number {
+  const exp = Math.min(policy.maxDelayMs, policy.baseDelayMs * Math.pow(2, attempt - 1));
+  const jitter = exp * policy.jitterFactor * Math.random();
+  return Math.floor(exp + jitter);
+}
+
+/**
+ * Start the spawn loop for the given handle. Returns immediately; all work
+ * happens asynchronously. Errors bubble up through handle events + complete().
+ */
+export function startSpawnLoop(
+  handle: RunHandleImpl,
+  adapter: AgentAdapter,
+  options: RunOptions,
+): void {
+  const policy: Required<RetryPolicy> = {
+    ...DEFAULT_RETRY_POLICY,
+    ...(options.retryPolicy ?? {}),
+  };
+  const retryOn = new Set<ErrorCode>(policy.retryOn);
+  const enableRetry = options.retryPolicy !== undefined;
+
+  let attempt = 0;
+
+  const attemptSpawn = (): void => {
+    attempt += 1;
+    try {
+      runOnce(handle, adapter, options, (terminalCode, exitReason, exitCode, signal) => {
+        if (
+          enableRetry &&
+          attempt < policy.maxAttempts &&
+          terminalCode !== null &&
+          retryOn.has(terminalCode)
+        ) {
+          const delay = computeDelay(policy, attempt);
+          handle.emit({
+            type: 'retry',
+            runId: handle.runId,
+            agent: handle.agent,
+            timestamp: Date.now(),
+            attempt: attempt + 1,
+            maxAttempts: policy.maxAttempts,
+            reason: terminalCode,
+            delayMs: delay,
+          });
+          setTimeout(attemptSpawn, delay);
+          return;
+        }
+        handle.complete(exitReason, exitCode, signal);
+      });
+    } catch (err) {
+      handle.emit({
+        type: 'error',
+        runId: handle.runId,
+        agent: handle.agent,
+        timestamp: Date.now(),
+        code: 'SPAWN_ERROR',
+        message: err instanceof Error ? err.message : String(err),
+        recoverable: false,
+      });
+      handle.complete('crashed', null, null);
+    }
+  };
+
+  // Defer to microtask so the synchronous RunHandle return happens first.
+  queueMicrotask(attemptSpawn);
+}
+
+type FinalizeFn = (
+  terminalCode: ErrorCode | null,
+  exitReason: import('./run-handle.js').RunResult['exitReason'],
+  exitCode: number | null,
+  signal: string | null,
+) => void;
+
+function runOnce(
+  handle: RunHandleImpl,
+  adapter: AgentAdapter,
+  options: RunOptions,
+  finalize: FinalizeFn,
+): void {
+  const spawnArgs = adapter.buildSpawnArgs(options);
+  const now = Date.now();
+
+  // Transform the spawnArgs according to the configured invocation mode.
+  let invocationCmd: InvocationCommandWithCleanup;
+  try {
+    invocationCmd = buildInvocationCommand(options.invocation, spawnArgs, adapter.agent);
+  } catch (err) {
+    handle.emit({
+      type: 'error',
+      runId: handle.runId,
+      agent: handle.agent,
+      timestamp: Date.now(),
+      code: 'SPAWN_ERROR',
+      message: err instanceof Error ? err.message : String(err),
+      recoverable: false,
+    });
+    finalize('SPAWN_ERROR', 'crashed', null, null);
+    return;
+  }
+
+  // Emit a debug start event.
+  handle.emit({
+    type: 'debug',
+    runId: handle.runId,
+    agent: handle.agent,
+    timestamp: now,
+    level: 'info',
+    message: `Spawning ${invocationCmd.command} (mode=${options.invocation?.mode ?? 'local'}, cwd=${invocationCmd.cwd})`,
+  });
+
+  let child: ChildProcess;
+  try {
+    child = spawn(invocationCmd.command, invocationCmd.args, {
+      cwd: invocationCmd.cwd,
+      env: { ...process.env, ...invocationCmd.env },
+      shell: invocationCmd.shell,
+      detached: !isWindows,
+      stdio: ['pipe', 'pipe', 'pipe'],
+      windowsHide: true,
+    });
+  } catch (err) {
+    handle.emit({
+      type: 'error',
+      runId: handle.runId,
+      agent: handle.agent,
+      timestamp: Date.now(),
+      code: 'SPAWN_ERROR',
+      message: err instanceof Error ? err.message : String(err),
+      recoverable: false,
+    });
+    finalize('SPAWN_ERROR', 'crashed', null, null);
+    return;
+  }
+
+  const active: ActiveSpawn = { child, killTimer: null };
+
+  // Transition spawned -> running.
+  try {
+    handle.transitionTo('running');
+  } catch {
+    // If handle was already aborted before spawn, ignore.
+  }
+
+  // ── ProcessTracker registration ─────────────────────────────────────────
+  if (typeof child.pid === 'number') {
+    processTracker.register(child.pid, isWindows ? 0 : child.pid, handle.runId);
+  }
+
+  // ── StreamAssembler + parseEvent wiring ─────────────────────────────────
+  const assembler = new StreamAssembler();
+  const adapterState: Record<string, unknown> = {};
+  let eventCount = 0;
+  let lastEventType: string | null = null;
+
+  const makeParseCtx = (source: 'stdout' | 'stderr'): ParseContext => ({
+    runId: handle.runId,
+    agent: handle.agent,
+    sessionId: options.sessionId,
+    turnIndex: 0,
+    debug: false,
+    outputFormat: options.outputFormat ?? 'text',
+    source,
+    assembler,
+    eventCount,
+    lastEventType,
+    adapterState,
+  });
+
+  let stderrBuf = '';
+  let inactivityTimer: NodeJS.Timeout | null = null;
+
+  const resetInactivity = (): void => {
+    if (!options.inactivityTimeout || options.inactivityTimeout <= 0) return;
+    if (inactivityTimer) clearTimeout(inactivityTimer);
+    inactivityTimer = setTimeout(() => {
+      handle.emit({
+        type: 'timeout',
+        runId: handle.runId,
+        agent: handle.agent,
+        timestamp: Date.now(),
+        kind: 'inactivity',
+      });
+      inactivityTimeoutHit = true;
+      killChild('SIGTERM');
+    }, options.inactivityTimeout);
+  };
+
+  const feedLine = (line: string, source: 'stdout' | 'stderr'): void => {
+    if (line.length === 0) return;
+    resetInactivity();
+    // Always emit a log event for observability.
+    handle.emit({
+      type: 'log',
+      runId: handle.runId,
+      agent: handle.agent,
+      timestamp: Date.now(),
+      source,
+      line,
+    });
+    const assembled = assembler.feed(line);
+    if (assembled === null) return;
+    try {
+      const result = adapter.parseEvent(assembled, makeParseCtx(source));
+      if (result === null) return;
+      const events = Array.isArray(result) ? result : [result];
+      for (const ev of events) {
+        eventCount += 1;
+        lastEventType = ev.type;
+        handle.emit(ev);
+      }
+    } catch (err) {
+      handle.emit({
+        type: 'debug',
+        runId: handle.runId,
+        agent: handle.agent,
+        timestamp: Date.now(),
+        level: 'warn',
+        message: `parseEvent threw: ${err instanceof Error ? err.message : String(err)}`,
+      });
+    }
+  };
+
+  const pipeStream = (stream: NodeJS.ReadableStream | null, source: 'stdout' | 'stderr'): void => {
+    if (!stream) return;
+    let buf = '';
+    stream.setEncoding?.('utf8');
+    stream.on('data', (chunk: string | Buffer) => {
+      buf += typeof chunk === 'string' ? chunk : chunk.toString('utf8');
+      if (source === 'stderr') stderrBuf += typeof chunk === 'string' ? chunk : chunk.toString('utf8');
+      let idx: number;
+      while ((idx = buf.indexOf('\n')) !== -1) {
+        const line = buf.slice(0, idx).replace(/\r$/, '');
+        buf = buf.slice(idx + 1);
+        feedLine(line, source);
+      }
+    });
+    stream.on('end', () => {
+      if (buf.length > 0) feedLine(buf, source);
+    });
+  };
+
+  pipeStream(child.stdout, 'stdout');
+  pipeStream(child.stderr, 'stderr');
+
+  // ── Interaction channel -> stdin ────────────────────────────────────────
+  handle.interaction.setDispatch(async (_id, response) => {
+    if (!child.stdin || child.stdin.destroyed) return;
+    let text = '';
+    if (response.type === 'approve') text = 'y\n';
+    else if (response.type === 'deny') text = 'n\n';
+    else if (response.type === 'text') text = (response.text ?? '') + '\n';
+    try {
+      child.stdin.write(text);
+    } catch {
+      /* ignore */
+    }
+  });
+
+  // Optional initial stdin from SpawnArgs.
+  if (spawnArgs.stdin && child.stdin) {
+    child.stdin.write(spawnArgs.stdin);
+    child.stdin.end();
+  }
+
+  // ── Timeouts ─────────────────────────────────────────────────────────────
+  let runTimeoutHit = false;
+  let inactivityTimeoutHit = false;
+  let aborted = false;
+
+  const killChild = (signal: NodeJS.Signals): void => {
+    try {
+      if (!isWindows && typeof child.pid === 'number') {
+        try { process.kill(-child.pid, signal); } catch { child.kill(signal); }
+      } else {
+        child.kill(signal);
+      }
+    } catch {
+      /* already dead */
+    }
+    // Two-phase: SIGKILL after grace.
+    const grace = options.gracePeriodMs ?? 5000;
+    if (active.killTimer) clearTimeout(active.killTimer);
+    active.killTimer = setTimeout(() => {
+      try {
+        if (!isWindows && typeof child.pid === 'number') {
+          try { process.kill(-child.pid, 'SIGKILL'); } catch { child.kill('SIGKILL'); }
+        } else {
+          child.kill('SIGKILL');
+        }
+      } catch {
+        /* ignore */
+      }
+    }, grace);
+  };
+
+  let runTimer: NodeJS.Timeout | null = null;
+  if (options.timeout && options.timeout > 0) {
+    runTimer = setTimeout(() => {
+      runTimeoutHit = true;
+      handle.emit({
+        type: 'timeout',
+        runId: handle.runId,
+        agent: handle.agent,
+        timestamp: Date.now(),
+        kind: 'run',
+      });
+      killChild('SIGTERM');
+    }, options.timeout);
+  }
+  resetInactivity();
+
+  // ── Patch handle control methods to actually signal the child ──────────
+  const originalAbort = handle.abort.bind(handle);
+  handle.abort = async () => {
+    aborted = true;
+    handle.emit({
+      type: 'aborted',
+      runId: handle.runId,
+      agent: handle.agent,
+      timestamp: Date.now(),
+    });
+    killChild('SIGTERM');
+    try { await originalAbort(); } catch { /* state transition may no-op */ }
+  };
+
+  const originalPause = handle.pause.bind(handle);
+  handle.pause = async () => {
+    if (isWindows) {
+      handle.emit({
+        type: 'debug',
+        runId: handle.runId,
+        agent: handle.agent,
+        timestamp: Date.now(),
+        level: 'warn',
+        message: 'pause() is not supported on Windows — no-op',
+      });
+      return;
+    }
+    try {
+      if (typeof child.pid === 'number') process.kill(child.pid, 'SIGSTOP');
+    } catch { /* ignore */ }
+    await originalPause();
+  };
+
+  const originalResume = handle.resume.bind(handle);
+  handle.resume = async () => {
+    if (isWindows) return;
+    try {
+      if (typeof child.pid === 'number') process.kill(child.pid, 'SIGCONT');
+    } catch { /* ignore */ }
+    await originalResume();
+  };
+
+  // ── Exit / error handlers ───────────────────────────────────────────────
+  let errorFired = false;
+  child.on('error', (err: NodeJS.ErrnoException) => {
+    if (errorFired) return;
+    errorFired = true;
+    const code: ErrorCode =
+      err.code === 'ENOENT' ? 'AGENT_NOT_FOUND' : 'SPAWN_ERROR';
+    handle.emit({
+      type: 'error',
+      runId: handle.runId,
+      agent: handle.agent,
+      timestamp: Date.now(),
+      code,
+      message: err.message,
+      recoverable: false,
+    });
+    cleanupAndFinalize(code, 'crashed', null, null);
+  });
+
+  const cleanupAndFinalize: FinalizeFn = (terminalCode, exitReason, exitCode, signal) => {
+    if (runTimer) clearTimeout(runTimer);
+    if (inactivityTimer) clearTimeout(inactivityTimer);
+    if (active.killTimer) clearTimeout(active.killTimer);
+    if (typeof child.pid === 'number') processTracker.unregister(child.pid);
+    // Best-effort k8s ephemeral pod teardown — safety net if `kubectl run --rm`
+    // didn't fire because our local kubectl client was killed mid-flight.
+    if (invocationCmd.cleanup) runCleanupDetached(invocationCmd.cleanup);
+    finalize(terminalCode, exitReason, exitCode, signal);
+  };
+
+  child.on('exit', (code, signal) => {
+    if (errorFired) return;
+
+    let exitReason: import('./run-handle.js').RunResult['exitReason'];
+    let terminalCode: ErrorCode | null = null;
+
+    if (runTimeoutHit) {
+      exitReason = 'timeout';
+      terminalCode = 'TIMEOUT';
+    } else if (inactivityTimeoutHit) {
+      exitReason = 'inactivity';
+      terminalCode = 'INACTIVITY_TIMEOUT';
+    } else if (aborted) {
+      exitReason = 'aborted';
+      terminalCode = 'ABORTED';
+    } else if (code === 0) {
+      exitReason = 'completed';
+    } else if (signal) {
+      exitReason = 'killed';
+      terminalCode = 'AGENT_CRASH';
+    } else {
+      exitReason = 'crashed';
+      terminalCode = 'AGENT_CRASH';
+      handle.emit({
+        type: 'crash',
+        runId: handle.runId,
+        agent: handle.agent,
+        timestamp: Date.now(),
+        exitCode: code ?? -1,
+        stderr: stderrBuf.slice(-4096),
+      });
+    }
+
+    cleanupAndFinalize(terminalCode, exitReason, code, signal ?? null);
+  });
+}

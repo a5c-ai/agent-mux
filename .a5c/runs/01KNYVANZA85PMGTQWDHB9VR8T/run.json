@@ -1,0 +1,16 @@
+{
+  "runId": "01KNYVANZA85PMGTQWDHB9VR8T",
+  "request": "agent-mux-implementation",
+  "processId": "agent-mux-implementation",
+  "harness": "claude-code",
+  "entrypoint": {
+    "importPath": "../../processes/implementation.js",
+    "exportName": "process"
+  },
+  "processPath": "../../processes/implementation.js",
+  "layoutVersion": "2026.01-storage-preview",
+  "createdAt": "2026-04-11T18:02:09.815Z",
+  "prompt": "Implement @a5c-ai/agent-mux from specs in docs/ - iterative TDD with adversarial review convergence to 99%",
+  "nonInteractive": true,
+  "completionProof": "d7a70be2474a82357c0b698df343469e"
+}

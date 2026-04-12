@@ -1,0 +1,308 @@
+/**
+ * HermesAdapter — Hermes agent (NousResearch) CLI adapter.
+ */
+
+import * as os from 'node:os';
+import * as path from 'node:path';
+
+import type {
+  AgentCapabilities,
+  ModelCapabilities,
+  AgentConfigSchema,
+  AuthState,
+  AuthSetupGuidance,
+  Session,
+  SpawnArgs,
+  ParseContext,
+  RunOptions,
+  AgentEvent,
+  AgentConfig,
+} from '@a5c-ai/agent-mux-core';
+
+import * as fs from 'node:fs/promises';
+
+import { BaseAgentAdapter } from './base-adapter.js';
+import {
+  listJsonlFiles,
+  parseJsonlSessionFile,
+  parseFlatYaml,
+  stringifyFlatYaml,
+  writeTextFileAtomic,
+} from './session-fs.js';
+
+export class HermesAdapter extends BaseAgentAdapter {
+  readonly agent = 'hermes' as const;
+  readonly displayName = 'Hermes';
+  readonly cliCommand = 'hermes';
+  readonly minVersion = '0.1.0';
+  readonly hostEnvSignals = ['HERMES_SESSION', 'HERMES_RUN_ID'] as const;
+
+  readonly capabilities: AgentCapabilities = {
+    agent: 'hermes',
+    canResume: true,
+    canFork: false,
+    supportsMultiTurn: true,
+    sessionPersistence: 'sqlite',
+    supportsTextStreaming: true,
+    supportsToolCallStreaming: true,
+    supportsThinkingStreaming: false,
+    supportsNativeTools: true,
+    supportsMCP: true,
+    supportsParallelToolCalls: true,
+    requiresToolApproval: true,
+    approvalModes: ['yolo', 'prompt'],
+    supportsThinking: false,
+    thinkingEffortLevels: [],
+    supportsThinkingBudgetTokens: false,
+    supportsJsonMode: false,
+    supportsStructuredOutput: false,
+    supportsSkills: false,
+    supportsAgentsMd: false,
+    skillsFormat: null,
+    supportsSubagentDispatch: false,
+    supportsParallelExecution: false,
+    supportsInteractiveMode: true,
+    supportsStdinInjection: true,
+    supportsImageInput: false,
+    supportsImageOutput: false,
+    supportsFileAttachments: false,
+    supportsPlugins: false,
+    pluginFormats: [],
+    pluginRegistries: [],
+    supportedPlatforms: ['darwin', 'linux', 'win32'],
+    requiresGitRepo: false,
+    requiresPty: false,
+    authMethods: [
+      { type: 'api_key', name: 'OpenRouter API Key', description: 'OPENROUTER_API_KEY environment variable' },
+      { type: 'api_key', name: 'Anthropic API Key', description: 'ANTHROPIC_API_KEY environment variable' },
+      { type: 'api_key', name: 'OpenAI API Key', description: 'OPENAI_API_KEY environment variable' },
+      { type: 'api_key', name: 'Nous API Key', description: 'NOUS_API_KEY environment variable' },
+      { type: 'github_token', name: 'GitHub Token', description: 'GITHUB_TOKEN environment variable' },
+      { type: 'api_key', name: 'Google API Key', description: 'GOOGLE_API_KEY environment variable' },
+    ],
+    authFiles: ['.hermes/cli-config.yaml'],
+    installMethods: [
+      { platform: 'all', type: 'npm', command: 'npm install -g hermes-agent' },
+    ],
+  };
+
+  readonly models: ModelCapabilities[] = [
+    {
+      agent: 'hermes',
+      modelId: 'hermes-3-llama-3.1-405b',
+      displayName: 'Hermes 3 Llama 3.1 405B',
+      deprecated: false,
+      contextWindow: 128000,
+      maxOutputTokens: 8192,
+      supportsThinking: false,
+      supportsToolCalling: true,
+      supportsParallelToolCalls: true,
+      supportsToolCallStreaming: true,
+      supportsJsonMode: false,
+      supportsStructuredOutput: false,
+      supportsTextStreaming: true,
+      supportsThinkingStreaming: false,
+      supportsImageInput: false,
+      supportsImageOutput: false,
+      supportsFileInput: false,
+      cliArgKey: '--model',
+      cliArgValue: 'hermes-3-llama-3.1-405b',
+      lastUpdated: '2025-01-01',
+      source: 'bundled',
+    },
+  ];
+
+  readonly defaultModelId = 'hermes-3-llama-3.1-405b';
+
+  readonly configSchema: AgentConfigSchema = {
+    agent: 'hermes',
+    version: 1,
+    fields: [],
+    configFilePaths: [path.join(os.homedir(), '.hermes', 'cli-config.yaml')],
+    configFormat: 'yaml',
+    supportsProjectConfig: false,
+  };
+
+  buildSpawnArgs(options: RunOptions): SpawnArgs {
+    const args: string[] = [];
+
+    if (options.model) {
+      args.push('--model', options.model);
+    }
+
+    if (options.approvalMode === 'yolo') {
+      args.push('--auto-approve');
+    }
+
+    const prompt = Array.isArray(options.prompt) ? options.prompt.join('\n') : options.prompt;
+    args.push('--prompt', prompt);
+
+    return {
+      command: this.cliCommand,
+      args,
+      env: this.buildEnvFromOptions(options),
+      cwd: options.cwd ?? process.cwd(),
+      usePty: false,
+      timeout: options.timeout,
+      inactivityTimeout: options.inactivityTimeout,
+    };
+  }
+
+  parseEvent(line: string, context: ParseContext): AgentEvent | AgentEvent[] | null {
+    const parsed = this.parseJsonLine(line);
+    if (parsed == null || typeof parsed !== 'object') return null;
+
+    const obj = parsed as Record<string, unknown>;
+    const ts = Date.now();
+    const base = { runId: context.runId, agent: this.agent, timestamp: ts };
+
+    const type = obj['type'] as string | undefined;
+
+    if (type === 'text' || type === 'message') {
+      const content = (obj['content'] ?? obj['text'] ?? '') as string;
+      if (content) {
+        return { ...base, type: 'text_delta', delta: content, accumulated: content } as AgentEvent;
+      }
+    }
+
+    if (type === 'tool_call') {
+      return {
+        ...base,
+        type: 'tool_call_start',
+        toolCallId: (obj['id'] ?? '') as string,
+        toolName: (obj['name'] ?? '') as string,
+        inputAccumulated: JSON.stringify(obj['input'] ?? {}),
+      } as AgentEvent;
+    }
+
+    if (type === 'error') {
+      return {
+        ...base,
+        type: 'error',
+        code: 'INTERNAL' as const,
+        message: (obj['message'] ?? 'Unknown error') as string,
+        recoverable: false,
+      } as AgentEvent;
+    }
+
+    return null;
+  }
+
+  async detectAuth(): Promise<AuthState> {
+    const envVars = [
+      'OPENROUTER_API_KEY',
+      'ANTHROPIC_API_KEY',
+      'OPENAI_API_KEY',
+      'NOUS_API_KEY',
+      'GITHUB_TOKEN',
+      'GOOGLE_API_KEY',
+    ] as const;
+
+    for (const envVar of envVars) {
+      if (process.env[envVar]) {
+        const method = envVar === 'GITHUB_TOKEN' ? 'github_token' : 'api_key';
+        return {
+          status: 'authenticated',
+          method,
+          identity: `${envVar.toLowerCase().replace('_api_key', '').replace('_token', '')}`,
+        };
+      }
+    }
+
+    return { status: 'unauthenticated' };
+  }
+
+  getAuthGuidance(): AuthSetupGuidance {
+    return {
+      agent: 'hermes',
+      providerName: 'NousResearch / Hermes',
+      steps: [
+        { step: 1, description: 'Set one or more provider API key environment variables' },
+        { step: 2, description: 'OpenRouter: export OPENROUTER_API_KEY=sk-or-...', command: 'export OPENROUTER_API_KEY=sk-or-...' },
+        { step: 3, description: 'Or use Anthropic, OpenAI, Nous, GitHub, or Google API keys' },
+      ],
+      envVars: [
+        { name: 'OPENROUTER_API_KEY', description: 'OpenRouter API key', required: false, exampleFormat: 'sk-or-...' },
+        { name: 'ANTHROPIC_API_KEY', description: 'Anthropic API key', required: false },
+        { name: 'OPENAI_API_KEY', description: 'OpenAI API key', required: false },
+        { name: 'NOUS_API_KEY', description: 'Nous API key', required: false },
+        { name: 'GITHUB_TOKEN', description: 'GitHub token', required: false },
+        { name: 'GOOGLE_API_KEY', description: 'Google API key', required: false },
+      ],
+      documentationUrls: ['https://github.com/NousResearch/hermes'],
+      verifyCommand: 'hermes --version',
+    };
+  }
+
+  sessionDir(_cwd?: string): string {
+    return path.join(os.homedir(), '.hermes', 'sessions');
+  }
+
+  async parseSessionFile(filePath: string): Promise<Session> {
+    const parsed = await parseJsonlSessionFile(filePath, 'hermes');
+    return { ...parsed, agent: 'hermes' };
+  }
+
+  async listSessionFiles(_cwd?: string): Promise<string[]> {
+    return listJsonlFiles(this.sessionDir());
+  }
+
+  async readConfig(_cwd?: string): Promise<AgentConfig> {
+    const filePath = this.configSchema.configFilePaths?.[0];
+    if (!filePath) return { agent: 'hermes', source: 'global' };
+    let text: string;
+    try {
+      text = await fs.readFile(filePath, 'utf8');
+    } catch {
+      return { agent: 'hermes', source: 'global', filePaths: [filePath] };
+    }
+    const data = parseFlatYaml(text);
+    return { agent: 'hermes', source: 'global', filePaths: [filePath], ...data };
+  }
+
+  async writeConfig(config: Partial<AgentConfig>, _cwd?: string): Promise<void> {
+    const filePath = this.configSchema.configFilePaths?.[0];
+    if (!filePath) return;
+    let existing: Record<string, unknown> = {};
+    try {
+      existing = parseFlatYaml(await fs.readFile(filePath, 'utf8'));
+    } catch {
+      existing = {};
+    }
+    const { agent: _a, source: _s, filePaths: _fp, ...rest } = config as Record<string, unknown>;
+    void _a; void _s; void _fp;
+    const merged = { ...existing, ...rest };
+    await writeTextFileAtomic(filePath, stringifyFlatYaml(merged));
+  }
+
+  /**
+   * Hermes stores config as flat YAML. We encode hooks as a nested
+   * `hooks:` block with one `<hookType>: <command>` entry per line.
+   * Multiple commands per hookType are joined with `&&` since flat YAML
+   * allows only one value per key.
+   */
+  protected override async writeNativeHook(hookType: string, command: string): Promise<void> {
+    const filePath = this.configSchema.configFilePaths?.[0];
+    if (!filePath) return;
+    try {
+      let existing: Record<string, unknown> = {};
+      try {
+        existing = parseFlatYaml(await fs.readFile(filePath, 'utf8'));
+      } catch {
+        existing = {};
+      }
+      const hooks = (existing['hooks'] && typeof existing['hooks'] === 'object'
+        ? (existing['hooks'] as Record<string, unknown>)
+        : {}) as Record<string, unknown>;
+      const prior = typeof hooks[hookType] === 'string' ? (hooks[hookType] as string) : '';
+      hooks[hookType] = prior ? `${prior} && ${command}` : command;
+      const merged = { ...existing, hooks };
+      const fsp = await import('node:fs/promises');
+      const pathMod = await import('node:path');
+      await fsp.mkdir(pathMod.dirname(filePath), { recursive: true });
+      await writeTextFileAtomic(filePath, stringifyFlatYaml(merged));
+    } catch {
+      // swallow
+    }
+  }
+}

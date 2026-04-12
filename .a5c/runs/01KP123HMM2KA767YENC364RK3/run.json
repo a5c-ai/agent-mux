@@ -1,0 +1,14 @@
+{
+  "runId": "01KP123HMM2KA767YENC364RK3",
+  "request": "reference-parity-research",
+  "processId": "reference-parity-research",
+  "entrypoint": {
+    "importPath": "../../processes/reference-parity-research.js",
+    "exportName": "default"
+  },
+  "processPath": "../../processes/reference-parity-research.js",
+  "layoutVersion": "2026.01-storage-preview",
+  "createdAt": "2026-04-12T14:39:04.885Z",
+  "nonInteractive": true,
+  "completionProof": "beabccbe882cba7a913538c1793c98f5"
+}

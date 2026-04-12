@@ -1,0 +1,124 @@
+import { describe, it, expect } from 'vitest';
+import {
+  MockProcess,
+  AGENT_SCENARIOS,
+  ERROR_SCENARIOS,
+  INTERACTION_SCENARIOS,
+  resolveScenario,
+  listScenarioNames,
+  buildInteractiveScenario,
+} from '../src/index.js';
+
+describe('Per-agent scenarios', () => {
+  const names = Object.keys(AGENT_SCENARIOS);
+
+  it('covers all 10 built-in agents with >=2 scenarios each', () => {
+    const agents = ['claude', 'codex', 'gemini', 'copilot', 'cursor', 'opencode', 'pi', 'omp', 'openclaw', 'hermes'];
+    for (const a of agents) {
+      const forAgent = names.filter((n) => n.startsWith(`${a}:`));
+      expect(forAgent.length, `agent ${a}`).toBeGreaterThanOrEqual(2);
+    }
+  });
+
+  for (const name of Object.keys(AGENT_SCENARIOS)) {
+    it(`scenario ${name} runs and exits 0`, async () => {
+      const proc = new MockProcess(AGENT_SCENARIOS[name]!);
+      proc.start();
+      const res = await proc.waitForExit();
+      expect(res.exitCode).toBe(0);
+      expect(res.stdout.length).toBeGreaterThan(0);
+    });
+  }
+});
+
+describe('resolveScenario / listScenarioNames', () => {
+  it('lists agent + error + interactive names', () => {
+    const all = listScenarioNames();
+    expect(all).toContain('claude:basic-text');
+    expect(all).toContain('error:rate-limit');
+    expect(all).toContain('interactive:yolo');
+  });
+
+  it('returns undefined for unknown', () => {
+    expect(resolveScenario('nope:nada')).toBeUndefined();
+  });
+
+  it('resolves agent scenario', () => {
+    const s = resolveScenario('gemini:streaming');
+    expect(s?.name).toBe('gemini:streaming');
+  });
+
+  it('resolves error scenario', () => {
+    const s = resolveScenario('error:crash');
+    expect(s).toBeDefined();
+    expect(s?.process.crashAfterMs).toBeGreaterThan(0);
+  });
+
+  it('resolves interactive scenario', () => {
+    const s = resolveScenario('interactive:deny');
+    expect(s?.name).toBe('interactive:deny');
+  });
+});
+
+describe('Error scenarios', () => {
+  it('rate-limit exits nonzero and emits error line', async () => {
+    const meta = ERROR_SCENARIOS['rate-limit']!;
+    const proc = new MockProcess(meta.scenario);
+    proc.start();
+    const res = await proc.waitForExit();
+    expect(res.exitCode).toBe(1);
+    expect(res.stdout).toContain('Rate limit');
+  });
+
+  it('crash exits with signal code', async () => {
+    const meta = ERROR_SCENARIOS['crash']!;
+    const proc = new MockProcess(meta.scenario);
+    proc.start();
+    const res = await proc.waitForExit();
+    expect([137, 143]).toContain(res.exitCode);
+  });
+
+  it('oom exits with 137', async () => {
+    const meta = ERROR_SCENARIOS['oom']!;
+    const proc = new MockProcess(meta.scenario);
+    proc.start();
+    const res = await proc.waitForExit();
+    expect(res.exitCode).toBe(137);
+  });
+
+  it('timeout scenario hangs until killed', async () => {
+    const meta = ERROR_SCENARIOS['timeout']!;
+    const proc = new MockProcess(meta.scenario);
+    proc.start();
+    setTimeout(() => proc.kill(), 50);
+    const res = await proc.waitForExit();
+    expect(res.exitCode).toBe(143);
+  });
+});
+
+describe('Interaction scenarios', () => {
+  it('yolo auto-responds y', async () => {
+    const scen = INTERACTION_SCENARIOS.yolo;
+    const proc = new MockProcess(scen);
+    const responses: string[] = [];
+    proc.on('auto-response', (r: string) => responses.push(r));
+    proc.start();
+    await proc.waitForExit();
+    expect(responses).toEqual(['y\n']);
+  });
+
+  it('deny auto-responds n', async () => {
+    const scen = INTERACTION_SCENARIOS.deny;
+    const proc = new MockProcess(scen);
+    const responses: string[] = [];
+    proc.on('auto-response', (r: string) => responses.push(r));
+    proc.start();
+    await proc.waitForExit();
+    expect(responses).toEqual(['n\n']);
+  });
+
+  it('prompt mode has no auto-response configured', () => {
+    const scen = buildInteractiveScenario('prompt');
+    expect(scen.interactions).toBeUndefined();
+  });
+});

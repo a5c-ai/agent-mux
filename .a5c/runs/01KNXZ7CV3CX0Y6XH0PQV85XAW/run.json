@@ -1,0 +1,15 @@
+{
+  "runId": "01KNXZ7CV3CX0Y6XH0PQV85XAW",
+  "request": "spec-convergence",
+  "processId": "spec-convergence",
+  "harness": "claude-code",
+  "entrypoint": {
+    "importPath": "../../processes/spec-convergence.js",
+    "exportName": "process"
+  },
+  "processPath": "../../processes/spec-convergence.js",
+  "layoutVersion": "2026.01-storage-preview",
+  "createdAt": "2026-04-11T09:51:02.024Z",
+  "prompt": "Create full specs in docs/ from agent-mux-scope.md - converge iteratively to 99% score through research, refinement and adversarial reviews",
+  "completionProof": "0601516e8d76aa29030331ebafe54bba"
+}

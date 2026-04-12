@@ -1,0 +1,536 @@
+/**
+ * RunHandleImpl — concrete implementation of RunHandle.
+ *
+ * Implements:
+ * - Typed EventEmitter dispatch with per-type handler maps
+ * - AsyncIterator fan-out with shared replay buffer (high-water-mark bounded)
+ * - State machine (via state-machine.ts)
+ * - Thenable contract (lazy internal promise, resolves to RunResult)
+ * - Control method guards (RUN_NOT_ACTIVE, INVALID_STATE_TRANSITION)
+ * - Interaction channel wiring
+ */
+
+import type { AgentName, CostRecord } from './types.js';
+import type { AgentEvent, AgentEventType, EventOfType, DebugEvent } from './events.js';
+import type { RunHandle, RunResult, TokenUsageSummary, RunError } from './run-handle.js';
+import type { InteractionChannel, InteractionResponse } from './interaction.js';
+import type { ApprovalRequestEvent, InputRequiredEvent, TokenUsageEvent, CostEvent, TextDeltaEvent, TurnStartEvent } from './events.js';
+import { AgentMuxError } from './errors.js';
+import { type RunState, assertTransition, isTerminal } from './state-machine.js';
+import { InteractionChannelImpl } from './interaction-channel-impl.js';
+import {
+  accumulateTokenUsage,
+  accumulateCost,
+  buildTokenUsageSummary,
+  type CostAccumulator,
+  type TokenAccumulator,
+} from './run-handle-cost.js';
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+/** Options for constructing a RunHandleImpl. */
+export interface RunHandleImplOptions {
+  readonly runId: string;
+  readonly agent: AgentName;
+  readonly model?: string;
+  /** Approval mode for the interaction channel. */
+  readonly approvalMode?: 'yolo' | 'prompt' | 'deny';
+  /** Maximum number of events to buffer for late async iterators. */
+  readonly bufferHighWaterMark?: number;
+  /** Whether to collect all events in RunResult.events. */
+  readonly collectEvents?: boolean;
+  /** Tags echoed back in RunResult. */
+  readonly tags?: string[];
+}
+
+/** Default high-water mark for the shared event buffer. */
+const DEFAULT_HWM = 1000;
+
+// ---------------------------------------------------------------------------
+// Iterator state
+// ---------------------------------------------------------------------------
+
+interface IteratorState {
+  /** Position in the shared _buffer from which this iterator should next yield. */
+  position: number;
+
+  /** Resolve function for the current `next()` call that is awaiting an event. */
+  waiting: ((value: IteratorResult<AgentEvent>) => void) | null;
+}
+
+// ---------------------------------------------------------------------------
+// RunHandleImpl
+// ---------------------------------------------------------------------------
+
+export class RunHandleImpl implements RunHandle {
+  // ── Identity ─────────────────────────────────────────────────────────────
+
+  readonly runId: string;
+  readonly agent: AgentName;
+  readonly model: string | undefined;
+
+  // ── State machine ─────────────────────────────────────────────────────────
+
+  private _state: RunState = 'spawned';
+
+  // ── EventEmitter handler map ──────────────────────────────────────────────
+
+  /** Map from event type -> array of handlers. */
+  private readonly _handlers = new Map<string, ((event: AgentEvent) => void)[]>();
+
+  // ── AsyncIterator fan-out ─────────────────────────────────────────────────
+
+  /** Shared ordered buffer of all events emitted so far. */
+  private readonly _buffer: AgentEvent[] = [];
+
+  /** Per-iterator tracking state. */
+  private readonly _iterators: Set<IteratorState> = new Set();
+
+  /** When true, the run has ended and all iterators should drain and stop. */
+  private _done = false;
+
+  /** High-water mark for the buffer. */
+  private readonly _hwm: number;
+
+  // ── Thenable / result promise (lazy, per spec §2) ─────────────────────────
+
+  private _resultPromise: Promise<RunResult> | null = null;
+  private _resolveResult: ((result: RunResult) => void) | null = null;
+  /** Queued result if complete() is called before the promise is created. */
+  private _pendingResult: RunResult | null = null;
+
+  // ── Run result accumulators ───────────────────────────────────────────────
+
+  private _text = '';
+  private _sessionId: string | undefined;
+  private _cost: CostAccumulator | null = null;
+  private _startTime = Date.now();
+  private _tokenUsage: TokenAccumulator = { inputTokens: 0, outputTokens: 0, thinkingTokens: 0, cachedTokens: 0 };
+  private _turnCount = 0;
+  private _exitCode: number | null = null;
+  private _signal: string | null = null;
+  private _runError: RunError | null = null;
+  private _collectedEvents: AgentEvent[] = [];
+  private readonly _collectEvents: boolean;
+  private readonly _tags: string[];
+
+  // ── Interaction channel ───────────────────────────────────────────────────
+
+  readonly interaction: InteractionChannelImpl;
+
+  // ── Constructor ───────────────────────────────────────────────────────────
+
+  constructor(options: RunHandleImplOptions) {
+    this.runId = options.runId;
+    this.agent = options.agent;
+    this.model = options.model;
+    this._hwm = options.bufferHighWaterMark ?? DEFAULT_HWM;
+    this._collectEvents = options.collectEvents ?? false;
+    this._tags = options.tags ?? [];
+
+    this.interaction = new InteractionChannelImpl(options.approvalMode ?? 'prompt');
+
+    // Wire up the interaction channel's response dispatcher.
+    this.interaction.setDispatch(async (id, response) => {
+      await this._handleInteractionResponse(id, response);
+    });
+    // Result promise is created lazily per spec §2.
+  }
+
+  // ── State machine ─────────────────────────────────────────────────────────
+
+  /** Current run state. */
+  get state(): RunState {
+    return this._state;
+  }
+
+  /**
+   * Transition to a new state.
+   * Validates the transition and updates the internal state.
+   * Does NOT emit a state-change event — callers should emit the appropriate event then call this.
+   */
+  transitionTo(next: RunState): void {
+    assertTransition(this._state, next);
+    this._state = next;
+  }
+
+  // ── Event dispatch ────────────────────────────────────────────────────────
+
+  /**
+   * Emit an event. Called by the adapter or test harness.
+   *
+   * 1. Accumulates relevant fields (text, token usage, cost, session ID).
+   * 2. Appends to the shared buffer (with HWM enforcement).
+   * 3. Wakes up waiting async iterators.
+   * 4. Dispatches to registered EventEmitter handlers.
+   */
+  emit(event: AgentEvent): void {
+    // Accumulate run result fields.
+    this._accumulate(event);
+
+    // Collect if requested.
+    if (this._collectEvents) {
+      this._collectedEvents.push(event);
+    }
+
+    // Append to shared buffer with HWM enforcement.
+    if (this._buffer.length >= this._hwm) {
+      // Drop oldest events already consumed by all iterators per spec §10.3.
+      let minPosition = this._buffer.length;
+      for (const iter of this._iterators) {
+        if (iter.position < minPosition) minPosition = iter.position;
+      }
+      if (minPosition > 0) {
+        // Evict events already consumed by all iterators.
+        this._buffer.splice(0, minPosition);
+        for (const iter of this._iterators) {
+          iter.position -= minPosition;
+        }
+      } else if (this._buffer.length >= this._hwm) {
+        // All iterators at position 0 — must drop oldest anyway.
+        this._buffer.shift();
+        // No position adjustment needed since they haven't consumed it.
+      }
+      this._emitDebugEvent('warn', `Event buffer overflow: events dropped (HWM=${this._hwm})`);
+    }
+    this._buffer.push(event);
+
+    // Wake waiting iterators.
+    for (const iter of this._iterators) {
+      if (iter.waiting !== null) {
+        const resolve = iter.waiting;
+        iter.waiting = null;
+        iter.position++;
+        resolve({ value: event, done: false });
+      }
+    }
+
+    // Dispatch to EventEmitter handlers.
+    this._dispatchHandlers(event);
+  }
+
+  /**
+   * Signal that the run has ended with the given exit information.
+   * Resolves the result promise and terminates all async iterators.
+   */
+  complete(exitReason: RunResult['exitReason'], exitCode: number | null, signal: string | null): void {
+    this._exitCode = exitCode;
+    this._signal = signal;
+    this._done = true;
+    this.interaction.terminate();
+
+    // Wake all waiting iterators with done = true.
+    for (const iter of this._iterators) {
+      if (iter.waiting !== null) {
+        const resolve = iter.waiting;
+        iter.waiting = null;
+        resolve({ value: undefined as unknown as AgentEvent, done: true });
+      }
+    }
+
+    // Resolve the result promise (or queue for lazy creation).
+    const result = this._buildResult(exitReason);
+    if (this._resolveResult) {
+      this._resolveResult(result);
+    } else {
+      this._pendingResult = result;
+    }
+  }
+
+  // ── AsyncIterable ─────────────────────────────────────────────────────────
+
+  [Symbol.asyncIterator](): AsyncIterator<AgentEvent> {
+    const iterState: IteratorState = {
+      position: 0,
+      waiting: null,
+    };
+    this._iterators.add(iterState);
+
+    const self = this;
+    return {
+      next(): Promise<IteratorResult<AgentEvent>> {
+        // Replay buffered events that this iterator hasn't consumed yet.
+        if (iterState.position < self._buffer.length) {
+          const event = self._buffer[iterState.position++]!;
+          return Promise.resolve({ value: event, done: false });
+        }
+
+        // If the run is done and we've consumed all buffered events, terminate.
+        if (self._done) {
+          self._iterators.delete(iterState);
+          return Promise.resolve({ value: undefined as unknown as AgentEvent, done: true });
+        }
+
+        // Wait for the next event.
+        return new Promise<IteratorResult<AgentEvent>>((resolve) => {
+          iterState.waiting = resolve;
+        });
+      },
+
+      return(): Promise<IteratorResult<AgentEvent>> {
+        iterState.waiting = null;
+        self._iterators.delete(iterState);
+        return Promise.resolve({ value: undefined as unknown as AgentEvent, done: true });
+      },
+    };
+  }
+
+  // ── EventEmitter ──────────────────────────────────────────────────────────
+
+  on<T extends AgentEventType>(type: T, handler: (event: EventOfType<T>) => void): this {
+    const list = this._handlers.get(type) ?? [];
+    list.push(handler as (event: AgentEvent) => void);
+    this._handlers.set(type, list);
+    return this;
+  }
+
+  off<T extends AgentEventType>(type: T, handler: (event: EventOfType<T>) => void): this {
+    const list = this._handlers.get(type);
+    if (!list) return this;
+    const idx = list.indexOf(handler as (event: AgentEvent) => void);
+    if (idx !== -1) list.splice(idx, 1);
+    return this;
+  }
+
+  once<T extends AgentEventType>(type: T, handler: (event: EventOfType<T>) => void): this {
+    const wrapper = (event: EventOfType<T>) => {
+      this.off(type, wrapper);
+      handler(event);
+    };
+    return this.on(type, wrapper);
+  }
+
+  // ── Thenable ──────────────────────────────────────────────────────────────
+
+  /** Lazily create the result promise per spec §2. */
+  private _ensureResultPromise(): Promise<RunResult> {
+    if (!this._resultPromise) {
+      if (this._pendingResult) {
+        // complete() was called before anyone accessed the promise.
+        this._resultPromise = Promise.resolve(this._pendingResult);
+      } else {
+        this._resultPromise = new Promise<RunResult>((resolve) => {
+          this._resolveResult = resolve;
+        });
+      }
+    }
+    return this._resultPromise;
+  }
+
+  get then(): Promise<RunResult>['then'] {
+    const p = this._ensureResultPromise();
+    return p.then.bind(p);
+  }
+
+  get catch(): Promise<RunResult>['catch'] {
+    const p = this._ensureResultPromise();
+    return p.catch.bind(p);
+  }
+
+  get finally(): Promise<RunResult>['finally'] {
+    const p = this._ensureResultPromise();
+    return p.finally.bind(p);
+  }
+
+  result(): Promise<RunResult> {
+    return this._ensureResultPromise();
+  }
+
+  // ── Interaction methods ───────────────────────────────────────────────────
+
+  async send(text: string): Promise<void> {
+    this._assertActive();
+    if (!text) {
+      throw new AgentMuxError('VALIDATION_ERROR', 'send() requires non-empty text', false);
+    }
+    // Stub: real implementation writes to subprocess stdin with trailing newline.
+    // Adapter integration (subprocess I/O) is implemented in Phase 11.
+  }
+
+  async approve(detail?: string): Promise<void> {
+    this._assertActive();
+    const pending = this.interaction.pending.filter((p) => p.type === 'approval');
+    if (pending.length === 0) {
+      throw new AgentMuxError('NO_PENDING_INTERACTION', 'No pending approval interaction', false);
+    }
+    await this.interaction.respond(pending[0]!.id, { type: 'approve', detail });
+  }
+
+  async deny(reason?: string): Promise<void> {
+    this._assertActive();
+    const pending = this.interaction.pending.filter((p) => p.type === 'approval');
+    if (pending.length === 0) {
+      throw new AgentMuxError('NO_PENDING_INTERACTION', 'No pending approval interaction', false);
+    }
+    await this.interaction.respond(pending[0]!.id, { type: 'deny', reason });
+  }
+
+  async continue(prompt: string): Promise<void> {
+    this._assertActive();
+    if (!prompt) {
+      throw new AgentMuxError('VALIDATION_ERROR', 'continue() requires non-empty prompt', false);
+    }
+    // Semantically equivalent to send() — adapters may differentiate later.
+    await this.send(prompt);
+  }
+
+  // ── Control methods ───────────────────────────────────────────────────────
+
+  async interrupt(): Promise<void> {
+    this._assertActive();
+    this.transitionTo('interrupted');
+  }
+
+  async abort(): Promise<void> {
+    if (isTerminal(this._state)) {
+      // No-op for already-terminated runs.
+      return;
+    }
+    this.transitionTo('aborted');
+  }
+
+  async pause(): Promise<void> {
+    this._assertActive();
+    this.transitionTo('paused');
+  }
+
+  async resume(): Promise<void> {
+    this._assertActive();
+    this.transitionTo('running');
+  }
+
+  // ── Private helpers ───────────────────────────────────────────────────────
+
+  private _assertActive(): void {
+    if (isTerminal(this._state)) {
+      throw new AgentMuxError('RUN_NOT_ACTIVE', `Run ${this.runId} is not active (state: ${this._state})`, false);
+    }
+  }
+
+  private _accumulate(event: AgentEvent): void {
+    switch (event.type) {
+      case 'text_delta':
+        this._text += (event as TextDeltaEvent).delta;
+        break;
+      case 'session_start':
+        this._sessionId = (event as { sessionId: string }).sessionId;
+        break;
+      case 'token_usage':
+        accumulateTokenUsage(this._tokenUsage, event as TokenUsageEvent);
+        break;
+      case 'cost':
+        this._cost = accumulateCost(this._cost, event as CostEvent);
+        break;
+      case 'turn_start':
+        this._turnCount = (event as TurnStartEvent).turnIndex + 1;
+        break;
+      case 'crash':
+        this._runError = {
+          code: 'AGENT_CRASH',
+          message: (event as { stderr: string }).stderr || 'Agent crashed',
+          stderr: (event as { stderr: string }).stderr,
+          recoverable: false,
+        };
+        break;
+      case 'error':
+        this._runError = {
+          code: (event as { code: import('./types.js').ErrorCode }).code,
+          message: (event as { message: string }).message,
+          stderr: '',
+          recoverable: (event as { recoverable: boolean }).recoverable,
+        };
+        break;
+      case 'approval_request':
+        this.interaction.handleApprovalRequest(event as ApprovalRequestEvent);
+        break;
+      case 'input_required':
+        this.interaction.handleInputRequired(event as InputRequiredEvent);
+        break;
+    }
+  }
+
+  private _dispatchHandlers(event: AgentEvent): void {
+    const list = this._handlers.get(event.type);
+    if (!list || list.length === 0) return;
+    // Invoke handlers in registration order; catch errors and emit debug events per spec §10.4.
+    for (const handler of list.slice()) {
+      try {
+        handler(event);
+      } catch (err) {
+        // Per spec: errors in handlers are caught, logged via debug event,
+        // and do not prevent subsequent handlers from executing.
+        this._emitDebugEvent(
+          'warn',
+          `EventEmitter handler threw: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    }
+  }
+
+  /** Emit a debug event without recursing through _dispatchHandlers for debug handlers. */
+  private _emitDebugEvent(level: 'verbose' | 'info' | 'warn', message: string): void {
+    const debugEvent: DebugEvent = {
+      type: 'debug',
+      runId: this.runId,
+      agent: this.agent,
+      timestamp: Date.now(),
+      level,
+      message,
+    };
+    // Append to buffer and collected events, but dispatch to debug handlers
+    // directly to avoid infinite recursion.
+    if (this._collectEvents) {
+      this._collectedEvents.push(debugEvent);
+    }
+    this._buffer.push(debugEvent);
+    // Wake waiting iterators for the debug event.
+    for (const iter of this._iterators) {
+      if (iter.waiting !== null) {
+        const resolve = iter.waiting;
+        iter.waiting = null;
+        iter.position++;
+        resolve({ value: debugEvent, done: false });
+      }
+    }
+    // Dispatch only to 'debug' handlers (not the handler that just threw).
+    const debugHandlers = this._handlers.get('debug');
+    if (debugHandlers && debugHandlers.length > 0) {
+      for (const h of debugHandlers.slice()) {
+        try {
+          h(debugEvent);
+        } catch {
+          // Swallow errors in debug handlers to prevent infinite recursion.
+        }
+      }
+    }
+  }
+
+  private _buildResult(exitReason: RunResult['exitReason']): RunResult {
+    const durationMs = Date.now() - this._startTime;
+    const tokenUsage = buildTokenUsageSummary(this._tokenUsage);
+    return {
+      runId: this.runId,
+      agent: this.agent,
+      model: this.model,
+      sessionId: this._sessionId,
+      text: this._text,
+      cost: this._cost,
+      durationMs,
+      exitCode: this._exitCode,
+      signal: this._signal,
+      exitReason,
+      tokenUsage,
+      turnCount: this._turnCount,
+      error: this._runError,
+      events: this._collectEvents ? [...this._collectedEvents] : [],
+      tags: [...this._tags],
+    };
+  }
+
+  private async _handleInteractionResponse(_id: string, _response: InteractionResponse): Promise<void> {
+    // In this phase: stub. Real adapters will write to the agent's stdin/PTY.
+    // The interaction channel already removed the interaction from pending.
+  }
+}

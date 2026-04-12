@@ -1,0 +1,14 @@
+{
+  "runId": "01KP123VYEBBHGRZY6W6QGAKE3",
+  "request": "babysitter-parity",
+  "processId": "babysitter-parity",
+  "entrypoint": {
+    "importPath": "../../processes/babysitter-parity.js",
+    "exportName": "default"
+  },
+  "processPath": "../../processes/babysitter-parity.js",
+  "layoutVersion": "2026.01-storage-preview",
+  "createdAt": "2026-04-12T14:39:15.515Z",
+  "nonInteractive": true,
+  "completionProof": "6b211c9d8766a58195a6675050f95578"
+}
