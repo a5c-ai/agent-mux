@@ -1,6 +1,6 @@
 {
   "name": "@a5c-ai/agent-mux",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "license": "MIT",
   "description": "Unified dispatch layer for local CLI-based AI coding agents",
@@ -54,8 +54,8 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@a5c-ai/agent-mux-core": "0.1.0",
-    "@a5c-ai/agent-mux-adapters": "0.1.0",
-    "@a5c-ai/agent-mux-cli": "0.1.0"
+    "@a5c-ai/agent-mux-core": "0.2.0",
+    "@a5c-ai/agent-mux-adapters": "0.2.0",
+    "@a5c-ai/agent-mux-cli": "0.2.0"
   }
 }
