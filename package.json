@@ -15,8 +15,8 @@
     "packages/harness-mock"
   ],
   "scripts": {
-    "build": "tsc --build",
-    "typecheck": "tsc --build",
+    "build": "tsc --build packages/core && tsc --build packages/adapters packages/harness-mock && tsc --build packages/cli && tsc --build packages/agent-mux",
+    "typecheck": "npm run build",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
