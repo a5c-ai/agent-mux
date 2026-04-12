@@ -38,6 +38,7 @@ import { detectHostCommand } from './commands/detect-host.js';
 import { remoteCommand, REMOTE_FLAGS } from './commands/remote.js';
 import { hooksCommand, HOOKS_FLAGS } from './commands/hooks.js';
 import { doctorCommand } from './commands/doctor.js';
+import { tuiCommand } from './commands/tui.js';
 import { registerBuiltInAdapters } from './bootstrap.js';
 
 /**
@@ -163,6 +164,9 @@ export async function main(argv?: string[]): Promise<number> {
 
       case 'doctor':
         return await doctorCommand(client, args);
+
+      case 'tui':
+        return await tuiCommand(client, args);
 
       default:
         if (jsonMode) {

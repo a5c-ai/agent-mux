@@ -12,6 +12,7 @@ import cost from './plugins/cost.js';
 import chatView from './plugins/chat-view.js';
 import sessionsView from './plugins/sessions-view.js';
 import fallback from './plugins/fallback.js';
+import diff from './plugins/diff.js';
 import type { TuiPlugin } from './plugin.js';
 
 // Order matters: specific renderers first, fallback LAST so it only matches
@@ -19,6 +20,7 @@ import type { TuiPlugin } from './plugin.js';
 export const builtinPlugins: TuiPlugin[] = [
   textDelta,
   toolCall,
+  diff,
   cost,
   chatView,
   sessionsView,
