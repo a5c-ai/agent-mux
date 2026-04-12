@@ -94,7 +94,7 @@ services:
       context: ../..
       dockerfile: docker/e2e/Dockerfile.real
     environment:
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:?set ANTHROPIC_API_KEY to run}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
     command: ["run", "claude", "--prompt", "say hi"]
 
   real-e2e-codex:
@@ -102,7 +102,7 @@ services:
       context: ../..
       dockerfile: docker/e2e/Dockerfile.real
     environment:
-      OPENAI_API_KEY: ${OPENAI_API_KEY:?set OPENAI_API_KEY to run}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
     command: ["run", "codex", "--prompt", "say hi"]
 
   real-e2e-cursor:
@@ -110,7 +110,7 @@ services:
       context: ../..
       dockerfile: docker/e2e/Dockerfile.real
     environment:
-      CURSOR_API_KEY: ${CURSOR_API_KEY:?set CURSOR_API_KEY to run}
+      CURSOR_API_KEY: ${CURSOR_API_KEY:-}
     command: ["run", "cursor", "--prompt", "say hi"]
 
   real-e2e-gemini:
@@ -118,7 +118,7 @@ services:
       context: ../..
       dockerfile: docker/e2e/Dockerfile.real
     environment:
-      GOOGLE_API_KEY: ${GOOGLE_API_KEY:?set GOOGLE_API_KEY to run}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
     command: ["run", "gemini", "--prompt", "say hi"]
 
   real-e2e-opencode:
@@ -126,5 +126,5 @@ services:
       context: ../..
       dockerfile: docker/e2e/Dockerfile.real
     environment:
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:?set ANTHROPIC_API_KEY to run}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
     command: ["run", "opencode", "--prompt", "say hi"]
