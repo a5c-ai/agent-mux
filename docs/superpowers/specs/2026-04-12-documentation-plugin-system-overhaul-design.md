@@ -73,7 +73,7 @@ amux mcp list <agent> --project         # List project-specific MCPs
 amux mcp install <agent> <mcp-server> --project  # Install to project scope
 ```
 
-**Note**: MCP commands include additional configuration nuances beyond basic install/list/uninstall, including configuration management, enable/disable states, and config file handling.
+**Note**: MCP commands will require additional implementation beyond the basic commands shown above. The full MCP command API design (including configuration management, enable/disable states, and config file handling) will be detailed in a separate technical specification during implementation.
 
 **Plugin Commands (New - delegate to native harness commands):**
 
@@ -176,8 +176,8 @@ amux mcp list <agent>
 ## Implementation Notes
 
 - **No backward compatibility** - existing `amux plugins` commands will be replaced entirely
-- **MCP configuration nuances** require careful attention beyond basic install/uninstall
-- **Agent detection** needed to determine plugin vs MCP-only support
+- **MCP configuration complexity** will require detailed technical specification during implementation (configuration file formats, enable/disable states, global vs project scoping)
+- **Agent capability detection** will check for native plugin command availability (e.g., test if `claude plugins --help` succeeds) to determine plugin vs MCP-only support
 - **Link checking integration** must not significantly slow CI pipeline
 
 ## Dependencies
