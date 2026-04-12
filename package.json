@@ -30,7 +30,8 @@
     "release": "npm run build && changeset publish",
     "tui": "npm --workspace @a5c-ai/agent-mux-tui run dev",
     "amux": "node packages/cli/dist/index.js",
-    "cli": "npm run build --silent && node packages/cli/dist/index.js"
+    "cli": "npm run build --silent && node packages/cli/dist/index.js",
+    "link-check": "mlc docs/**/*.md website/src/**/*.{js,jsx,ts,tsx,md,mdx}"
   },
   "devDependencies": {
     "@changesets/cli": "^2.27.0",
@@ -38,6 +39,7 @@
     "@types/node": "^20",
     "@vitest/coverage-v8": "2.1.9",
     "eslint": "^10.2.0",
+    "markdown-link-check": "^3.14.2",
     "typescript": "^5.4",
     "typescript-eslint": "^8.58.1",
     "vitest": "^2"
