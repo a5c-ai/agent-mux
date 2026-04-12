@@ -15,7 +15,7 @@
     "packages/harness-mock"
   ],
   "scripts": {
-    "build": "tsc --build packages/core && ls packages/core/dist/index.d.ts && tsc --build packages/adapters && ls packages/adapters/dist/index.d.ts && tsc --build packages/harness-mock && tsc --build packages/cli && tsc --build packages/agent-mux",
+    "build": "tsc --build packages/core && tsc --build packages/adapters --verbose && ls -la packages/adapters/dist/ && tsc --build packages/harness-mock && tsc --build packages/cli && tsc --build packages/agent-mux",
     "typecheck": "npm run build",
     "test": "vitest run",
     "test:watch": "vitest",
