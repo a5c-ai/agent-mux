@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Box, Text, useInput, useApp } from 'ink';
-import type { AgentMuxClient, AgentEvent } from '@a5c-ai/agent-mux';
+import type { AgentMuxClient, AgentEvent, RunHandle } from '@a5c-ai/agent-mux';
 import { createRegistry, createContext, loadPlugins, type Registry } from './registry.js';
 import type { TuiPlugin, TuiViewProps, EventRenderer } from './plugin.js';
 import { EventStream } from './event-stream.js';
@@ -25,6 +25,11 @@ export function App({ client, plugins, defaultAgent = 'claude-code' }: AppProps)
   const [promptMode, setPromptMode] = useState<boolean>(false);
   const [pendingResume, setPendingResume] = useState<
     { agent: string; sessionId: string } | null
+  >(null);
+  const currentHandleRef = React.useRef<RunHandle | null>(null);
+  const pendingApprovalRef = React.useRef<{ interactionId: string; action: string } | null>(null);
+  const [pendingApproval, setPendingApproval] = useState<
+    { interactionId: string; action: string; riskLevel: string } | null
   >(null);
 
   const { registry, stream } = useMemo(() => {
@@ -56,6 +61,22 @@ export function App({ client, plugins, defaultAgent = 'claude-code' }: AppProps)
     if (input === 'p') {
       setPromptMode(true);
       return;
+    }
+    if (pendingApproval && currentHandleRef.current) {
+      if (input === 'y') {
+        void currentHandleRef.current.approve();
+        setPendingApproval(null);
+        pendingApprovalRef.current = null;
+        setStatus('Approved.');
+        return;
+      }
+      if (input === 'n') {
+        void currentHandleRef.current.deny('Denied from TUI');
+        setPendingApproval(null);
+        pendingApprovalRef.current = null;
+        setStatus('Denied.');
+        return;
+      }
     }
     for (const v of registry.views) {
       if (v.hotkey && input === v.hotkey) setActiveId(v.id);
@@ -117,9 +138,27 @@ export function App({ client, plugins, defaultAgent = 'claude-code' }: AppProps)
       if (pendingResume) runOpts.sessionId = pendingResume.sessionId;
       setPendingResume(null);
       const handle = client.run(runOpts as never);
+      currentHandleRef.current = handle;
       for await (const ev of handle) {
-        stream.push(ev as AgentEvent);
+        const agentEv = ev as AgentEvent;
+        if (agentEv.type === 'approval_request') {
+          const pending = {
+            interactionId: agentEv.interactionId,
+            action: agentEv.action,
+            riskLevel: agentEv.riskLevel,
+          };
+          pendingApprovalRef.current = pending;
+          setPendingApproval(pending);
+        } else if (
+          agentEv.type === 'approval_granted' ||
+          agentEv.type === 'approval_denied'
+        ) {
+          pendingApprovalRef.current = null;
+          setPendingApproval(null);
+        }
+        stream.push(agentEv);
       }
+      currentHandleRef.current = null;
       setStatus('Run complete.');
     } catch (e) {
       setStatus(`Error: ${(e as Error).message}`);
@@ -142,6 +181,13 @@ export function App({ client, plugins, defaultAgent = 'claude-code' }: AppProps)
           <Text dimColor>No views registered.</Text>
         )}
       </Box>
+      {pendingApproval ? (
+        <Box>
+          <Text color={pendingApproval.riskLevel === 'high' ? 'red' : 'yellow'}>
+            [approval {pendingApproval.riskLevel}] {pendingApproval.action} — y: approve · n: deny
+          </Text>
+        </Box>
+      ) : null}
       {promptMode ? (
         <PromptInput
           onSubmit={handlePromptSubmit}

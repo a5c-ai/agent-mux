@@ -15,6 +15,11 @@ import costView from './plugins/cost-view.js';
 import fallback from './plugins/fallback.js';
 import diff from './plugins/diff.js';
 import shell from './plugins/shell.js';
+import mcp from './plugins/mcp.js';
+import subagent from './plugins/subagent.js';
+import fileOps from './plugins/file-ops.js';
+import sessionLifecycle from './plugins/session-lifecycle.js';
+import approval from './plugins/approval.js';
 import type { TuiPlugin } from './plugin.js';
 
 // Order matters: specific renderers first, fallback LAST so it only matches
@@ -24,6 +29,11 @@ export const builtinPlugins: TuiPlugin[] = [
   toolCall,
   diff,
   shell,
+  mcp,
+  subagent,
+  fileOps,
+  sessionLifecycle,
+  approval,
   cost,
   chatView,
   sessionsView,
