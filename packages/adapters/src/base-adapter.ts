@@ -326,7 +326,22 @@ export abstract class BaseAgentAdapter implements AgentAdapter {
   protected buildEnvFromOptions(options: RunOptions): Record<string, string> {
     const env: Record<string, string> = {};
 
-    // Merge RunOptions.env
+    // Propagate harness-specific env vars that affect config/session location
+    // or transport routing. Explicit RunOptions.env overrides.
+    const passthrough = [
+      'CODEX_HOME',                      // codex config/session root override
+      'GH_HOST',                         // gh copilot — GitHub Enterprise host
+      'GH_TOKEN',                        // gh copilot auth
+      'GOOGLE_APPLICATION_CREDENTIALS',  // gemini service account
+      'HTTPS_PROXY',
+      'HTTP_PROXY',
+      'NO_PROXY',
+    ];
+    for (const name of passthrough) {
+      const v = process.env[name];
+      if (v) env[name] = v;
+    }
+
     if (options.env) {
       Object.assign(env, options.env);
     }

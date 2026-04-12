@@ -14,6 +14,7 @@ const sidebars: SidebarsConfig = {
         'tutorials/hooks',
         'tutorials/plugins',
         'tutorials/multi-agent',
+        'tutorials/cost-tracking',
       ],
     },
     {
@@ -76,7 +77,7 @@ const sidebars: SidebarsConfig = {
     {
       type: 'category',
       label: 'Reference',
-      items: ['16-reference-comparison'],
+      items: ['16-reference-comparison', '19-capabilities-matrix'],
     },
   ],
 };

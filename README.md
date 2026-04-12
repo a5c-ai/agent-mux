@@ -156,24 +156,21 @@ await handle.done;
 
 ### Non-realtime: read cost/tokens from a completed session
 
-```ts
-const sessions = client.sessions('claude-code');
-const list = await sessions.list();
-const last = list[0];
-const full = await sessions.read(last.sessionId);
+Use the exported `sumCost` / `filterEvents` helpers — no per-call reduce:
 
-const totals = full.events.reduce(
-  (acc, ev) => {
-    if (ev.type === 'cost') {
-      acc.usd += ev.cost.totalUsd ?? 0;
-      acc.inputTokens += ev.cost.inputTokens ?? 0;
-      acc.outputTokens += ev.cost.outputTokens ?? 0;
-    }
-    return acc;
-  },
-  { usd: 0, inputTokens: 0, outputTokens: 0 },
-);
-console.log(`Session ${last.sessionId}: $${totals.usd.toFixed(4)} / ${totals.inputTokens}→${totals.outputTokens} tok`);
+```ts
+import { createClient, sumCost, filterEvents } from '@a5c-ai/agent-mux';
+
+const sessions = createClient().sessions('claude-code');
+const [last] = await sessions.list();
+const { events } = await sessions.read(last.sessionId);
+
+const totals = sumCost(events);
+console.log(`$${totals.totalUsd.toFixed(4)} · ${totals.totalTokens} tok · ${totals.costEventCount} cost events`);
+
+for (const tr of filterEvents(events, 'tool_result')) {
+  console.log(`${tr.toolName} took ${tr.durationMs}ms`);
+}
 ```
 
 ### Resume vs. fork

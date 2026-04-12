@@ -115,6 +115,15 @@ export type {
   LogEvent,
 } from './events.js';
 
+// Cost / event aggregation helpers
+export type { EventCostSummary } from './cost-utils.js';
+export {
+  sumCost,
+  sumCostAsync,
+  filterEvents,
+  filterEventsAsync,
+} from './cost-utils.js';
+
 // State Machine
 export type { RunState } from './state-machine.js';
 export {
