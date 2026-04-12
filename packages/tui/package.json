@@ -1,0 +1,68 @@
+{
+  "name": "@a5c-ai/agent-mux-tui",
+  "version": "0.2.0",
+  "type": "module",
+  "license": "MIT",
+  "description": "Extensible Ink-based TUI for agent-mux, with a plugin-first architecture",
+  "author": "a5c-ai",
+  "homepage": "https://github.com/a5c-ai/agent-mux#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/a5c-ai/agent-mux.git",
+    "directory": "packages/tui"
+  },
+  "bugs": {
+    "url": "https://github.com/a5c-ai/agent-mux/issues"
+  },
+  "keywords": [
+    "agent-mux",
+    "tui",
+    "ink",
+    "react",
+    "plugins"
+  ],
+  "engines": {
+    "node": ">=20.9.0"
+  },
+  "bin": {
+    "amux-tui": "./dist/bin/amux-tui.js"
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
+    },
+    "./plugin": {
+      "import": {
+        "types": "./dist/plugin.d.ts",
+        "default": "./dist/plugin.js"
+      }
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc --build",
+    "prepublishOnly": "npm run build",
+    "test": "vitest run --config ../../vitest.config.ts"
+  },
+  "dependencies": {
+    "@a5c-ai/agent-mux": "0.2.0",
+    "ink": "^5.0.1",
+    "react": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.3"
+  }
+}

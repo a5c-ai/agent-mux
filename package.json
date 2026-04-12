@@ -12,7 +12,8 @@
     "packages/adapters",
     "packages/cli",
     "packages/agent-mux",
-    "packages/harness-mock"
+    "packages/harness-mock",
+    "packages/tui"
   ],
   "scripts": {
     "build": "tsc --build",

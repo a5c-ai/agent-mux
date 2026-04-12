@@ -17,7 +17,8 @@
     { "path": "packages/adapters" },
     { "path": "packages/cli" },
     { "path": "packages/agent-mux" },
-    { "path": "packages/harness-mock" }
+    { "path": "packages/harness-mock" },
+    { "path": "packages/tui" }
   ],
   "files": []
 }

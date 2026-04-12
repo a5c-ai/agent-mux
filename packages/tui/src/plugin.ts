@@ -1,0 +1,50 @@
+import type { ComponentType } from 'react';
+import type { AgentMuxClient, AgentEvent, RunHandle } from '@a5c-ai/agent-mux';
+
+export interface TuiContext {
+  client: AgentMuxClient;
+  registerView(view: TuiView): void;
+  registerEventRenderer(renderer: EventRenderer): void;
+  registerCommand(cmd: TuiCommand): void;
+  emit(event: TuiInternalEvent): void;
+}
+
+export interface TuiView {
+  id: string;
+  title: string;
+  hotkey?: string;
+  component: ComponentType<TuiViewProps>;
+}
+
+export interface TuiViewProps {
+  client: AgentMuxClient;
+  active: boolean;
+}
+
+export interface EventRenderer {
+  id: string;
+  match(ev: AgentEvent): boolean;
+  component: ComponentType<{ event: AgentEvent }>;
+}
+
+export interface TuiCommand {
+  id: string;
+  hotkey: string;
+  label: string;
+  run(ctx: TuiContext): void | Promise<void>;
+}
+
+export type TuiInternalEvent =
+  | { type: 'view:switch'; id: string }
+  | { type: 'run:attach'; handle: RunHandle }
+  | { type: 'status'; message: string };
+
+export interface TuiPlugin {
+  name: string;
+  version?: string;
+  register(ctx: TuiContext): void | Promise<void>;
+}
+
+export function definePlugin(plugin: TuiPlugin): TuiPlugin {
+  return plugin;
+}
