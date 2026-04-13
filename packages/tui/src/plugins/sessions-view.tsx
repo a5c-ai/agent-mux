@@ -12,6 +12,7 @@ function SessionsView({ client, active, emit }: TuiViewProps) {
   const [error, setError] = useState<string | null>(null);
   const [cursor, setCursor] = useState<number>(0);
 
+  const [refreshTick, setRefreshTick] = useState(0);
   useEffect(() => {
     if (!active) return;
     (async () => {
@@ -31,7 +32,7 @@ function SessionsView({ client, active, emit }: TuiViewProps) {
         setError(String(e));
       }
     })();
-  }, [active, client]);
+  }, [active, client, refreshTick]);
 
   useInput(
     (_input, key) => {
@@ -52,6 +53,8 @@ function SessionsView({ client, active, emit }: TuiViewProps) {
         const sel = sessions[cursor];
         if (!sel) return;
         emit({ type: 'session:diff', agent: sel.agent, sessionId: sel.sessionId });
+      } else if (_input === 'R') {
+        setRefreshTick((t) => t + 1);
       }
     },
     { isActive: active },
@@ -70,7 +73,7 @@ function SessionsView({ client, active, emit }: TuiViewProps) {
           </Text>
         );
       })}
-      <Text dimColor>↑/↓ navigate · Enter: resume · d: details · D: mark/diff</Text>
+      <Text dimColor>↑/↓ navigate · Enter: resume · d: details · D: mark/diff · R: refresh</Text>
     </Box>
   );
 }

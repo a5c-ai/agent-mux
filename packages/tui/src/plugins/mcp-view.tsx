@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Box, Text } from 'ink';
+import { Box, Text, useInput } from 'ink';
 import { definePlugin, type TuiViewProps } from '../plugin.js';
 
 interface Row {
@@ -13,6 +13,14 @@ function McpView({ client, active }: TuiViewProps) {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [refreshTick, setRefreshTick] = useState(0);
+
+  useInput(
+    (input) => {
+      if (input === 'R') setRefreshTick((t) => t + 1);
+    },
+    { isActive: active },
+  );
 
   useEffect(() => {
     if (!active) return;
@@ -42,7 +50,7 @@ function McpView({ client, active }: TuiViewProps) {
         setLoading(false);
       }
     })();
-  }, [active, client]);
+  }, [active, client, refreshTick]);
 
   if (loading && rows.length === 0) return <Text dimColor>Loading MCP servers…</Text>;
   if (error) return <Text color="red">{error}</Text>;
@@ -65,7 +73,7 @@ function McpView({ client, active }: TuiViewProps) {
         </Text>
       ))}
       {rows.length > 40 ? <Text dimColor>… {rows.length - 40} more</Text> : null}
-      <Text dimColor>Manage via: amux mcp list|install|uninstall &lt;agent&gt; [server]</Text>
+      <Text dimColor>R: refresh · manage via: amux mcp list|install|uninstall &lt;agent&gt; [server]</Text>
     </Box>
   );
 }
