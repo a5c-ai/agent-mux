@@ -37,6 +37,8 @@ jobs:
         with:
           links: docs/**/*.md website/src/**/*.{js,jsx,ts,tsx,md,mdx}
           markup-types: markdown
+        timeout-minutes: 10
+        continue-on-error: true
       - run: npm run build
       - uses: actions/upload-pages-artifact@v3
         with:

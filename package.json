@@ -37,11 +37,11 @@
     "@changesets/cli": "^2.27.0",
     "@eslint/js": "^10.0.1",
     "@types/node": "^20",
-    "@vitest/coverage-v8": "2.1.9",
+    "@vitest/coverage-v8": "^4.1.4",
     "eslint": "^10.2.0",
     "markdown-link-check": "^3.14.2",
     "typescript": "^5.4",
     "typescript-eslint": "^8.58.1",
-    "vitest": "^2"
+    "vitest": "^4.1.4"
   }
 }

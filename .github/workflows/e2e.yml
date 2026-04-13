@@ -41,6 +41,7 @@ jobs:
       fail-fast: false
       matrix:
         service:
+          # Original adapters
           - mock-e2e-claude
           - mock-e2e-codex
           - mock-e2e-cursor
@@ -52,6 +53,16 @@ jobs:
           - mock-e2e-pi
           - mock-e2e-omp
           - mock-e2e-agent-mux-remote
+          # New adapters added in recent implementations
+          - mock-e2e-droid
+          - mock-e2e-amp
+          - mock-e2e-qwen
+          # SDK and programmatic adapter variants
+          - mock-e2e-claude-agent-sdk
+          - mock-e2e-codex-sdk
+          - mock-e2e-codex-websocket
+          - mock-e2e-opencode-http
+          - mock-e2e-pi-sdk
     steps:
       - uses: actions/checkout@v4
       - name: Build mock E2E image (${{ matrix.service }})
