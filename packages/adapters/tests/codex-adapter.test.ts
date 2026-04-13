@@ -78,7 +78,8 @@ describe('CodexAdapter', () => {
       });
 
       expect(result.command).toBe('codex');
-      expect(result.args).toContain('--quiet');
+      expect(result.args).toContain('exec');
+      expect(result.args).toContain('--json');
       expect(result.args).toContain('Fix the bug');
     });
 
