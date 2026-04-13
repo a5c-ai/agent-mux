@@ -15,13 +15,15 @@ function ChatViewInner({ eventStream, renderers, filter }: ChatViewInnerProps) {
     });
   }, [eventStream]);
 
-  const filtered = filter
+  const NOISE_TYPES = new Set(['log', 'debug', 'raw', 'heartbeat']);
+  const filtered = (filter
     ? events.filter((ev) => {
         const f = filter.toLowerCase();
         if (f.startsWith('type:')) return ev.type.includes(f.slice(5));
         return JSON.stringify(ev).toLowerCase().includes(f);
       })
-    : events;
+    : events
+  ).filter((ev) => !NOISE_TYPES.has(ev.type));
 
   if (filtered.length === 0 && filter) {
     return (
