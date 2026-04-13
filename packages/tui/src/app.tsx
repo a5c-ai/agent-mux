@@ -45,6 +45,7 @@ export function App({ client, plugins, defaultAgent = 'claude-code' }: AppProps)
   const [currentProfile, setCurrentProfile] = useState<string | undefined>(undefined);
   const [availableProfiles, setAvailableProfiles] = useState<string[]>([]);
   const diffLeftRef = React.useRef<{ agent: string; sessionId: string } | null>(null);
+  const [promptHistory, setPromptHistory] = useState<string[]>([]);
 
   const availableModels = useMemo<ModelOption[]>(() => {
     try {
@@ -230,6 +231,11 @@ export function App({ client, plugins, defaultAgent = 'claude-code' }: AppProps)
   async function handlePromptSubmit(prompt: string) {
     setPromptMode(false);
     if (!prompt.trim()) return;
+    setPromptHistory((h) => {
+      const next = h.filter((p) => p !== prompt);
+      next.push(prompt);
+      return next.slice(-50);
+    });
     setStatus(`Dispatching to ${defaultAgent}…`);
 
     // If a plugin registered a prompt handler, it wins.
@@ -375,6 +381,7 @@ export function App({ client, plugins, defaultAgent = 'claude-code' }: AppProps)
         <PromptInput
           onSubmit={handlePromptSubmit}
           onCancel={() => setPromptMode(false)}
+          history={promptHistory}
         />
       ) : (
         <Box flexDirection="column">
