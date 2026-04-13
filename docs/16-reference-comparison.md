@@ -118,7 +118,7 @@ Source-level comparison of seven reference executors against our adapters in `pa
 
 ### 4. vibe-kanban `opencode.rs` vs `opencode-adapter.ts`
 
-**Spawn (upstream L109-111):** `npx -y opencode-ai@1.2.27 serve --hostname 127.0.0.1 --port 0` — **HTTP server** transport, not stdout streaming. Ours (L124-143): `opencode --model M --message <prompt>` treated as one-shot streamer — fundamentally wrong transport. Missing: server spawn, URL parsing, `OPENCODE_SERVER_USERNAME`/`OPENCODE_SERVER_PASSWORD` env (L309-310), `build_authenticated_client` (L405), password generation.
+**Spawn (upstream L109-111):** `npx -y @anomalyco/opencode serve --hostname 127.0.0.1 --port 0` — **HTTP server** transport, not stdout streaming. Ours (L124-143): `opencode --model M --message <prompt>` treated as one-shot streamer — fundamentally wrong transport. Missing: server spawn, URL parsing, `OPENCODE_SERVER_USERNAME`/`OPENCODE_SERVER_PASSWORD` env (L309-310), `build_authenticated_client` (L405), password generation.
 
 **Error mapping (upstream L284-294):** timeout with last 12 lines, premature exit, read-failure. Ours: none.
 

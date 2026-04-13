@@ -35,7 +35,6 @@ Extension of `16-reference-comparison.md`. Candidates surfaced via WebSearch on 
 | 13 | aider | https://github.com/Aider-AI/aider | ~42k | Python | Agent harness | multi-LLM (Claude, o1, DeepSeek, local) | Tree-sitter repo map + architect mode — we don't ship these. |
 | 14 | continue | https://github.com/continuedev/continue | ~26k | TS | IDE wrapper | any (Claude, GPT, local, Mistral) | VS Code/JetBrains integration — agent-mux has no IDE surface. |
 | 15 | goose (block) | https://github.com/block/goose | ~29k | Rust | Agent framework | 15+ providers via MCP | 3000+ MCP tools + recipes — our MCP manager is narrower. |
-| 16 | crush | https://github.com/charmbracelet/crush | ~11k | Go | TUI agent | Anthropic, OpenAI, Gemini, Bedrock, Copilot, MiniMax, local | Mid-session model switching + LSP context — neither in agent-mux. |
 | 17 | OpenHarness (HKUDS) | https://github.com/HKUDS/OpenHarness | ~400 | Python | Harness | Claude, OpenAI, Copilot, Codex, Kimi, GLM, MiniMax | Academic harness with pluggable endpoints — reference for capability surface. |
 
 ## Cross-reference: features agent-mux lacks
@@ -48,7 +47,6 @@ Extension of `16-reference-comparison.md`. Candidates surfaced via WebSearch on 
 | Tree-sitter repo map / architect planning | aider | Medium — out of scope for pure harness, but useful as plugin. |
 | IDE extension (VS Code / JetBrains) | continue | Low — different shape of product. |
 | MCP recipe library (3000+ tools) | goose | Medium — we ship MCP lifecycle but no curated catalog. |
-| Mid-session model switching with preserved context | crush | Low-Medium — API feasible via `RunHandle`. |
 | Live request/response trace viewer | cc-viewer | Low — debugging aid. |
 | Menubar / system tray switcher | cctop | Low — presentation layer only. |
 | Qwen / droid / amp adapters | vibe-kanban, ccusage, claude-squad | Medium — already noted in `16-reference-comparison.md`. |
@@ -61,4 +59,4 @@ Adding these 17 projects to the survey in `16-reference-comparison.md` does not 
 2. **OTLP telemetry exporter** (zcquant, ccboard) — natural plugin.
 3. **MCP recipe catalog** (goose) — complements our MCP lifecycle manager.
 
-The UI-shaped projects (vibe-kanban, paperclip, continue, crush) remain orthogonal: agent-mux is an SDK, not a UI, and should stay that way per scope doc.
+The UI-shaped projects (vibe-kanban, paperclip, continue) remain orthogonal: agent-mux is an SDK, not a UI, and should stay that way per scope doc.

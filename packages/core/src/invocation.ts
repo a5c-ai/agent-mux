@@ -119,7 +119,7 @@ export const HARNESS_IMAGE_CATALOG: readonly HarnessImageEntry[] = [
   { harness: 'gemini', image: 'ghcr.io/google/gemini-cli', preinstalled: true },
   { harness: 'copilot', image: 'ghcr.io/github/copilot-cli', preinstalled: true },
   { harness: 'cursor', image: 'ghcr.io/cursor/cursor-agent', preinstalled: true },
-  { harness: 'opencode', image: 'ghcr.io/opencode-ai/opencode', preinstalled: true },
+  { harness: 'opencode', image: 'ghcr.io/anomalyco/opencode', preinstalled: true },
   { harness: 'pi', image: 'ghcr.io/a5c-ai/pi', preinstalled: true },
   { harness: 'omp', image: 'ghcr.io/a5c-ai/omp', preinstalled: true },
   { harness: 'openclaw', image: 'ghcr.io/openclaw/openclaw', preinstalled: true },

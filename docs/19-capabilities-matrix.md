@@ -6,27 +6,27 @@ runtime via `client.adapter(agent).capabilities`.
 
 Legend: ✓ supported · · not supported · ~ partial / virtual-only.
 
-| Feature / Agent        | claude | codex | gemini | copilot | cursor | opencode | openclaw | hermes | pi | omp | qwen | agent-mux-remote |
-|------------------------|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
-| Resume session         | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Fork session           | ✓ | ✓ | ~ | · | ~ | ~ | ~ | · | · | · | ~ | ✓ |
-| Multi-turn             | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Text streaming         | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Thinking streaming     | ✓ | ✓ | · | · | · | · | · | · | · | · | ~ | ~ |
-| Tool-call streaming    | ✓ | ✓ | ✓ | ~ | ✓ | ✓ | ✓ | ~ | ~ | ~ | ✓ | ✓ |
-| Native tools           | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Parallel tool calls    | ✓ | ✓ | ✓ | · | ✓ | ✓ | · | · | · | · | ✓ | ~ |
-| MCP plugins            | ✓ | ✓ | ✓ | · | ✓ | ✓ | ✓ | · | · | · | ✓ | ~ |
-| Native hooks           | ✓ | ✓ | ✓ | · | ~ | ~ | ~ | · | · | · | ~ | · |
-| Virtual hooks          | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Subagent dispatch      | ✓ | · | · | · | · | · | · | · | · | · | · | ~ |
-| Skills / AGENTS.md     | ✓ | · | · | · | · | · | · | · | · | · | · | · |
-| Image input            | ✓ | · | ✓ | · | · | · | · | · | · | · | ~ | ~ |
-| File attachments       | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Approval (yolo/prompt) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ~ |
-| PTY required           | · | · | · | · | · | · | · | · | · | · | · | · |
-| Session persistence    | file | file | file | file | file | file | file | file | file | file | file | transport |
-| Cost events            | ✓ | ✓ | ✓ | · | ~ | ~ | · | · | · | · | ~ | ~ |
+| Feature / Agent        | claude | codex | gemini | copilot | cursor | opencode | opencode-http | openclaw | hermes | pi | omp | qwen | agent-mux-remote |
+|------------------------|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
+| Resume session         | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Fork session           | ✓ | ✓ | ~ | · | ~ | ~ | ✓ | ~ | · | · | · | ~ | ✓ |
+| Multi-turn             | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Text streaming         | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Thinking streaming     | ✓ | ✓ | · | · | · | · | · | · | · | · | · | ~ | ~ |
+| Tool-call streaming    | ✓ | ✓ | ✓ | ~ | ✓ | ✓ | ✓ | ✓ | ~ | ~ | ~ | ✓ | ✓ |
+| Native tools           | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Parallel tool calls    | ✓ | ✓ | ✓ | · | ✓ | ✓ | ✓ | · | · | · | · | ✓ | ~ |
+| MCP plugins            | ✓ | ✓ | ✓ | · | ✓ | ✓ | ✓ | ✓ | · | · | · | ✓ | ~ |
+| Native hooks           | ✓ | ✓ | ✓ | · | ~ | ~ | ~ | ~ | · | · | · | ~ | · |
+| Virtual hooks          | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Subagent dispatch      | ✓ | · | · | · | · | · | ✓ | · | · | · | · | · | ~ |
+| Skills / AGENTS.md     | ✓ | · | · | · | · | · | ✓ | · | · | · | · | · | · |
+| Image input            | ✓ | · | ✓ | · | · | · | ✓ | · | · | · | · | ~ | ~ |
+| File attachments       | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Approval (yolo/prompt) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ~ |
+| PTY required           | · | · | · | · | · | · | · | · | · | · | · | · | · |
+| Session persistence    | file | file | file | file | file | file | file | file | file | file | file | file | transport |
+| Cost events            | ✓ | ✓ | ✓ | · | ~ | ~ | ~ | · | · | · | · | ~ | ~ |
 | Invocation modes       | local, docker, ssh, k8s — all adapters (chosen per-run via `RunOptions.invocation`). |
 
 ## How this is derived

@@ -70,7 +70,7 @@ export interface K8sInvocation {
 | `gemini` | `ghcr.io/google/gemini-cli` |
 | `copilot` | `ghcr.io/github/copilot-cli` |
 | `cursor` | `ghcr.io/cursor/cursor-agent` |
-| `opencode` | `ghcr.io/opencode-ai/opencode` |
+| `opencode` | `ghcr.io/anomalyco/opencode` |
 | `pi` | `ghcr.io/a5c-ai/pi` |
 | `omp` | `ghcr.io/a5c-ai/omp` |
 | `openclaw` | `ghcr.io/openclaw/openclaw` |

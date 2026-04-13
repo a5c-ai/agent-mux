@@ -261,12 +261,31 @@ export type {
   ParseContext,
   InstalledAgentInfo,
   AgentAdapterInfo,
-  AgentAdapter,
+  AgentAdapter as LegacyAgentAdapter,
   DetectInstallationResult,
   InstallResult,
   AdapterInstallOptions,
   AdapterUpdateOptions,
   Spawner,
+  // Multi-adapter architecture types
+  SubprocessAdapter,
+  RemoteAdapter,
+  ProgrammaticAdapter,
+  RemoteConnection,
+  HttpConnection,
+  WebSocketConnection,
+  WebSocketMessage,
+  ServerOptions,
+  ServerInfo,
+  ServerHealth,
+  ServerManager,
+  MultiAgentAdapter,
+  AgentAdapter,
+  isSubprocessAdapter,
+  isRemoteAdapter,
+  isProgrammaticAdapter,
+  isHttpConnection,
+  isWebSocketConnection,
 } from './adapter.js';
 
 // Adapter Registry
@@ -340,3 +359,6 @@ export { parseHookPayload, formatHookResult } from './hook-payload.js';
 // Atomic filesystem helpers (unified config/session writes).
 export type { AtomicWriteOptions } from './atomic-fs.js';
 export { writeFileAtomic, writeJsonAtomic } from './atomic-fs.js';
+
+// Multi-adapter architecture (direct from adapter-types to avoid conflicts)
+export type { BaseAgentAdapterInterface } from './adapter-types.js';

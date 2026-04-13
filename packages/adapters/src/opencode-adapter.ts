@@ -36,37 +36,38 @@ export class OpenCodeAdapter extends BaseAgentAdapter {
   readonly displayName = 'OpenCode';
   readonly cliCommand = 'opencode';
   readonly minVersion = '0.1.0';
-  readonly hostEnvSignals = ['OPENCODE_SESSION', 'OPENCODE_RUN_ID'] as const;
+  readonly hostEnvSignals = ['OPENCODE_SESSION_ID', 'OPENCODE_CONFIG'] as const;
 
   readonly capabilities: AgentCapabilities = {
     agent: 'opencode',
     canResume: true,
-    canFork: false,
+    canFork: true,
     supportsMultiTurn: true,
-    sessionPersistence: 'sqlite',
+    sessionPersistence: 'file',
     supportsTextStreaming: true,
     supportsToolCallStreaming: true,
-    supportsThinkingStreaming: true,
+    supportsThinkingStreaming: false,
     supportsNativeTools: true,
     supportsMCP: true,
     supportsParallelToolCalls: true,
     requiresToolApproval: true,
     approvalModes: ['yolo', 'prompt'],
-    supportsThinking: true,
-    thinkingEffortLevels: ['low', 'medium', 'high'],
+    supportsThinking: false,
+    thinkingEffortLevels: [],
     supportsThinkingBudgetTokens: false,
-    supportsJsonMode: false,
-    supportsStructuredOutput: false,
-    supportsSkills: false,
-    supportsAgentsMd: false,
-    skillsFormat: null,
-    supportsSubagentDispatch: false,
-    supportsParallelExecution: false,
+    supportsJsonMode: true,
+    supportsStructuredOutput: true,
+    supportsSkills: true,
+    supportsAgentsMd: true,
+    skillsFormat: 'file',
+    supportsSubagentDispatch: true,
+    supportsParallelExecution: true,
+    maxParallelTasks: 5,
     supportsInteractiveMode: true,
     supportsStdinInjection: true,
-    supportsImageInput: false,
+    supportsImageInput: true,
     supportsImageOutput: false,
-    supportsFileAttachments: false,
+    supportsFileAttachments: true,
     supportsPlugins: true,
     pluginFormats: ['mcp-server'],
     pluginRegistries: [{ name: 'mcp', url: 'https://modelcontextprotocol.io', searchable: false }],
@@ -74,44 +75,75 @@ export class OpenCodeAdapter extends BaseAgentAdapter {
     requiresGitRepo: false,
     requiresPty: false,
     authMethods: [
-      { type: 'api_key', name: 'Anthropic API Key', description: 'ANTHROPIC_API_KEY environment variable' },
-      { type: 'api_key', name: 'OpenAI API Key', description: 'OPENAI_API_KEY environment variable' },
+      { type: 'api_key', name: 'API Key', description: 'Provider API keys via opencode auth' },
+      { type: 'oauth', name: 'OAuth', description: 'Provider OAuth via opencode auth' },
     ],
-    authFiles: ['.config/opencode/opencode.json'],
+    authFiles: ['.config/opencode/config.json', '.opencode/config.json'],
     installMethods: [
-      { platform: 'all', type: 'npm', command: 'npm install -g opencode-ai' },
-      { platform: 'darwin', type: 'brew', command: 'brew install opencode-ai' },
+      { platform: 'all', type: 'npm', command: 'npm install -g @anomalyco/opencode' },
+      { platform: 'darwin', type: 'brew', command: 'brew install --cask opencode' },
+      { platform: 'all', type: 'curl', command: 'curl -fsSL https://opencode.ai/install | bash' },
     ],
   };
 
   readonly models: ModelCapabilities[] = [
     {
       agent: 'opencode',
-      modelId: 'claude-sonnet-4-20250514',
-      displayName: 'Claude Sonnet 4 (via OpenCode)',
+      modelId: 'claude-3-5-sonnet-20241022',
+      modelAlias: 'claude-sonnet',
+      displayName: 'Claude 3.5 Sonnet',
       deprecated: false,
       contextWindow: 200000,
-      maxOutputTokens: 16384,
-      supportsThinking: true,
-      thinkingEffortLevels: ['low', 'medium', 'high'],
+      maxOutputTokens: 8192,
+      inputPricePerMillion: 3,
+      outputPricePerMillion: 15,
+      supportsThinking: false,
+      thinkingEffortLevels: [],
       supportsToolCalling: true,
       supportsParallelToolCalls: true,
       supportsToolCallStreaming: true,
-      supportsJsonMode: false,
-      supportsStructuredOutput: false,
+      supportsJsonMode: true,
+      supportsStructuredOutput: true,
       supportsTextStreaming: true,
-      supportsThinkingStreaming: true,
-      supportsImageInput: false,
+      supportsThinkingStreaming: false,
+      supportsImageInput: true,
       supportsImageOutput: false,
-      supportsFileInput: false,
+      supportsFileInput: true,
       cliArgKey: '--model',
-      cliArgValue: 'claude-sonnet-4-20250514',
-      lastUpdated: '2025-05-14',
+      cliArgValue: 'claude-3-5-sonnet-20241022',
+      lastUpdated: '2024-10-22',
+      source: 'bundled',
+    },
+    {
+      agent: 'opencode',
+      modelId: 'gpt-4o',
+      modelAlias: 'gpt-4o',
+      displayName: 'GPT-4o',
+      deprecated: false,
+      contextWindow: 128000,
+      maxOutputTokens: 4096,
+      inputPricePerMillion: 2.5,
+      outputPricePerMillion: 10,
+      supportsThinking: false,
+      thinkingEffortLevels: [],
+      supportsToolCalling: true,
+      supportsParallelToolCalls: true,
+      supportsToolCallStreaming: true,
+      supportsJsonMode: true,
+      supportsStructuredOutput: true,
+      supportsTextStreaming: true,
+      supportsThinkingStreaming: false,
+      supportsImageInput: true,
+      supportsImageOutput: false,
+      supportsFileInput: true,
+      cliArgKey: '--model',
+      cliArgValue: 'gpt-4o',
+      lastUpdated: '2024-05-13',
       source: 'bundled',
     },
   ];
 
-  readonly defaultModelId = 'claude-sonnet-4-20250514';
+  readonly defaultModelId = 'claude-3-5-sonnet-20241022';
 
   readonly configSchema: AgentConfigSchema = {
     agent: 'opencode',
@@ -125,12 +157,45 @@ export class OpenCodeAdapter extends BaseAgentAdapter {
   buildSpawnArgs(options: RunOptions): SpawnArgs {
     const args: string[] = [];
 
+    // OpenCode uses 'run' subcommand for non-interactive execution
+    args.push('run');
+
+    // Model selection
     if (options.model) {
       args.push('--model', options.model);
     }
 
+    // Session management
+    const sessionId = this.resolveSessionId(options);
+    if (sessionId) {
+      if (options.forkSessionId) {
+        // Fork from existing session
+        args.push('--fork', options.forkSessionId);
+      } else {
+        // Resume or create session
+        args.push('--session', sessionId);
+        if (options.sessionId && !options.forkSessionId) {
+          args.push('--continue');
+        }
+      }
+    }
+
+    // Max turns
+    if (options.maxTurns != null) {
+      args.push('--max-turns', String(options.maxTurns));
+    }
+
+    // System prompt
+    if (options.systemPrompt) {
+      args.push('--system', options.systemPrompt);
+    }
+
+    // JSON output for parsing
+    args.push('--format', 'json');
+
+    // Main prompt
     const prompt = Array.isArray(options.prompt) ? options.prompt.join('\n') : options.prompt;
-    args.push('--message', prompt);
+    args.push('--prompt', prompt);
 
     return {
       command: this.cliCommand,
@@ -152,7 +217,78 @@ export class OpenCodeAdapter extends BaseAgentAdapter {
     const base = { runId: context.runId, agent: this.agent, timestamp: ts };
 
     const type = obj['type'] as string | undefined;
+    const event = obj['event'] as string | undefined;
 
+    // Handle OpenCode's event-based format
+    if (event === 'message' || type === 'message') {
+      const content = (obj['content'] ?? obj['data'] ?? '') as string;
+      if (content) {
+        return { ...base, type: 'text_delta', delta: content, accumulated: content } as AgentEvent;
+      }
+    }
+
+    if (event === 'tool_start' || type === 'tool_start' || event === 'tool_call' || type === 'tool_call') {
+      return {
+        ...base,
+        type: 'tool_call_start',
+        toolCallId: (obj['id'] ?? obj['tool_id'] ?? '') as string,
+        toolName: (obj['name'] ?? obj['tool_name'] ?? '') as string,
+        inputAccumulated: JSON.stringify(obj['input'] ?? obj['arguments'] ?? {}),
+      } as AgentEvent;
+    }
+
+    if (event === 'tool_result' || type === 'tool_result') {
+      return {
+        ...base,
+        type: 'tool_result',
+        toolCallId: (obj['id'] ?? obj['tool_id'] ?? '') as string,
+        toolName: (obj['name'] ?? obj['tool_name'] ?? '') as string,
+        output: obj['result'] ?? obj['output'] ?? '',
+        durationMs: (obj['duration'] ?? 0) as number,
+      } as AgentEvent;
+    }
+
+    if (event === 'session_start' || type === 'session_start') {
+      return {
+        ...base,
+        type: 'session_start',
+        sessionId: (obj['session_id'] ?? '') as string,
+        resumed: (obj['resumed'] ?? false) as boolean,
+      } as AgentEvent;
+    }
+
+    if (event === 'session_end' || type === 'session_end') {
+      const events: AgentEvent[] = [];
+
+      // Final message if present
+      const finalMessage = (obj['final_message'] ?? obj['message'] ?? '') as string;
+      if (finalMessage) {
+        events.push({ ...base, type: 'message_stop', text: finalMessage } as AgentEvent);
+      }
+
+      // Cost information
+      const usage = obj['usage'] as Record<string, unknown> | undefined;
+      if (usage) {
+        const cost = this.assembleCostRecord(usage);
+        if (cost) {
+          events.push({ ...base, type: 'cost', cost } as AgentEvent);
+        }
+      }
+
+      return events.length > 0 ? events : null;
+    }
+
+    if (event === 'error' || type === 'error') {
+      return {
+        ...base,
+        type: 'error',
+        code: 'INTERNAL' as const,
+        message: (obj['message'] ?? obj['error'] ?? 'Unknown error') as string,
+        recoverable: (obj['recoverable'] ?? false) as boolean,
+      } as AgentEvent;
+    }
+
+    // Legacy format fallback
     if (type === 'text' || type === 'content') {
       const content = (obj['content'] ?? obj['text'] ?? '') as string;
       if (content) {
@@ -160,53 +296,36 @@ export class OpenCodeAdapter extends BaseAgentAdapter {
       }
     }
 
-    if (type === 'tool_call') {
-      return {
-        ...base,
-        type: 'tool_call_start',
-        toolCallId: (obj['id'] ?? '') as string,
-        toolName: (obj['name'] ?? '') as string,
-        inputAccumulated: JSON.stringify(obj['input'] ?? {}),
-      } as AgentEvent;
-    }
-
-    if (type === 'error') {
-      return {
-        ...base,
-        type: 'error',
-        code: 'INTERNAL' as const,
-        message: (obj['message'] ?? 'Unknown error') as string,
-        recoverable: false,
-      } as AgentEvent;
-    }
-
     return null;
   }
 
   async detectAuth(): Promise<AuthState> {
-    if (process.env['ANTHROPIC_API_KEY']) {
+    // Check for provider API keys in environment
+    const anthropicKey = process.env['ANTHROPIC_API_KEY'];
+    const openaiKey = process.env['OPENAI_API_KEY'];
+    const googleKey = process.env['GOOGLE_API_KEY'];
+
+    if (anthropicKey || openaiKey || googleKey) {
+      const provider = anthropicKey ? 'anthropic' : openaiKey ? 'openai' : 'google';
+      const key = anthropicKey || openaiKey || googleKey;
       return {
         status: 'authenticated',
         method: 'api_key',
-        identity: `anthropic:...${process.env['ANTHROPIC_API_KEY']!.slice(-4)}`,
+        identity: `${provider}:...${key!.slice(-4)}`,
       };
     }
-    if (process.env['OPENAI_API_KEY']) {
-      return {
-        status: 'authenticated',
-        method: 'api_key',
-        identity: `openai:...${process.env['OPENAI_API_KEY']!.slice(-4)}`,
-      };
-    }
+
+    // Check OpenCode configuration files
     const home = os.homedir();
     const found = await readAuthConfigIdentity([
+      path.join(home, '.config', 'opencode', 'config.json'),
+      path.join(home, '.opencode', 'config.json'),
       path.join(home, '.config', 'opencode', 'auth.json'),
-      path.join(home, '.opencode', 'auth.json'),
-      path.join(home, '.opencode', 'credentials.json'),
     ]);
     if (found) {
       return { status: 'authenticated', method: found.method, identity: found.identity };
     }
+
     return { status: 'unauthenticated' };
   }
 
@@ -215,21 +334,25 @@ export class OpenCodeAdapter extends BaseAgentAdapter {
       agent: 'opencode',
       providerName: 'OpenCode',
       steps: [
-        { step: 1, description: 'Set an API key for your preferred provider' },
-        { step: 2, description: 'For Anthropic: export ANTHROPIC_API_KEY=sk-ant-...', command: 'export ANTHROPIC_API_KEY=sk-ant-...' },
-        { step: 3, description: 'For OpenAI: export OPENAI_API_KEY=sk-...', command: 'export OPENAI_API_KEY=sk-...' },
+        { step: 1, description: 'Configure authentication using OpenCode CLI', command: 'opencode auth' },
+        { step: 2, description: 'Alternatively, set provider API keys directly' },
+        { step: 3, description: 'For Anthropic: export ANTHROPIC_API_KEY=sk-ant-...', command: 'export ANTHROPIC_API_KEY=sk-ant-...' },
+        { step: 4, description: 'For OpenAI: export OPENAI_API_KEY=sk-...', command: 'export OPENAI_API_KEY=sk-...' },
+        { step: 5, description: 'For Google: export GOOGLE_API_KEY=...', command: 'export GOOGLE_API_KEY=...' },
       ],
       envVars: [
         { name: 'ANTHROPIC_API_KEY', description: 'Anthropic API key', required: false },
         { name: 'OPENAI_API_KEY', description: 'OpenAI API key', required: false },
+        { name: 'GOOGLE_API_KEY', description: 'Google API key', required: false },
       ],
-      documentationUrls: ['https://github.com/opencode-ai/opencode'],
+      documentationUrls: ['https://github.com/anomalyco/opencode'],
+      loginCommand: 'opencode auth',
       verifyCommand: 'opencode --version',
     };
   }
 
   sessionDir(_cwd?: string): string {
-    return path.join(os.homedir(), '.local', 'share', 'opencode');
+    return path.join(os.homedir(), '.config', 'opencode', 'sessions');
   }
 
   async parseSessionFile(filePath: string): Promise<Session> {

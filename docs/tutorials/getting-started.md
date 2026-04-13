@@ -22,7 +22,7 @@ You should see the top-level commands: `run`, `detect`, `agent`, `plugin`, `sess
 amux detect
 ```
 
-This probes your `PATH` for each supported adapter (`claude`, `codex`, `cursor`, `gemini`, `opencode`, `openclaw`, `copilot`, `hermes`, `pi`, `omp`) and prints version, auth status, and install suggestions for any that are missing.
+This probes your `PATH` for each supported adapter (`claude`, `codex`, `cursor`, `gemini`, `opencode`, `opencode-http`, `openclaw`, `copilot`, `hermes`, `pi`, `omp`) and prints version, auth status, and install suggestions for any that are missing.
 
 To install one via the bundled installer:
 

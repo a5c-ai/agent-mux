@@ -361,3 +361,44 @@ export interface AgentAdapter {
   uninstallPlugin?(pluginId: string): Promise<void>;
   searchPlugins?(query: string, options?: PluginSearchOptions): Promise<PluginListing[]>;
 }
+
+// ---------------------------------------------------------------------------
+// Multi-Adapter Architecture (Phase 5+)
+// ---------------------------------------------------------------------------
+
+// Export new multi-adapter types
+export type {
+  BaseAgentAdapterInterface,
+  SubprocessAdapter,
+  RemoteAdapter,
+  ProgrammaticAdapter,
+  RemoteConnection,
+  HttpConnection,
+  WebSocketConnection,
+  WebSocketMessage,
+  ServerOptions,
+  ServerInfo,
+  ServerHealth,
+  ServerManager,
+  AgentAdapter as MultiAgentAdapter, // New union type
+} from './adapter-types.js';
+
+export {
+  isSubprocessAdapter,
+  isRemoteAdapter,
+  isProgrammaticAdapter,
+  isHttpConnection,
+  isWebSocketConnection,
+} from './adapter-types.js';
+
+/**
+ * Legacy AgentAdapter interface - equivalent to SubprocessAdapter in new architecture.
+ *
+ * @deprecated For new adapters, import specific types from './adapter-types.js':
+ *   - SubprocessAdapter (CLI tools)
+ *   - RemoteAdapter (HTTP/WebSocket)
+ *   - ProgrammaticAdapter (direct SDK)
+ *
+ * This interface is maintained for backward compatibility with existing adapters.
+ */
+// Note: This interface is still the "AgentAdapter" used by existing code

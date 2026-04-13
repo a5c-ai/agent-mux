@@ -6,6 +6,7 @@ import * as fs from 'node:fs/promises';
 import { CursorAdapter } from '../src/cursor-adapter.js';
 import { GeminiAdapter } from '../src/gemini-adapter.js';
 import { OpenCodeAdapter } from '../src/opencode-adapter.js';
+import { OpenCodeHttpAdapter } from '../src/opencode-http-adapter.js';
 import { OpenClawAdapter } from '../src/openclaw-adapter.js';
 import { QwenAdapter } from '../src/qwen-adapter.js';
 
@@ -13,6 +14,7 @@ const cases = [
   { name: 'cursor', make: () => new CursorAdapter() },
   { name: 'gemini', make: () => new GeminiAdapter() },
   { name: 'opencode', make: () => new OpenCodeAdapter() },
+  { name: 'opencode-http', make: () => new OpenCodeHttpAdapter() },
   { name: 'openclaw', make: () => new OpenClawAdapter() },
   { name: 'qwen', make: () => new QwenAdapter() },
 ] as const;

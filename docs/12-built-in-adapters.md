@@ -10,7 +10,7 @@
 
 ## 1. Overview
 
-This specification defines the implementation details for all 10 built-in adapter implementations in `@a5c-ai/agent-mux`. Each adapter extends `BaseAgentAdapter` (spec 05 §4) and translates between the unified `AgentAdapter` interface and the native CLI of its target agent.
+This specification defines the implementation details for all 13 built-in adapter implementations in `@a5c-ai/agent-mux`. Each adapter extends `BaseAgentAdapter` (spec 05 §4) and translates between the unified `AgentAdapter` interface and the native CLI of its target agent.
 
 This is the reference document for adapter authors and consumers who need to understand per-agent behavioral differences. It covers CLI arguments, event parsing, session formats, thinking normalization, install methods, auth detection, plugin delegation, and platform-specific notes for each adapter.
 
@@ -52,6 +52,7 @@ From scope §20, extended with hermes-agent:
 | Copilot CLI | `gh copilot` | `copilot` | JSON | yes | no | no | no | no | no | no | no | all |
 | Cursor | `cursor` | `cursor` | SQLite | partial | no | no | model-dep | yes | no | yes | no | all |
 | OpenCode | `opencode` | `opencode` | SQLite | yes | yes | yes | model-dep | yes | yes | yes | yes | all |
+| OpenCode HTTP | `opencode serve` | `opencode-http` | SQLite | yes | yes | yes | model-dep | yes | yes | yes | yes | all |
 | Pi | `pi` | `pi` | JSONL tree | yes | yes | yes | model-dep | no | yes | yes | yes | all |
 | omp | `omp` | `omp` | JSONL tree | yes | yes | yes | yes | no | yes | yes | yes | all (Win partial) |
 | OpenClaw | `openclaw` | `openclaw` | JSON | partial | no | no | model-dep | yes | yes | yes | no | all |
@@ -589,7 +590,87 @@ Model-dependent. Passed as provider-level parameter when model supports thinking
 
 ---
 
-## 9. Pi Adapter
+## 8.b OpenCode HTTP Adapter
+
+### 8.b.1 Identity
+
+| Property | Value |
+|---|---|
+| `agent` | `'opencode-http'` |
+| `displayName` | `'OpenCode (HTTP)'` |
+| `adapterType` | `'remote'` |
+| `connectionType` | `'http'` |
+| `minVersion` | `'0.1.0'` |
+
+**Note**: This is a **remote adapter** (not subprocess), implementing the `RemoteAdapter` interface.
+
+### 8.b.2 Connection Management
+
+```typescript
+// HTTP connection via RemoteAdapter interface
+interface OpenCodeHttpConnection {
+  connectionType: 'http';
+  baseUrl: string;          // e.g., 'http://localhost:9527'
+  
+  // Server-Sent Events streaming
+  stream(path: string, data: unknown): AsyncIterableIterator<AgentEvent>;
+  
+  // REST API methods
+  get(path: string, params?: Record<string, unknown>): Promise<unknown>;
+  post(path: string, data?: unknown): Promise<unknown>;
+}
+```
+
+**Server management**: The adapter automatically starts `opencode serve --port 0` when needed and manages the server lifecycle.
+
+### 8.b.3 Event Parsing
+
+**Transport:** HTTP POST to `/api/chat/stream` with Server-Sent Events (SSE).
+
+**Event format:** SSE events are parsed from `data: {...}` lines, with JSON payloads matching OpenCode's native event structure.
+
+| SSE Event Type | AgentEvent type(s) |
+|---|---|
+| `message.start` | `message_start` |
+| `message.text.delta` | `text_delta` |
+| `tool_start`, `tool_call` | `tool_call_start` |
+| `tool_input` | `tool_input_delta` |
+| `tool_ready` | `tool_call_ready` |
+| `tool_result` | `tool_result` |
+| `message.stop` | `message_stop` |
+
+**Enhanced streaming**: SSE provides lower latency than subprocess stdout parsing.
+
+### 8.b.4 Session Format
+
+- **Location:** Same as subprocess OpenCode: `~/.local/share/opencode/` (XDG data home on Linux).
+- **Format:** SQLite (shared with subprocess adapter).
+- **Capabilities:** `canResume: true`, `canFork: true`, `sessionPersistence: 'sqlite'`.
+
+### 8.b.5 Server Lifecycle
+
+- **Startup**: `opencode serve --port 0 --host 127.0.0.1` with dynamic port allocation.
+- **Health monitoring**: Regular `/health` endpoint checks.
+- **Cleanup**: Graceful server shutdown on adapter disposal.
+- **Port management**: Automatic port discovery to avoid conflicts.
+
+### 8.b.6 Auth Detection
+
+- **Inherited**: Uses same auth detection as subprocess OpenCode adapter.
+- **Provider support**: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_API_KEY`.
+- **Config file**: `~/.config/opencode/config.json`.
+
+### 8.b.7 Plugin Support
+
+- **Identical to subprocess adapter**: Supports MCP servers via HTTP API.
+- **Formats:** `['mcp-server']`.
+- **Registry:** MCP server marketplace at https://modelcontextprotocol.io.
+
+**Advantage**: HTTP interface enables enhanced MCP plugin management compared to subprocess limitations.
+
+---
+
+## 10. Pi Adapter
 
 ### 9.1 Identity
 
@@ -669,7 +750,7 @@ Model-dependent. Passed as provider-level parameter when model supports thinking
 
 ---
 
-## 10. omp Adapter
+## 11. omp Adapter
 
 ### 10.1 Identity
 
@@ -746,7 +827,7 @@ SpawnArgs {
 
 ---
 
-## 11. OpenClaw Adapter
+## 12. OpenClaw Adapter
 
 ### 11.1 Identity
 
@@ -841,7 +922,7 @@ OpenClaw is the only built-in agent with `requiresPty: true` (scope §22). See `
 
 ---
 
-## 12. Hermes Adapter
+## 13. Hermes Adapter
 
 > **SCOPE EXTENSION:** hermes-agent (`@NousResearch/hermes-agent`) is included as a 10th supported agent.
 
@@ -960,7 +1041,7 @@ Not applicable. `supportsThinking: false`. Setting `thinkingEffort` throws `Capa
 
 ---
 
-## 13. Per-Adapter Thinking Effort Summary
+## 14. Per-Adapter Thinking Effort Summary
 
 | Agent | `'low'` | `'medium'` | `'high'` | `'max'` | Budget tokens | Notes |
 |---|---|---|---|---|---|---|
@@ -979,7 +1060,7 @@ Not applicable. `supportsThinking: false`. Setting `thinkingEffort` throws `Capa
 
 ---
 
-## 14. Per-Adapter Auth Summary
+## 15. Per-Adapter Auth Summary
 
 | Agent | Primary method | Env var(s) | Auth file |
 |---|---|---|---|
@@ -1000,7 +1081,7 @@ Not applicable. `supportsThinking: false`. Setting `thinkingEffort` throws `Capa
 
 ---
 
-## 15. Per-Adapter Plugin Support Summary
+## 16. Per-Adapter Plugin Support Summary
 
 | Agent | `supportsPlugins` | Formats | Registry | Marketplace |
 |---|---|---|---|---|
@@ -1019,7 +1100,7 @@ Not applicable. `supportsThinking: false`. Setting `thinkingEffort` throws `Capa
 
 ---
 
-## 16. Error Format Translation
+## 17. Error Format Translation
 
 All adapters translate native agent errors into typed `AgentEvent` objects. The `BaseAgentAdapter` class (spec 05 §4) provides hook methods for common error scenarios:
 
@@ -1052,7 +1133,7 @@ Per spec 05 §4 (canonical signatures):
 
 ---
 
-## 17. Version Detection
+## 18. Version Detection
 
 All adapters detect the installed agent version via `detectVersionFromCli()` (a `BaseAgentAdapter` utility):
 
@@ -1069,7 +1150,7 @@ The detected version is compared against `minVersion`. If the installed version 
 
 ---
 
-## 18. Adapter Registration
+## 19. Adapter Registration
 
 All 10 built-in adapters are registered with the `AdapterRegistry` during `createClient()`:
 
@@ -1092,7 +1173,7 @@ Plugin adapters registered via `mux.adapters.register()` are added after built-i
 
 ---
 
-## 19. Spec-Level Additions
+## 20. Spec-Level Additions
 
 The following items are spec-level additions not explicitly stated in the scope:
 

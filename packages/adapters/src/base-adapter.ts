@@ -28,6 +28,7 @@ import type {
   SpawnArgs,
   ParseContext,
   AgentAdapter,
+  SubprocessAdapter,
   RunOptions,
   AgentEvent,
   ErrorCode,
@@ -65,10 +66,16 @@ export const defaultSpawner: Spawner = (command, args, options) =>
   });
 
 /**
- * Abstract base class for agent adapters. Provides shared utilities
- * and hook points with sensible defaults.
+ * Abstract base class for subprocess-based agent adapters.
+ * Provides shared utilities and hook points with sensible defaults.
+ *
+ * Implements SubprocessAdapter from the new multi-adapter architecture.
+ * For HTTP/WebSocket/SDK adapters, create separate base classes.
  */
-export abstract class BaseAgentAdapter implements AgentAdapter {
+export abstract class BaseAgentAdapter implements SubprocessAdapter {
+  // ── Adapter Type ──────────────────────────────────────────────────
+
+  readonly adapterType = 'subprocess' as const;
   // ── Abstract members (must be implemented by subclasses) ──────────
 
   abstract readonly agent: AgentName;

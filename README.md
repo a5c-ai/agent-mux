@@ -1,6 +1,6 @@
 # agent-mux
 
-`@a5c-ai/agent-mux` is a unified TypeScript SDK and CLI (`amux`) for driving heterogeneous coding-agent harnesses — Claude Code, Codex, Gemini, Copilot, Cursor, OpenCode, pi, omp, openclaw, hermes, qwen — through one contract.
+`@a5c-ai/agent-mux` is a unified TypeScript SDK and CLI (`amux`) for driving heterogeneous coding-agent harnesses — Claude Code, Codex, Gemini, Copilot, Cursor, OpenCode, OpenCode HTTP, pi, omp, openclaw, hermes, qwen — through one contract.
 
 It spawns real subprocesses, normalizes their streaming output into a shared `AgentEvent` stream, and exposes each harness's sessions, config, auth, and plugins through a single `AgentMuxClient` interface. Invocations can run locally, in Docker, over SSH, or in a Kubernetes pod with no code change.
 
@@ -56,6 +56,7 @@ await handle.done;
 | `copilot` | `gh copilot` | `~/.config/github-copilot/sessions` |
 | `cursor` | `cursor-agent` | `~/.cursor/sessions` |
 | `opencode` | `opencode` | `~/.config/opencode/sessions` |
+| `opencode-http` | `opencode serve` | `~/.config/opencode/sessions` |
 | `pi` | `pi` | `~/.pi/agent/sessions` |
 | `omp` | `omp` | `~/.omp/agent/sessions` |
 | `openclaw` | `openclaw` | `~/.openclaw/sessions` |
@@ -87,7 +88,7 @@ One option flips where the subprocess actually runs: `local`, `docker` (with vol
 `amux hooks install` wires a command to a harness event (`PreToolUse`, `PostToolUse`, `Stop`, `UserPromptSubmit`, …). Native hooks are written into the harness's own config (e.g. `~/.claude/settings.json`); harnesses without native hook support get a virtual hook layer driven off the event stream. Same UX, different mechanism.
 
 ### MCP plugins
-`amux plugins install <server> --agent claude` adds an MCP server entry in the harness's config file. Supported on claude, codex, gemini, cursor, opencode, openclaw (and qwen via MCP-compatible config). `list` / `uninstall` work symmetrically.
+`amux plugins install <server> --agent claude` adds an MCP server entry in the harness's config file. Supported on claude, codex, gemini, cursor, opencode, opencode-http, openclaw (and qwen via MCP-compatible config). `list` / `uninstall` work symmetrically.
 
 ### Skills & sub-agents
 `amux skill add <agent> <folder>` copies a skill folder into the harness convention path (e.g. `.claude/skills/`, `.codex/skills/`). `amux agent add <agent> <file>` does the same for sub-agent definitions (e.g. `.claude/agents/`). Both accept `--global` / `--project` scope, `--force` to overwrite, and have `list` / `remove` / `where` subcommands. File-convention only — no native harness command needed.
