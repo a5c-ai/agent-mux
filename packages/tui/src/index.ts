@@ -39,6 +39,8 @@ import runsView from './plugins/runs-view.js';
 import helpView from './plugins/help-view.js';
 import mcpView from './plugins/mcp-view.js';
 import doctorView from './plugins/doctor-view.js';
+import authView from './plugins/auth-view.js';
+import configView from './plugins/config-view.js';
 import type { TuiPlugin } from './plugin.js';
 
 // Order matters: specific renderers first, fallback LAST so it only matches
@@ -71,5 +73,7 @@ export const builtinPlugins: TuiPlugin[] = [
   helpView,
   mcpView,
   doctorView,
+  authView,
+  configView,
   fallback,
 ];
