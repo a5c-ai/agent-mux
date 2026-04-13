@@ -1,6 +1,6 @@
 {
   "name": "@a5c-ai/agent-mux-harness-mock",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "type": "module",
   "license": "MIT",
   "description": "Mock harness simulator for testing agent-mux adapters — simulates claude-code, codex, and other CLI harnesses",
@@ -53,6 +53,6 @@
     "test": "vitest run --config ../../vitest.config.ts"
   },
   "dependencies": {
-    "@a5c-ai/agent-mux-core": "0.2.0"
+    "@a5c-ai/agent-mux-core": "0.3.0"
   }
 }

@@ -23,7 +23,7 @@ Legend: [x] done · [~] initial pass done, deep-dive process authored · [>] pro
 - [x] TUI package at `packages/tui` (Ink + plugin-first). Run dispatch wired (`p` opens prompt → `client.run` streams to chat). Renderers: text-delta, tool-call, diff, shell, mcp, subagent, file-ops, session-lifecycle, approval, plugin-skill, image, control, lifecycle, cost, fallback. Views: chat, sessions, session-detail (export json/markdown, watch, diff), cost, runs, adapters, models, profiles, plugins, mcp, doctor, help. Overlays: command palette (`:`/Ctrl-K), filter (`/`), model picker (`m`), profile picker (`P`). Cost-threshold alerts via `AMUX_TUI_COST_ALERT`. Persistent prompt history (`AMUX_TUI_PROMPT_HISTORY`, default `~/.agent-mux/tui-prompt-history`) with up/down recall. User plugin discovery from `~/.amux/tui-plugins/` (override with `$AMUX_TUI_PLUGINS_DIR` or `--user-plugins-dir`; opt out with `--no-user-plugins`). 85 tests.
 
 
-- [ ] Cut a release: `npx changeset version && npm install --package-lock-only && git commit` once all four pipelines on `main` are green simultaneously.
+- [x] Cut a release (0.3.0 fixed group, 0.4.0 tui) — all four pipelines green on commit `1d9fe36`.
 - [x] Broaden config-file parsing to real agent formats: nested OAuth `tokens.{access,refresh,id}_token`, JWT id_token email decoding, expiry surfacing, and soft-optional keytar keychain probe (`tryKeychainLookup`). Adapters now report the actual auth method (oauth/api_key/keychain/config_file). 12 new tests.
 
 [~] - research and compare to references:
@@ -64,6 +64,7 @@ then perform the same research and analysis as mentioned above for these new ref
 [x] - skill management cli command (for global and for repo). File-convention only (no native harness command): `amux skill <list|add|remove|where|agents>` with `--global`/`--project` scope. Per-agent path registry in `packages/cli/src/lib/agent-skill-paths.ts` (claude, codex, cursor, opencode, gemini, copilot). 7 tests.
 [x] - polish mcp management command — added explicit `--global` flag (was project-only).
 [~] - polish plugin / hooks / per-adapter config management commands — already accept `--global`/`--project`; further polish (uniform JSON envelope, exhaustive subcommand help) deferred.
+[ ] - like skills management command, add an agents management command (codex and claude support it for sure, but i'm not sure about the others, research) (code https://developers.openai.com/codex/subagents#custom-agents , claude - https://code.claude.com/docs/en/sub-agents) with `amux agent <list|add|remove|where>` and `--global`/`--project` scope. research and add support for all the adapters that support custom agents.
 ---
 
 Run remaining [>] / [~] items:

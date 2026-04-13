@@ -1,6 +1,6 @@
 {
   "name": "@a5c-ai/agent-mux-core",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "type": "module",
   "license": "MIT",
   "description": "Core types, client, and stream engine for agent-mux",

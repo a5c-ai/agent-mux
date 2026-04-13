@@ -87,6 +87,10 @@ describe('agent capabilities detection', () => {
       { agent: 'gemini', expectedCommand: 'gemini extensions' },
       { agent: 'copilot', expectedCommand: 'copilot plugin' },
       { agent: 'opencode', expectedCommand: 'opencode plugins' },
+      { agent: 'omp', expectedCommand: 'omp plugin' },
+      { agent: 'openclaw', expectedCommand: 'openclaw plugins' },
+      { agent: 'pi', expectedCommand: 'pi' },
+      { agent: 'qwen', expectedCommand: 'qwen extensions' },
     ];
 
     for (const { agent, expectedCommand } of agentConfigs) {

@@ -25,6 +25,22 @@ const AGENT_PLUGIN_CONFIGS = {
   opencode: {
     command: 'opencode plugins',
     commands: ['list', 'install'],
+  },
+  omp: {
+    command: 'omp plugin',
+    commands: ['list', 'install', 'uninstall', 'enable', 'disable', 'doctor'],
+  },
+  openclaw: {
+    command: 'openclaw plugins',
+    commands: ['list', 'install', 'enable', 'disable', 'doctor'],
+  },
+  pi: {
+    command: 'pi',
+    commands: ['list', 'install', 'update', 'config'],
+  },
+  qwen: {
+    command: 'qwen extensions',
+    commands: ['install', 'settings'],
   }
 } as const;
 
