@@ -7,6 +7,7 @@ import { EventStream } from './event-stream.js';
 import { PromptInput } from './prompt-input.js';
 import { CommandPalette, type PaletteAction } from './command-palette.js';
 import { ModelPicker, type ModelOption } from './model-picker.js';
+import { loadHistory, appendHistory } from './prompt-history-store.js';
 
 export interface AppProps {
   client: AgentMuxClient;
@@ -45,7 +46,7 @@ export function App({ client, plugins, defaultAgent = 'claude-code' }: AppProps)
   const [currentProfile, setCurrentProfile] = useState<string | undefined>(undefined);
   const [availableProfiles, setAvailableProfiles] = useState<string[]>([]);
   const diffLeftRef = React.useRef<{ agent: string; sessionId: string } | null>(null);
-  const [promptHistory, setPromptHistory] = useState<string[]>([]);
+  const [promptHistory, setPromptHistory] = useState<string[]>(() => loadHistory());
 
   const availableModels = useMemo<ModelOption[]>(() => {
     try {
@@ -234,8 +235,9 @@ export function App({ client, plugins, defaultAgent = 'claude-code' }: AppProps)
     setPromptHistory((h) => {
       const next = h.filter((p) => p !== prompt);
       next.push(prompt);
-      return next.slice(-50);
+      return next.slice(-200);
     });
+    appendHistory(prompt);
     setStatus(`Dispatching to ${defaultAgent}…`);
 
     // If a plugin registered a prompt handler, it wins.
