@@ -64,7 +64,7 @@ then perform the same research and analysis as mentioned above for these new ref
 [x] - skill management cli command (for global and for repo). File-convention only (no native harness command): `amux skill <list|add|remove|where|agents>` with `--global`/`--project` scope. Per-agent path registry in `packages/cli/src/lib/agent-skill-paths.ts` (claude, codex, cursor, opencode, gemini, copilot). 7 tests.
 [x] - polish mcp management command — added explicit `--global` flag (was project-only).
 [~] - polish plugin / hooks / per-adapter config management commands — already accept `--global`/`--project`; further polish (uniform JSON envelope, exhaustive subcommand help) deferred.
-[ ] - like skills management command, add an agents management command (codex and claude support it for sure, but i'm not sure about the others, research) (code https://developers.openai.com/codex/subagents#custom-agents , claude - https://code.claude.com/docs/en/sub-agents) with `amux agent <list|add|remove|where>` and `--global`/`--project` scope. research and add support for all the adapters that support custom agents.
+[x] - agents management command — `amux agent <list|add|remove|where|agents>` with `--global`/`--project` scope, file-convention based (copies md/yaml/json files). Supports claude, claude-code, codex, cursor, opencode. 8 tests.
 ---
 
 Run remaining [>] / [~] items:
