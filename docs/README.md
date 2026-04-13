@@ -41,6 +41,7 @@ See [../CONTRIBUTING.md](../CONTRIBUTING.md).
 - **Invocation modes** — `local`, `docker`, `ssh`, and `k8s` share the same adapter contract.
 - **Hooks** — `amux hooks install` wires native settings or a virtual event-stream layer.
 - **MCP plugins** — `amux plugins install <server> --agent claude` across claude/codex/gemini/cursor/opencode/openclaw.
+- **Skills & sub-agents** — `amux skill <list|add|remove|where>` and `amux agent <list|add|remove|where>` copy file-convention definitions into per-harness dirs (`.claude/skills/`, `.codex/agents/`, …) with `--global`/`--project` scope.
 - **Auth & install detection** — `amux doctor`, `amux detect --all --json`, `amux install <agent>`.
 - **Capabilities & models** — each adapter declares `AgentCapabilities` and `ModelCapabilities[]`.
 - **Cost tracking** — `cost` events + `sumCost(events)` / `filterEvents` helpers.

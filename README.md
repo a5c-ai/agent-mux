@@ -55,7 +55,7 @@ await handle.done;
 | `gemini` | `gemini` | `~/.gemini/sessions` |
 | `copilot` | `gh copilot` | `~/.config/github-copilot/sessions` |
 | `cursor` | `cursor-agent` | `~/.cursor/sessions` |
-| `opencode` | `opencode` | `~/.local/share/opencode` |
+| `opencode` | `opencode` | `~/.config/opencode/sessions` |
 | `pi` | `pi` | `~/.pi/agent/sessions` |
 | `omp` | `omp` | `~/.omp/agent/sessions` |
 | `openclaw` | `openclaw` | `~/.openclaw/sessions` |
@@ -88,6 +88,9 @@ One option flips where the subprocess actually runs: `local`, `docker` (with vol
 
 ### MCP plugins
 `amux plugins install <server> --agent claude` adds an MCP server entry in the harness's config file. Supported on claude, codex, gemini, cursor, opencode, openclaw (and qwen via MCP-compatible config). `list` / `uninstall` work symmetrically.
+
+### Skills & sub-agents
+`amux skill add <agent> <folder>` copies a skill folder into the harness convention path (e.g. `.claude/skills/`, `.codex/skills/`). `amux agent add <agent> <file>` does the same for sub-agent definitions (e.g. `.claude/agents/`). Both accept `--global` / `--project` scope, `--force` to overwrite, and have `list` / `remove` / `where` subcommands. File-convention only — no native harness command needed.
 
 ### Auth & install detection
 `amux doctor` reports each harness's binary presence, version, auth state (env var, config file, browser token), and config directory health. `amux detect --all --json` is the machine-readable form. `amux install <agent>` / `update <agent>` dispatches to the adapter-declared install method (npm, brew, curl script).
@@ -259,6 +262,16 @@ const proc = new MockProcess(claudeCodeSuccess);
 ```
 
 See [docs/14-harness-mock.md](docs/14-harness-mock.md).
+
+## Important Notes
+
+### OpenCode Project Distinction
+
+**Note**: There are two different projects named "OpenCode":
+- ✅ **Supported**: [anomalyco/opencode](https://github.com/anomalyco/opencode) - This is the OpenCode project that agent-mux supports
+- ❌ **Not supported**: `opencode-ai/opencode` (renamed to [charmbracelet/crush](https://github.com/charmbracelet/crush)) - This project is **not supported** by agent-mux
+
+When referring to OpenCode in agent-mux documentation and code, we always mean the anomalyco/opencode project.
 
 ## Contributing
 

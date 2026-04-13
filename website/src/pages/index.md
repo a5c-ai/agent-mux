@@ -29,6 +29,7 @@ amux run claude --prompt "Hello, agent-mux"
 - **Invocation modes** — `local`, `docker`, `ssh`, and `k8s` share the same adapter contract.
 - **Hooks** — `amux hooks install` wires native settings or a virtual event-stream layer.
 - **MCP plugins** — install/list/uninstall MCP servers across claude/codex/gemini/cursor/opencode.
+- **Skills & sub-agents** — `amux skill` / `amux agent` manage file-convention definitions (`.claude/skills/`, `.codex/agents/`, …) per-project or globally.
 - **Auth & install detection** — `amux doctor`, `amux detect --all --json`, `amux install`.
 - **Capabilities & models** — every adapter declares capability + model metadata.
 - **Cost tracking** — `cost` events + `sumCost(events)` helper.
