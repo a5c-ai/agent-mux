@@ -10,12 +10,33 @@ interface ChatViewInnerProps extends TuiViewProps {
 function ChatViewInner({ eventStream, renderers, filter }: ChatViewInnerProps) {
   const [events, setEvents] = useState<AgentEvent[]>(() => [...eventStream.snapshot()]);
   useEffect(() => {
-    return eventStream.subscribe((ev) => {
+    const offPush = eventStream.subscribe((ev) => {
       setEvents((prev) => [...prev, ev]);
     });
+    const offReset = eventStream.onReset(() => {
+      setEvents([...eventStream.snapshot()]);
+    });
+    return () => {
+      offPush();
+      offReset();
+    };
   }, [eventStream]);
 
-  const NOISE_TYPES = new Set(['log', 'debug', 'raw', 'heartbeat']);
+  const NOISE_TYPES = new Set([
+    'log',
+    'debug',
+    'raw',
+    'heartbeat',
+    'tool_input_delta',
+    'message_start',
+    'message_stop',
+    'turn_start',
+    'turn_end',
+    'step_start',
+    'step_end',
+    'thinking_start',
+    'thinking_stop',
+  ]);
   const filtered = (filter
     ? events.filter((ev) => {
         const f = filter.toLowerCase();

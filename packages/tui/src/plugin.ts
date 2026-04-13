@@ -30,6 +30,8 @@ export interface TuiViewProps {
   filter?: string;
   /** Optional session selection routed by emit(session:detail). */
   selection?: { agent: string; sessionId: string };
+  /** Sessions currently backed by an amux-managed run (keyed `${agent}:${sessionId}`). */
+  activeSessions?: ReadonlySet<string>;
 }
 
 export interface EventRenderer {

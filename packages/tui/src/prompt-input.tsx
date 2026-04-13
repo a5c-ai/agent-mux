@@ -5,15 +5,20 @@ export interface PromptInputProps {
   onSubmit: (value: string) => void;
   onCancel: () => void;
   label?: string;
+  labelColor?: string;
   /** Optional prior submissions for up/down recall (most recent last). */
   history?: string[];
+  /** Shift+Tab handler — typically used to cycle execution modes. */
+  onShiftTab?: () => void;
 }
 
 export function PromptInput({
   onSubmit,
   onCancel,
   label = 'prompt> ',
+  labelColor = 'cyan',
   history,
+  onShiftTab,
 }: PromptInputProps) {
   const [value, setValue] = useState('');
   // -1 = current draft; 0..history.length-1 = recalled entry (0 = most recent)
@@ -38,12 +43,19 @@ export function PromptInput({
   }
 
   useInput((input, key) => {
+    if (key.shift && key.tab && onShiftTab) {
+      onShiftTab();
+      return;
+    }
     if (key.escape) {
       onCancel();
       return;
     }
     if (key.return) {
       onSubmit(value);
+      setValue('');
+      setHistIdx(-1);
+      setDraft('');
       return;
     }
     if (key.upArrow) {
@@ -66,9 +78,9 @@ export function PromptInput({
   });
   return (
     <Box>
-      <Text color="cyan">{label}</Text>
+      <Text color={labelColor}>{label}</Text>
       <Text>{value}</Text>
-      <Text color="cyan">▌</Text>
+      <Text color={labelColor}>▌</Text>
     </Box>
   );
 }

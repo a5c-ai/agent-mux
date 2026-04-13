@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Box, Text, useInput, useApp } from 'ink';
 import type { AgentMuxClient, AgentEvent, RunHandle } from '@a5c-ai/agent-mux';
 import { createRegistry, createContext, loadPlugins, type Registry } from './registry.js';
@@ -49,6 +49,38 @@ export function App({ client, plugins, defaultAgent = 'claude' }: AppProps) {
   const [availableProfiles, setAvailableProfiles] = useState<string[]>([]);
   const diffLeftRef = React.useRef<{ agent: string; sessionId: string } | null>(null);
   const [promptHistory, setPromptHistory] = useState<string[]>(() => loadHistory());
+  const [activeSessions, setActiveSessions] = useState<ReadonlySet<string>>(() => new Set());
+  function markActive(agent: string, sessionId: string) {
+    setActiveSessions((prev) => {
+      const next = new Set(prev);
+      next.add(`${agent}:${sessionId}`);
+      return next;
+    });
+  }
+  function unmarkActive(agent: string, sessionId: string) {
+    setActiveSessions((prev) => {
+      const next = new Set(prev);
+      next.delete(`${agent}:${sessionId}`);
+      return next;
+    });
+  }
+  const EXEC_MODES = ['normal', 'bypass', 'planning', 'deny'] as const;
+  type ExecMode = (typeof EXEC_MODES)[number];
+  const EXEC_MODE_COLORS: Record<ExecMode, string> = {
+    normal: 'cyan',
+    bypass: 'red',
+    planning: 'yellow',
+    deny: 'magenta',
+  };
+  const [execMode, setExecMode] = useState<ExecMode>('normal');
+  function cycleExecMode() {
+    setExecMode((m) => {
+      const i = EXEC_MODES.indexOf(m);
+      const next = EXEC_MODES[(i + 1) % EXEC_MODES.length];
+      setStatus(`Mode: ${next}`);
+      return next;
+    });
+  }
 
   const availableModels = useMemo<ModelOption[]>(() => {
     try {
@@ -75,7 +107,8 @@ export function App({ client, plugins, defaultAgent = 'claude' }: AppProps) {
         if (ev.type === 'view:switch') setActiveId(ev.id);
         if (ev.type === 'session:select') {
           setPendingResume({ agent: ev.agent, sessionId: ev.sessionId });
-          setStatus(`Resuming ${ev.agent}/${ev.sessionId} — press p to send next message`);
+          setStatus(`Resuming ${ev.agent}/${ev.sessionId} — type to send next message`);
+          void loadSessionTranscript(ev.agent, ev.sessionId);
         }
         if (ev.type === 'session:detail') {
           setSelection({ agent: ev.agent, sessionId: ev.sessionId });
@@ -96,10 +129,7 @@ export function App({ client, plugins, defaultAgent = 'claude' }: AppProps) {
       exit();
       return;
     }
-    if (input === 'p') {
-      setPromptMode(true);
-      return;
-    }
+    // `p` intentionally not bound — chat view auto-focuses an inline prompt.
     if (input === '/') {
       setFilterMode(true);
       return;
@@ -171,6 +201,27 @@ export function App({ client, plugins, defaultAgent = 'claude' }: AppProps) {
   });
 
   const active = registry.views.find((v) => v.id === activeId) ?? registry.views[0];
+
+  // Chat view has an always-on inline prompt. Auto-focus when entering chat
+  // and no modal is open. Esc inside PromptInput flips promptMode off, which
+  // re-enables global hotkeys; any hotkey that switches away from chat also
+  // clears it. This is the simplest model that keeps global navigation working.
+  useEffect(() => {
+    if (
+      active?.id === 'chat' &&
+      !promptMode &&
+      !filterMode &&
+      !paletteMode &&
+      !modelPickerMode &&
+      !profilePickerMode &&
+      !agentPickerMode
+    ) {
+      setPromptMode(true);
+    }
+    if (active?.id !== 'chat' && promptMode) {
+      setPromptMode(false);
+    }
+  }, [active?.id, filterMode, paletteMode, modelPickerMode, profilePickerMode, agentPickerMode, promptMode]);
   const ActiveView = active?.component;
 
   const viewEmit = (ev: Parameters<TuiViewProps['emit']>[0]) => {
@@ -178,13 +229,35 @@ export function App({ client, plugins, defaultAgent = 'claude' }: AppProps) {
     else if (ev.type === 'view:switch') setActiveId(ev.id);
     else if (ev.type === 'session:select') {
       setPendingResume({ agent: ev.agent, sessionId: ev.sessionId });
-      setStatus(`Resuming ${ev.agent}/${ev.sessionId} — press p to send next message`);
+      setStatus(`Resuming ${ev.agent}/${ev.sessionId} — type to send next message`);
+      void loadSessionTranscript(ev.agent, ev.sessionId);
+      setActiveId('chat');
     } else if (ev.type === 'session:detail') {
       setSelection({ agent: ev.agent, sessionId: ev.sessionId });
     } else if (ev.type === 'session:diff') {
       void handleSessionDiff(ev.agent, ev.sessionId);
     } else if (ev.type === 'event') stream.push(ev.event);
   };
+
+  async function loadSessionTranscript(agent: string, sessionId: string) {
+    try {
+      const full = await client.sessions.get(agent as never, sessionId);
+      stream.reset();
+      for (const m of full.messages) {
+        if (!m.content) continue;
+        stream.push({
+          runId: 'transcript',
+          agent,
+          timestamp: (m.timestamp ?? new Date()).toISOString(),
+          type: 'text_delta',
+          delta: `[${m.role}] ${m.content}\n`,
+        } as never);
+      }
+      setStatus(`Loaded ${full.messages.length} messages from ${agent}/${sessionId}`);
+    } catch (e) {
+      setStatus(`transcript load failed: ${(e as Error).message}`);
+    }
+  }
 
   async function handleSessionDiff(agent: string, sessionId: string) {
     const left = diffLeftRef.current;
@@ -236,7 +309,6 @@ export function App({ client, plugins, defaultAgent = 'claude' }: AppProps) {
     : undefined;
 
   async function handlePromptSubmit(prompt: string) {
-    setPromptMode(false);
     if (!prompt.trim()) return;
     setPromptHistory((h) => {
       const next = h.filter((p) => p !== prompt);
@@ -244,13 +316,26 @@ export function App({ client, plugins, defaultAgent = 'claude' }: AppProps) {
       return next.slice(-200);
     });
     appendHistory(prompt);
-    setStatus(`Dispatching to ${defaultAgent}…`);
 
     // If a plugin registered a prompt handler, it wins.
     if (registry.promptHandlers.length > 0) {
       for (const h of registry.promptHandlers) await h(prompt);
       return;
     }
+
+    // If a run is already live, inject into its stdin rather than spawning a
+    // fresh process — keeps follow-ups inside the same session & context.
+    if (currentHandleRef.current) {
+      try {
+        setStatus('Sending to active run…');
+        await currentHandleRef.current.send(prompt);
+      } catch (e) {
+        setStatus(`send failed: ${(e as Error).message}`);
+      }
+      return;
+    }
+
+    setStatus(`Dispatching to ${currentAgent ?? defaultAgent}…`);
 
     try {
       const baseOpts: Partial<{ agent: string; model: string }> = currentProfile
@@ -264,16 +349,34 @@ export function App({ client, plugins, defaultAgent = 'claude' }: AppProps) {
         setStatus(`Cannot resume ${pendingResume.agent} session with ${selectedAgent}: cross-harness resume not implemented yet.`);
         return;
       }
-      const runOpts: { agent: string; prompt: string; sessionId?: string; model?: string } = {
+      const runOpts: {
+        agent: string;
+        prompt: string;
+        sessionId?: string;
+        model?: string;
+        approvalMode?: 'yolo' | 'prompt' | 'deny';
+      } = {
         agent: pendingResume?.agent ?? selectedAgent,
         prompt,
       };
       if (pendingResume) runOpts.sessionId = pendingResume.sessionId;
       if (currentModel) runOpts.model = currentModel.modelId;
       else if (baseOpts.model) runOpts.model = baseOpts.model;
-      setPendingResume(null);
+      // Map TUI execMode → SDK approvalMode. "planning" has no SDK analogue
+      // yet; treat it as strict prompt mode and surface a status hint so the
+      // user knows the intent is advisory.
+      if (execMode === 'bypass') runOpts.approvalMode = 'yolo';
+      else if (execMode === 'deny') runOpts.approvalMode = 'deny';
+      else if (execMode === 'planning') {
+        // No SDK analogue yet — fall back to prompt approvals and flag it.
+        runOpts.approvalMode = 'prompt';
+        setStatus('Planning mode: adapters do not expose a plan-only flag — running with prompt approvals.');
+      } else runOpts.approvalMode = 'prompt';
+      const resumedAgent = runOpts.agent;
+      let resumedSessionId = runOpts.sessionId;
       const handle = client.run(runOpts as never);
       currentHandleRef.current = handle;
+      if (resumedSessionId) markActive(resumedAgent, resumedSessionId);
       for await (const ev of handle) {
         const agentEv = ev as AgentEvent;
         if (agentEv.type === 'approval_request') {
@@ -290,12 +393,22 @@ export function App({ client, plugins, defaultAgent = 'claude' }: AppProps) {
         ) {
           pendingApprovalRef.current = null;
           setPendingApproval(null);
+        } else if (agentEv.type === 'session_started') {
+          const sid = (agentEv as unknown as { sessionId?: string }).sessionId;
+          if (sid && !resumedSessionId) {
+            resumedSessionId = sid;
+            markActive(resumedAgent, sid);
+            setPendingResume({ agent: resumedAgent, sessionId: sid });
+          }
         }
         stream.push(agentEv);
       }
       currentHandleRef.current = null;
+      if (resumedSessionId) unmarkActive(resumedAgent, resumedSessionId);
       setStatus('Run complete.');
     } catch (e) {
+      // best-effort cleanup — we might not have started a session, but harmless
+      // if the set doesn't contain the key.
       const msg = (e as Error).message;
       if (/ENOENT/.test(msg)) {
         const m = msg.match(/spawn (\S+)/);
@@ -325,6 +438,7 @@ export function App({ client, plugins, defaultAgent = 'claude' }: AppProps) {
             emit={viewEmit}
             filter={filter || undefined}
             selection={selection}
+            activeSessions={activeSessions}
           />
         ) : (
           <Text dimColor>No views registered.</Text>
@@ -415,46 +529,49 @@ export function App({ client, plugins, defaultAgent = 'claude' }: AppProps) {
           }}
         />
       ) : null}
-      {promptMode ? (
-        <PromptInput
-          onSubmit={handlePromptSubmit}
-          onCancel={() => setPromptMode(false)}
-          history={promptHistory}
-        />
-      ) : (
-        <Box flexDirection="column">
-          {status ? <Text dimColor>{status}</Text> : null}
-          <Box>
-            <Text dimColor>p: prompt · /: filter · :: palette · m: model · N: agent · P: profile</Text>
-            <Text color="cyan"> · agent={currentAgent ?? defaultAgent}</Text>
-            {filter ? <Text color="cyan"> · filter=&quot;{filter}&quot;</Text> : null}
-            {currentModel ? (
-              <Text color="magenta"> · model={currentModel.agent}/{currentModel.modelId}</Text>
-            ) : null}
-            {currentProfile ? (
-              <Text color="blue"> · profile={currentProfile}</Text>
-            ) : null}
-            {currentHandleRef.current ? <Text color="yellow"> · i: interrupt</Text> : null}
-            {pendingApproval ? <Text color="yellow"> · y/n: approve/deny</Text> : null}
-            <Text dimColor> · q: quit</Text>
-            {registry.views.length > 1 ? (
-              <Text dimColor>
-                {' · '}
-                {registry.views
-                  .filter((v) => v.hotkey)
-                  .map((v) => `${v.hotkey}:${v.title.toLowerCase()}`)
-                  .join(' ')}
-              </Text>
-            ) : null}
-            {registry.commands.length > 0 ? (
-              <Text dimColor>
-                {' · '}
-                {registry.commands.map((c) => `${c.hotkey}:${c.label}`).join(' ')}
-              </Text>
-            ) : null}
-          </Box>
+      <Box flexDirection="column">
+        {status ? <Text dimColor>{status}</Text> : null}
+        <Box>
+          <Text dimColor>shift+tab: mode · /: filter · :: palette · m: model · N: agent · P: profile</Text>
+          <Text color={EXEC_MODE_COLORS[execMode]}> · mode={execMode}</Text>
+          <Text color="cyan"> · agent={currentAgent ?? defaultAgent}</Text>
+          {filter ? <Text color="cyan"> · filter=&quot;{filter}&quot;</Text> : null}
+          {currentModel ? (
+            <Text color="magenta"> · model={currentModel.agent}/{currentModel.modelId}</Text>
+          ) : null}
+          {currentProfile ? (
+            <Text color="blue"> · profile={currentProfile}</Text>
+          ) : null}
+          {currentHandleRef.current ? <Text color="yellow"> · i: interrupt</Text> : null}
+          {pendingApproval ? <Text color="yellow"> · y/n: approve/deny</Text> : null}
+          <Text dimColor> · q: quit</Text>
+          {registry.views.length > 1 ? (
+            <Text dimColor>
+              {' · '}
+              {registry.views
+                .filter((v) => v.hotkey)
+                .map((v) => `${v.hotkey}:${v.title.toLowerCase()}`)
+                .join(' ')}
+            </Text>
+          ) : null}
+          {registry.commands.length > 0 ? (
+            <Text dimColor>
+              {' · '}
+              {registry.commands.map((c) => `${c.hotkey}:${c.label}`).join(' ')}
+            </Text>
+          ) : null}
         </Box>
-      )}
+        {promptMode ? (
+          <PromptInput
+            label="> "
+            labelColor={EXEC_MODE_COLORS[execMode]}
+            onSubmit={handlePromptSubmit}
+            onCancel={() => setPromptMode(false)}
+            onShiftTab={cycleExecMode}
+            history={promptHistory}
+          />
+        ) : null}
+      </Box>
     </Box>
   );
 }

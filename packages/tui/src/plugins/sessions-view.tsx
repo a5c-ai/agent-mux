@@ -7,7 +7,7 @@ interface Row {
   agent: string;
 }
 
-function SessionsView({ client, active, emit }: TuiViewProps) {
+function SessionsView({ client, active, emit, activeSessions }: TuiViewProps) {
   const [sessions, setSessions] = useState<Row[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [cursor, setCursor] = useState<number>(0);
@@ -65,9 +65,11 @@ function SessionsView({ client, active, emit }: TuiViewProps) {
     <Box flexDirection="column">
       {sessions.map((s, i) => {
         const selected = i === cursor;
+        const isActive = activeSessions?.has(`${s.agent}:${s.sessionId}`) ?? false;
         return (
           <Text key={s.agent + ':' + s.sessionId} color={selected ? 'green' : undefined}>
             {selected ? '> ' : '  '}
+            {isActive ? <Text color="yellow">● </Text> : <Text>  </Text>}
             <Text color="cyan">{s.agent}</Text> {s.sessionId}
           </Text>
         );
