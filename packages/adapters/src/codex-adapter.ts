@@ -143,6 +143,18 @@ export class CodexAdapter extends BaseAgentAdapter {
   buildSpawnArgs(options: RunOptions): SpawnArgs {
     const args: string[] = [];
 
+    // Codex requires the 'exec' subcommand for proper JSON output
+    const sessionId = this.resolveSessionId(options);
+    const isResume = sessionId && !options.forkSessionId;
+
+    if (isResume) {
+      // Resume existing session
+      args.push('exec', 'resume', '--last', '--json');
+    } else {
+      // New session
+      args.push('exec', '--json');
+    }
+
     if (options.model) {
       args.push('--model', options.model);
     }
@@ -151,8 +163,11 @@ export class CodexAdapter extends BaseAgentAdapter {
       args.push('--full-auto');
     }
 
-    const prompt = Array.isArray(options.prompt) ? options.prompt.join('\n') : options.prompt;
-    args.push('--quiet', prompt);
+    // For new sessions, add the prompt
+    if (!isResume) {
+      const prompt = Array.isArray(options.prompt) ? options.prompt.join('\n') : options.prompt;
+      args.push(prompt);
+    }
 
     return {
       command: this.cliCommand,
@@ -175,6 +190,94 @@ export class CodexAdapter extends BaseAgentAdapter {
 
     const type = obj['type'] as string | undefined;
 
+    // Proper Codex event types from 'codex exec --json'
+    if (type === 'thread.started') {
+      return { ...base, type: 'session_start', sessionId: context.sessionId || '', resumed: false } as AgentEvent;
+    }
+
+    if (type === 'turn.started') {
+      return { ...base, type: 'thinking_delta', delta: '', accumulated: '' } as AgentEvent;
+    }
+
+    if (type === 'turn.completed') {
+      const events: AgentEvent[] = [];
+      const text = (obj['content'] ?? obj['text'] ?? '') as string;
+      if (text) {
+        events.push({ ...base, type: 'message_stop', text } as AgentEvent);
+      }
+      // Parse usage/cost from turn.completed
+      const usage = obj['usage'] as Record<string, unknown> | undefined;
+      if (usage) {
+        const cost = this.assembleCostRecord(usage);
+        if (cost) {
+          events.push({ ...base, type: 'cost', cost } as AgentEvent);
+        }
+      }
+      return events.length > 0 ? events : null;
+    }
+
+    if (type === 'turn.failed') {
+      const message = (obj['message'] ?? obj['error'] ?? 'Turn failed') as string;
+      return {
+        ...base,
+        type: 'error',
+        code: 'INTERNAL' as const,
+        message,
+        recoverable: false,
+      } as AgentEvent;
+    }
+
+    if (type === 'item.started') {
+      const kind = obj['kind'] as string | undefined;
+      const name = (obj['name'] ?? '') as string;
+      const id = (obj['id'] ?? '') as string;
+
+      if (kind === 'command_execution' || kind === 'function_call') {
+        return {
+          ...base,
+          type: 'tool_call_start',
+          toolCallId: id,
+          toolName: name,
+          inputAccumulated: JSON.stringify(obj['arguments'] ?? obj['input'] ?? {}),
+        } as AgentEvent;
+      }
+
+      if (kind === 'message') {
+        const content = (obj['content'] ?? obj['text'] ?? '') as string;
+        if (content) {
+          return { ...base, type: 'text_delta', delta: content, accumulated: content } as AgentEvent;
+        }
+      }
+    }
+
+    if (type === 'item.completed') {
+      const kind = obj['kind'] as string | undefined;
+      const id = (obj['id'] ?? '') as string;
+      const name = (obj['name'] ?? '') as string;
+
+      if (kind === 'command_execution' || kind === 'function_call') {
+        return {
+          ...base,
+          type: 'tool_result',
+          toolCallId: id,
+          toolName: name,
+          output: obj['output'] ?? obj['result'] ?? '',
+          durationMs: (obj['duration_ms'] ?? 0) as number,
+        } as AgentEvent;
+      }
+    }
+
+    if (type === 'error') {
+      return {
+        ...base,
+        type: 'error',
+        code: 'INTERNAL' as const,
+        message: (obj['message'] ?? 'Unknown Codex error') as string,
+        recoverable: false,
+      } as AgentEvent;
+    }
+
+    // Legacy fallback for old event types (backwards compatibility)
     if (type === 'message' || type === 'text') {
       const content = (obj['content'] ?? obj['text'] ?? '') as string;
       if (content) {
@@ -200,16 +303,6 @@ export class CodexAdapter extends BaseAgentAdapter {
         toolName: (obj['name'] ?? '') as string,
         output: obj['output'] ?? '',
         durationMs: 0,
-      } as AgentEvent;
-    }
-
-    if (type === 'error') {
-      return {
-        ...base,
-        type: 'error',
-        code: 'INTERNAL' as const,
-        message: (obj['message'] ?? 'Unknown error') as string,
-        recoverable: false,
       } as AgentEvent;
     }
 
