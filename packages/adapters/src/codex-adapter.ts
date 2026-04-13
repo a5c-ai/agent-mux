@@ -231,7 +231,7 @@ export class CodexAdapter extends BaseAgentAdapter {
       path.join(codexHome, 'credentials.json'),
     ]);
     if (found) {
-      return { status: 'authenticated', method: 'config_file', identity: found.identity };
+      return { status: 'authenticated', method: found.method, identity: found.identity };
     }
     return { status: 'unauthenticated' };
   }

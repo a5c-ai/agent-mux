@@ -24,7 +24,7 @@ Legend: [x] done · [~] initial pass done, deep-dive process authored · [>] pro
 
 
 - [ ] Cut a release: `npx changeset version && npm install --package-lock-only && git commit` once all four pipelines on `main` are green simultaneously.
-- [ ] Broaden config-file parsing to real agent formats (keytar keychain, OAuth refresh tokens) — current pass is conservative token-key lookup.
+- [x] Broaden config-file parsing to real agent formats: nested OAuth `tokens.{access,refresh,id}_token`, JWT id_token email decoding, expiry surfacing, and soft-optional keytar keychain probe (`tryKeychainLookup`). Adapters now report the actual auth method (oauth/api_key/keychain/config_file). 12 new tests.
 
 [~] - research and compare to references:
 https://github.com/paperclipai/paperclip/tree/master/packages/adapters https://github.com/BloopAI/vibe-kanban/tree/main/crates/executors/src/executors https://github.com/Th0rgal/sandboxed.sh/tree/master/src/backend https://github.com/hiyenwong/matop/tree/main/crates/agentmon-adapters/src https://github.com/SihaoLiu/ai-usage/tree/main/src/data https://github.com/fotoetienne/gru/blob/main/src/claude_runner.rs https://github.com/fotoetienne/gru/blob/main/src/codex_backend.rs https://github.com/fotoetienne/gru/blob/main/src/claude_backend.rs

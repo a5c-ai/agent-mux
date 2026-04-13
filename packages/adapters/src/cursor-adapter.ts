@@ -23,7 +23,7 @@ import type {
 
 import { BaseAgentAdapter } from './base-adapter.js';
 import { mcpListPlugins, mcpInstallPlugin, mcpUninstallPlugin } from './mcp-plugins.js';
-import { readAuthConfigIdentity } from './auth-config.js';
+import { readAuthConfigIdentity, tryKeychainLookup } from './auth-config.js';
 import {
   listJsonlFiles,
   parseJsonlSessionFile,
@@ -197,7 +197,11 @@ export class CursorAdapter extends BaseAgentAdapter {
       path.join(home, '.config', 'cursor', 'auth.json'),
     ]);
     if (found) {
-      return { status: 'authenticated', method: 'config_file', identity: found.identity };
+      return { status: 'authenticated', method: found.method, identity: found.identity };
+    }
+    const kc = await tryKeychainLookup('Cursor', 'token');
+    if (kc) {
+      return { status: 'authenticated', method: 'keychain', identity: `kc:...${kc.slice(-4)}` };
     }
     return { status: 'unauthenticated' };
   }

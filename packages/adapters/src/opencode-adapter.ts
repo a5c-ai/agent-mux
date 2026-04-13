@@ -205,7 +205,7 @@ export class OpenCodeAdapter extends BaseAgentAdapter {
       path.join(home, '.opencode', 'credentials.json'),
     ]);
     if (found) {
-      return { status: 'authenticated', method: 'config_file', identity: found.identity };
+      return { status: 'authenticated', method: found.method, identity: found.identity };
     }
     return { status: 'unauthenticated' };
   }
