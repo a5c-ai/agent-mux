@@ -28,6 +28,7 @@ import adaptersView from './plugins/adapters-view.js';
 import modelsView from './plugins/models-view.js';
 import profilesView from './plugins/profiles-view.js';
 import pluginsView from './plugins/plugins-view.js';
+import runsView from './plugins/runs-view.js';
 import type { TuiPlugin } from './plugin.js';
 
 // Order matters: specific renderers first, fallback LAST so it only matches
@@ -54,5 +55,6 @@ export const builtinPlugins: TuiPlugin[] = [
   modelsView,
   profilesView,
   pluginsView,
+  runsView,
   fallback,
 ];

@@ -26,6 +26,8 @@ export interface TuiViewProps {
   active: boolean;
   eventStream: EventStream;
   emit: (event: TuiInternalEvent) => void;
+  /** Optional global filter string (e.g. set via top-level `/` in chat). */
+  filter?: string;
 }
 
 export interface EventRenderer {

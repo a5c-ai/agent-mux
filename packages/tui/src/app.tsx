@@ -5,6 +5,7 @@ import { createRegistry, createContext, loadPlugins, type Registry } from './reg
 import type { TuiPlugin, TuiViewProps, EventRenderer } from './plugin.js';
 import { EventStream } from './event-stream.js';
 import { PromptInput } from './prompt-input.js';
+import { CommandPalette, type PaletteAction } from './command-palette.js';
 
 export interface AppProps {
   client: AgentMuxClient;
@@ -31,6 +32,9 @@ export function App({ client, plugins, defaultAgent = 'claude-code' }: AppProps)
   const [pendingApproval, setPendingApproval] = useState<
     { interactionId: string; action: string; riskLevel: string } | null
   >(null);
+  const [filterMode, setFilterMode] = useState<boolean>(false);
+  const [filter, setFilter] = useState<string>('');
+  const [paletteMode, setPaletteMode] = useState<boolean>(false);
 
   const { registry, stream } = useMemo(() => {
     const r: Registry = createRegistry();
@@ -53,13 +57,21 @@ export function App({ client, plugins, defaultAgent = 'claude-code' }: AppProps)
   }, [client, plugins]);
 
   useInput((input, key) => {
-    if (promptMode) return; // PromptInput owns keys while open
+    if (promptMode || filterMode || paletteMode) return; // child input owns keys while open
     if (input === 'q' || (key.ctrl && input === 'c')) {
       exit();
       return;
     }
     if (input === 'p') {
       setPromptMode(true);
+      return;
+    }
+    if (input === '/') {
+      setFilterMode(true);
+      return;
+    }
+    if (input === ':' || (key.ctrl && input === 'k')) {
+      setPaletteMode(true);
       return;
     }
     if (input === 'i' && currentHandleRef.current) {
@@ -181,7 +193,13 @@ export function App({ client, plugins, defaultAgent = 'claude-code' }: AppProps)
       </Box>
       <Box borderStyle="single" flexDirection="column" paddingX={1}>
         {ViewWithRenderers ? (
-          <ViewWithRenderers client={client} active={true} eventStream={stream} emit={viewEmit} />
+          <ViewWithRenderers
+            client={client}
+            active={true}
+            eventStream={stream}
+            emit={viewEmit}
+            filter={filter || undefined}
+          />
         ) : (
           <Text dimColor>No views registered.</Text>
         )}
@@ -193,6 +211,47 @@ export function App({ client, plugins, defaultAgent = 'claude-code' }: AppProps)
           </Text>
         </Box>
       ) : null}
+      {filterMode ? (
+        <PromptInput
+          label="filter (substring or `type:<prefix>`)> "
+          onSubmit={(v) => {
+            setFilter(v);
+            setFilterMode(false);
+            setStatus(v ? `Filter: ${v}` : 'Filter cleared.');
+          }}
+          onCancel={() => setFilterMode(false)}
+        />
+      ) : null}
+      {paletteMode ? (
+        <CommandPalette
+          views={registry.views}
+          commands={registry.commands}
+          onCancel={() => setPaletteMode(false)}
+          onPick={(a: PaletteAction) => {
+            setPaletteMode(false);
+            if (a.id.startsWith('view:')) {
+              setActiveId(a.id.slice('view:'.length));
+            } else if (a.id.startsWith('cmd:')) {
+              const cmdId = a.id.slice('cmd:'.length);
+              const cmd = registry.commands.find((c) => c.id === cmdId);
+              if (cmd) {
+                void cmd.run({
+                  client,
+                  eventStream: stream,
+                  registerView: () => {},
+                  registerEventRenderer: () => {},
+                  registerCommand: () => {},
+                  registerPromptHandler: () => {},
+                  emit: (e) => {
+                    if (e.type === 'status') setStatus(e.message);
+                    if (e.type === 'event') stream.push(e.event);
+                  },
+                });
+              }
+            }
+          }}
+        />
+      ) : null}
       {promptMode ? (
         <PromptInput
           onSubmit={handlePromptSubmit}
@@ -202,7 +261,8 @@ export function App({ client, plugins, defaultAgent = 'claude-code' }: AppProps)
         <Box flexDirection="column">
           {status ? <Text dimColor>{status}</Text> : null}
           <Box>
-            <Text dimColor>p: prompt</Text>
+            <Text dimColor>p: prompt · /: filter · :: palette</Text>
+            {filter ? <Text color="cyan"> · filter=&quot;{filter}&quot;</Text> : null}
             {currentHandleRef.current ? <Text color="yellow"> · i: interrupt</Text> : null}
             {pendingApproval ? <Text color="yellow"> · y/n: approve/deny</Text> : null}
             <Text dimColor> · q: quit</Text>

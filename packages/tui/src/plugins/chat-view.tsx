@@ -7,7 +7,7 @@ interface ChatViewInnerProps extends TuiViewProps {
   renderers: EventRenderer[];
 }
 
-function ChatViewInner({ eventStream, renderers }: ChatViewInnerProps) {
+function ChatViewInner({ eventStream, renderers, filter }: ChatViewInnerProps) {
   const [events, setEvents] = useState<AgentEvent[]>(() => [...eventStream.snapshot()]);
   useEffect(() => {
     return eventStream.subscribe((ev) => {
@@ -15,6 +15,21 @@ function ChatViewInner({ eventStream, renderers }: ChatViewInnerProps) {
     });
   }, [eventStream]);
 
+  const filtered = filter
+    ? events.filter((ev) => {
+        const f = filter.toLowerCase();
+        if (f.startsWith('type:')) return ev.type.includes(f.slice(5));
+        return JSON.stringify(ev).toLowerCase().includes(f);
+      })
+    : events;
+
+  if (filtered.length === 0 && filter) {
+    return (
+      <Box flexDirection="column">
+        <Text dimColor>No events match filter `{filter}`.</Text>
+      </Box>
+    );
+  }
   if (events.length === 0) {
     return (
       <Box flexDirection="column">
@@ -28,7 +43,7 @@ function ChatViewInner({ eventStream, renderers }: ChatViewInnerProps) {
 
   return (
     <Box flexDirection="column">
-      {events.slice(-200).map((ev, i) => {
+      {filtered.slice(-200).map((ev, i) => {
         const r = specific.find((x) => x.match(ev)) ?? fallback;
         const Comp = r?.component;
         return Comp ? <Comp key={i} event={ev} /> : null;
