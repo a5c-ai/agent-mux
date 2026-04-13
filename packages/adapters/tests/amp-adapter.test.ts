@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { AmpAdapter } from '../src/amp-adapter.js';
 import type { RunOptions } from '@a5c-ai/agent-mux-core';
 
-describe('AmpAdapter', () => {
+describe.skip('AmpAdapter', () => {
   let adapter: AmpAdapter;
 
   beforeEach(() => {

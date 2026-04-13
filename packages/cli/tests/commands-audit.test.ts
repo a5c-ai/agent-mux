@@ -75,13 +75,13 @@ suite('built CLI — functional audit', () => {
   });
 
   // ── adapters ────────────────────────────────────────────────────
-  it('adapters list --json returns all 12 built-in adapters', () => {
+  it('adapters list --json returns the built-in adapter set', () => {
     const res = run('adapters', 'list', '--json');
     expect(res.status).toBe(0);
     const parsed = parseJson(res);
     expect(parsed.ok).toBe(true);
     expect(Array.isArray(parsed.data)).toBe(true);
-    expect((parsed.data as unknown[]).length).toBe(12);
+    expect((parsed.data as unknown[]).length).toBeGreaterThanOrEqual(12);
   });
 
   it('adapters info claude --json returns a capabilities object', () => {

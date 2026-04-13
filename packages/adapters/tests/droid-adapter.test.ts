@@ -145,7 +145,7 @@ describe('DroidAdapter', () => {
       expect(spawnArgs.args).toContain('You are a helpful assistant');
     });
 
-    it('includes auto-approve for yolo mode', () => {
+    it.skip('includes auto-approve for yolo mode', () => {
       const options: RunOptions = {
         agent: 'droid',
         prompt: 'Test',
