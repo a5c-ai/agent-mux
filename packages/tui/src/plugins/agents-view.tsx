@@ -202,7 +202,7 @@ export default definePlugin({
     ctx.registerView({
       id: 'agents',
       title: 'Agents',
-      hotkey: 'g',
+      hotkey: 'G',
       component: AgentsView,
     });
   },

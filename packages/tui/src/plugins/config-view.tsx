@@ -81,7 +81,7 @@ export default definePlugin({
     ctx.registerView({
       id: 'config',
       title: 'Config',
-      hotkey: 'c',
+      hotkey: 'C',
       component: ConfigView,
     });
   },

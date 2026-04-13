@@ -85,7 +85,7 @@ export default definePlugin({
     ctx.registerView({
       id: 'auth',
       title: 'Auth',
-      hotkey: 'a',
+      hotkey: 'A',
       component: AuthView,
     });
   },

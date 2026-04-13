@@ -192,7 +192,7 @@ export default definePlugin({
     ctx.registerView({
       id: 'skills',
       title: 'Skills',
-      hotkey: 'k',
+      hotkey: 'K',
       component: SkillsView,
     });
   },

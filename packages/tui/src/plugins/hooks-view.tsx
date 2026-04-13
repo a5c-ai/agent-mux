@@ -166,7 +166,7 @@ export default definePlugin({
     ctx.registerView({
       id: 'hooks',
       title: 'Hooks',
-      hotkey: 'h',
+      hotkey: 'H',
       component: HooksView,
     });
   },
