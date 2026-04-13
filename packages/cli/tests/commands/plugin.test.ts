@@ -81,7 +81,7 @@ describe('plugin command', () => {
 
     const exitCode = await pluginCommand(mockClient, mockArgs);
 
-    expect(exitCode).toBe(ExitCode.GENERAL_ERROR);
+    expect(exitCode).toBe(ExitCode.USAGE_ERROR);
   });
 
   it('should show error for missing agent name', async () => {
@@ -89,7 +89,7 @@ describe('plugin command', () => {
 
     const exitCode = await pluginCommand(mockClient, mockArgs);
 
-    expect(exitCode).toBe(ExitCode.GENERAL_ERROR);
+    expect(exitCode).toBe(ExitCode.USAGE_ERROR);
   });
 
   it('should show error for unsupported subcommand', async () => {
@@ -102,7 +102,7 @@ describe('plugin command', () => {
 
     const exitCode = await pluginCommand(mockClient, mockArgs);
 
-    expect(exitCode).toBe(ExitCode.GENERAL_ERROR);
+    expect(exitCode).toBe(ExitCode.USAGE_ERROR);
   });
 
   it('should handle exec command failure', async () => {

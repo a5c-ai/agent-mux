@@ -13,11 +13,13 @@ export async function pluginCommand(
   client: AgentMuxClient,
   args: ParsedArgs,
 ): Promise<number> {
+  const json = flagBool(args.flags, 'json') === true;
+
   if (args.flags.help) {
     process.stdout.write([
       'Usage: amux plugin <subcommand> <agent> [args] [flags]',
       '',
-      'Manage plugins through agent-native plugin systems',
+      'Manage plugins through agent-native plugin systems.',
       '',
       'Subcommands:',
       '  list <agent>                    List installed plugins',
@@ -25,6 +27,9 @@ export async function pluginCommand(
       '  enable <agent> <plugin>         Enable plugin',
       '  disable <agent> <plugin>        Disable plugin',
       '  marketplace <agent> [cmd]       Access plugin marketplace',
+      '',
+      'Flags:',
+      '  --json                          Emit JSON envelopes on stdout/stderr',
       '',
       'Examples:',
       '  amux plugin list claude',
@@ -40,18 +45,21 @@ export async function pluginCommand(
   const agentName = args.positionals[0];
 
   if (!subcommand) {
-    printError('Missing subcommand. Available: list, install, enable, disable, marketplace');
-    return ExitCode.GENERAL_ERROR;
+    const msg = 'Missing subcommand. Available: list, install, enable, disable, marketplace';
+    if (json) printJsonError('VALIDATION_ERROR', msg);
+    else printError(msg);
+    return ExitCode.USAGE_ERROR;
   }
 
   if (!agentName) {
-    printError('Missing required argument: <agent>');
-    return ExitCode.GENERAL_ERROR;
+    const msg = 'Missing required argument: <agent>';
+    if (json) printJsonError('VALIDATION_ERROR', msg);
+    else printError(msg);
+    return ExitCode.USAGE_ERROR;
   }
 
   const capabilities = await detectAgentCapabilities(agentName);
 
-  const json = flagBool(args.flags, 'json') === true;
   if (!capabilities.supportsPlugins) {
     const msg = `Plugin management not supported for ${agentName}. Use 'amux mcp' for MCP servers.`;
     if (json) printJsonError('CAPABILITY_ERROR', msg);
@@ -60,8 +68,10 @@ export async function pluginCommand(
   }
 
   if (!capabilities.pluginCommands.includes(subcommand)) {
-    printError(`Subcommand '${subcommand}' not supported for ${agentName}. Available: ${capabilities.pluginCommands.join(', ')}`);
-    return ExitCode.GENERAL_ERROR;
+    const msg = `Subcommand '${subcommand}' not supported for ${agentName}. Available: ${capabilities.pluginCommands.join(', ')}`;
+    if (json) printJsonError('VALIDATION_ERROR', msg);
+    else printError(msg);
+    return ExitCode.USAGE_ERROR;
   }
 
   // Build native command
@@ -81,7 +91,9 @@ export async function pluginCommand(
     if (error.stdout) process.stdout.write(error.stdout);
     if (error.stderr) process.stderr.write(error.stderr);
 
-    printError(`Plugin command failed: ${error.message}`);
+    const msg = `Plugin command failed: ${error.message}`;
+    if (json) printJsonError('EXECUTION_ERROR', msg);
+    else printError(msg);
     return error.code || ExitCode.GENERAL_ERROR;
   }
 }

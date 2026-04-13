@@ -63,17 +63,7 @@ then perform the same research and analysis as mentioned above for these new ref
 
 [x] - skill management cli command (for global and for repo). File-convention only (no native harness command): `amux skill <list|add|remove|where|agents>` with `--global`/`--project` scope. Per-agent path registry in `packages/cli/src/lib/agent-skill-paths.ts` (claude, codex, cursor, opencode, gemini, copilot). 7 tests.
 [x] - polish mcp management command — added explicit `--global` flag (was project-only).
-[~] - polish plugin / hooks / per-adapter config management commands — already accept `--global`/`--project`; further polish (uniform JSON envelope, exhaustive subcommand help) deferred.
+[x] - polish plugin / hooks / per-adapter config management commands — uniform JSON envelopes (all error paths now emit `printJsonError` under `--json`), richer `--help` on `plugin`, validation failures return `USAGE_ERROR` (2) instead of `GENERAL_ERROR` (1). Hooks + config already compliant.
 [x] - agents management command — `amux agent <list|add|remove|where|agents>` with `--global`/`--project` scope, file-convention based (copies md/yaml/json files). Supports claude, claude-code, codex, cursor, opencode. 8 tests.
 ---
 
-Run remaining [>] / [~] items:
-
-```bash
-babysitter run .a5c/processes/integrate-harness.js          # e.g. add qwen
-babysitter run .a5c/processes/reference-parity-research.js
-babysitter run .a5c/processes/find-more-references.js
-babysitter run .a5c/processes/docker-e2e-matrix.js
-babysitter run .a5c/processes/docs-site.js
-babysitter run .a5c/processes/babysitter-parity.js
-```
