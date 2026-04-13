@@ -69,3 +69,27 @@ Events from the resulting `client.run()` are pushed into the shared
 The built-in plugins (`text-delta`, `thinking-delta`, `tool-call`,
 `tool-error`, `cost`, `chat-view`, `sessions-view`, `fallback`) are all
 implemented through these same extension points — use them as references.
+
+## View hotkeys
+
+| Key | View       | Purpose                                       |
+|-----|------------|-----------------------------------------------|
+| `1` | chat       | streaming run output + filter                 |
+| `2` | sessions   | session list (press `d` to inspect + export)  |
+| `3` | cost       | cost/usage summary                            |
+| `4` | adapters   | discovered adapters                           |
+| `5` | models     | model registry per adapter                    |
+| `6` | profiles   | run-options profiles                          |
+| `7` | plugins    | native plugins per adapter                    |
+| `8` | runs       | active/recent runs                            |
+| `9` | help       | keybindings + tips                            |
+| `0` | mcp        | registered MCP servers                        |
+| `-` | doctor     | capability matrix / diagnostics               |
+| `a` | auth       | auth status per adapter                       |
+| `c` | config     | config view                                   |
+| `k` | skills     | installed skills (d: delete, r: refresh)      |
+| `g` | agents     | installed sub-agents (d: delete, r: refresh)  |
+| `h` | hooks      | registered hooks (d: remove, r: refresh)      |
+
+Global: `p` prompt, `/` filter, `:` / Ctrl-K palette, `m` model picker,
+`P` profile picker, `i` interrupt, `y`/`n` approval, `q` quit.
