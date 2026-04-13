@@ -151,3 +151,132 @@ Source-of-truth for claude command shape (L20-44). Both builders pipe stdout, in
 ### Summary of gaps identified (30)
 
 See `.a5c/runs/.../state/output.json` for the structured list. Highest-impact clusters: (a) Claude stream-json block-level parsing and flags, (b) Codex `exec --json` subcommand and event vocabulary, (c) Cursor wrong `cliCommand` (`cursor` vs `cursor-agent`) and missing streaming flags, (d) OpenCode wrong transport (HTTP server vs one-shot stdout), (e) absent `GH_HOST`/`CODEX_HOME` env propagation across all OpenAI-adjacent adapters.
+
+## Extended Research: AI Orchestration and Monitoring Ecosystem (2026-04-13)
+
+Following the detailed adapter-level analysis above, this section examines the broader ecosystem of AI agent orchestration, monitoring, and harness management platforms to identify architectural patterns and potential feature gaps.
+
+### New projects surveyed
+
+| Category | Project | Lang | Focus | Relevance |
+|---|---|---|---|---|
+| Multi-Agent Orchestration | [LangGraph](https://www.langchain.com/) | Python | Graph-based workflows | Complex orchestration patterns |
+| Multi-Agent Orchestration | [CrewAI](https://crewai.com/) | Python | Role-playing agents | Agent collaboration (44k+ stars) |
+| Multi-Agent Orchestration | [MassGen](https://github.com/massgen/massgen) | Python | Terminal-based scaling | Session memory patterns |
+| Multi-Model Abstraction | [LiteLLM](https://github.com/BerriAI/litellm) | Python | Unified API proxy | 100+ provider abstraction |
+| Multi-Model Abstraction | [Portkey AI](https://portkey.ai/) | - | Enterprise gateway | Advanced observability |
+| Multi-Model Abstraction | [OpenRouter](https://openrouter.ai/) | - | SaaS marketplace | 300+ model coverage |
+| Cost Tracking | [TokenBudget](https://github.com/AIMasterLabs/tokenbudget) | JS | Free cost tracking | Real-time dashboard |
+| Cost Tracking | [Tokscale](https://github.com/junhoyeo/tokscale) | TS | Multi-harness CLI | Similar scope to agent-mux |
+| Cost Tracking | [claude-view](https://recca0120.github.io/en/2026/04/07/claude-view-mission-control/) | JS | Claude dashboard | Real-time monitoring |
+| Session Management | [Pipecat AI](https://github.com/pipecat-ai/pipecat) | Python | Voice/multimodal | Complex state management |
+| Session Management | OpenAI Agents SDK | Python | Session memory | Context preservation |
+| Orchestration | [Haystack](https://haystack.deepset.ai/) | Python | AI pipelines | Production LLM apps |
+| Observability | [Langfuse](https://langfuse.com/) | TS | Framework-agnostic | Span-level tracing |
+| Observability | [Arize Phoenix](https://arize.com/phoenix/) | Python | ML monitoring | Enterprise observability |
+| Observability | Dash0 Agent0 | - | OpenTelemetry-native | AI-powered operations |
+
+### Key architectural patterns observed
+
+#### 1. Abstraction layer positioning
+
+- **API Level** (LiteLLM, OpenRouter, Portkey): Focus on unifying HTTP APIs across providers
+- **Framework Level** (LangChain, CrewAI, Haystack): Provide high-level orchestration abstractions
+- **Harness Level** (agent-mux): **Unique positioning** - abstracts heterogeneous native CLI tools
+
+**Insight**: Agent-mux occupies a distinct layer that others don't address - the gap between raw harnesses and high-level frameworks.
+
+#### 2. Economic models in the ecosystem
+
+- **Pure Open Source**: TokenBudget, LiteLLM, agent-mux
+- **Open Source + Enterprise**: Langfuse, Arize Phoenix  
+- **SaaS with markup**: OpenRouter (5% markup)
+- **Subscription SaaS**: Portkey ($49/month+)
+
+**Insight**: The pure open-source positioning of agent-mux aligns with developer-focused tools rather than enterprise platforms.
+
+#### 3. Observability approaches
+
+- **Real-time dashboards**: claude-view, TokenBudget, Portkey
+- **Span-level tracing**: Langfuse, Arize Phoenix, OpenTelemetry integrations
+- **Cost-first monitoring**: TokenBudget, Tokscale, ai-usage (from original survey)
+
+**Gap identified**: Agent-mux lacks a real-time dashboard component for live monitoring across harnesses.
+
+### Competitive positioning analysis
+
+#### Agent-mux unique strengths confirmed
+
+1. **Multi-harness abstraction at CLI level**: No competitor operates at this specific layer
+2. **Native session file integration**: Reading `~/.claude/projects`, `~/.codex/sessions` etc. directly
+3. **Comprehensive invocation modes**: `local`, `docker`, `ssh`, `k8s` abstraction
+4. **Harness-specific feature preservation**: Hooks, plugins, subagents vs. lowest-common-denominator
+
+#### Emerging opportunity areas
+
+##### 1. Real-time monitoring dashboard
+**Evidence**: claude-view (Claude-specific), Tokscale (multi-harness CLI), TokenBudget (real-time UI)
+**Gap**: No unified dashboard for monitoring runs across all 19+ supported harnesses
+**Recommendation**: Build web-based dashboard similar to claude-view but harness-agnostic
+
+##### 2. Advanced workflow orchestration  
+**Evidence**: LangGraph (44k+ stars) graph-based workflows, CrewAI multi-agent collaboration
+**Gap**: Agent-mux focuses on single-agent runs; limited multi-step orchestration
+**Recommendation**: Consider graph-based workflow support for complex multi-harness processes
+
+##### 3. Enterprise observability features
+**Evidence**: Portkey semantic caching, Arize anomaly detection, Langfuse production monitoring
+**Gap**: Current observability is basic; missing advanced enterprise features
+**Recommendation**: Enhance with semantic caching, guardrails, anomaly detection
+
+##### 4. Cost optimization intelligence
+**Evidence**: All cost-tracking tools show usage but no optimization recommendations
+**Gap**: Industry-wide - everyone tracks costs but none provide optimization suggestions
+**Opportunity**: Agent-mux could be first to provide cost optimization recommendations
+
+##### 5. Agent marketplace integration
+**Evidence**: Existing plugin/skill ecosystems around specific harnesses
+**Gap**: No unified discovery/installation across harnesses
+**Recommendation**: Integrate with existing marketplaces per harness
+
+### Architecture pattern implications
+
+#### Session management patterns
+**From research**: OpenAI Agents SDK automatic context preservation, MassGen memory isolation, Pipecat Flows state management
+**Agent-mux approach**: Native session file reading + resume/fork capabilities  
+**Assessment**: Agent-mux approach is more integrated but could benefit from automatic memory management patterns
+
+#### Event streaming normalization
+**From research**: Most tools either work at API level (losing CLI-specific events) or single-harness (no normalization needed)
+**Agent-mux approach**: Unified `AgentEvent` stream across all adapters
+**Assessment**: This remains a unique and valuable architectural choice
+
+#### Cost attribution granularity  
+**From research**: ai-usage and ccusage parse session JSONL for cache-creation vs cache-read tokens
+**Current gap** (confirmed from original analysis): Agent-mux only emits cost from terminal `result` event
+**Implementation path**: Already identified in original analysis as actionable gap #3
+
+### Recommendations for evolution
+
+#### Immediate (high-impact, moderate effort)
+1. **Real-time dashboard**: Web-based monitoring UI for live runs across all harnesses
+2. **Enhanced cost attribution**: Separate cache-creation vs cache-read tokens (already identified)
+3. **Streaming flags completion**: Claude `--verbose --include-partial-messages stream-json` (already identified)
+
+#### Medium-term (high-value, higher effort)  
+1. **Workflow orchestration**: Graph-based multi-step processes across harnesses
+2. **Advanced observability**: Semantic caching, guardrails, anomaly detection patterns
+3. **Marketplace integration**: Unified discovery/installation across harness ecosystems
+
+#### Long-term (strategic differentiation)
+1. **Cost optimization AI**: First tool to provide intelligent cost optimization recommendations
+2. **Cross-harness session management**: Automatic context preservation across different AI services
+3. **Enterprise security features**: Inspired by emerging agent governance toolkits
+
+### Conclusion
+
+The extended research confirms that agent-mux occupies a unique and valuable position in the AI tooling ecosystem. While the original adapter-level analysis identified specific implementation gaps, this broader survey reveals strategic opportunities for differentiation and growth.
+
+Key insight: **No competitor operates at the harness abstraction level that agent-mux has carved out**. The closest competitors (Tokscale, claude-view) either focus on monitoring or single-harness scenarios. Agent-mux's multi-harness CLI abstraction with unified event streams remains architecturally unique.
+
+The opportunity areas identified (real-time monitoring, workflow orchestration, advanced observability) represent natural evolution paths rather than competitive catch-up, positioning agent-mux to lead rather than follow in this space.
