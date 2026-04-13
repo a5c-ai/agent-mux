@@ -32,7 +32,7 @@ npx amux run claude --prompt "hello"
 
 ## Contributing
 
-See [../CONTRIBUTING.md](../CONTRIBUTING.md).
+See [CONTRIBUTING.md](https://github.com/a5c-ai/agent-mux/blob/main/CONTRIBUTING.md) in the repository root.
 
 ## Features (summary)
 
@@ -72,4 +72,4 @@ for (const tr of filterEvents(events, 'tool_result')) console.log(tr.toolName, t
 
 ## Docs site
 
-A Docusaurus site is scaffolded under [`../website/`](../website). It sources these markdown files directly — keep edits here, not in the site.
+A Docusaurus site is scaffolded under `website/`. It sources these markdown files directly — keep edits here, not in the site.

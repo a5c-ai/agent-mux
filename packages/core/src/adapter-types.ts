@@ -65,20 +65,18 @@ export interface BaseAgentAdapterInterface {
 // Subprocess Adapter (Current Model)
 // ---------------------------------------------------------------------------
 
+// Import the legacy adapter interface for compatibility
+import type { AgentAdapter as LegacyAgentAdapter } from './adapter.js';
+
 /**
  * Subprocess-based adapter (traditional agent-mux model).
  * Spawns CLI process and parses line-based output.
  */
-export interface SubprocessAdapter extends BaseAgentAdapterInterface {
+export interface SubprocessAdapter extends LegacyAgentAdapter {
   readonly adapterType: 'subprocess';
-  readonly cliCommand: string;
-
-  buildSpawnArgs(options: RunOptions): SpawnArgs;
-  parseEvent(line: string, context: ParseContext): AgentEvent | AgentEvent[] | null;
 }
 
-// Import existing types that SubprocessAdapter needs
-import type { SpawnArgs, ParseContext } from './adapter.js';
+// SpawnArgs and ParseContext are now available through LegacyAgentAdapter import
 
 // ---------------------------------------------------------------------------
 // Remote Adapter (HTTP/WebSocket/Unix)
@@ -88,7 +86,7 @@ import type { SpawnArgs, ParseContext } from './adapter.js';
  * Remote adapter for HTTP APIs, WebSocket connections, or Unix sockets.
  * Manages persistent connections and may handle server lifecycle.
  */
-export interface RemoteAdapter extends BaseAgentAdapterInterface {
+export interface RemoteAdapter extends LegacyAgentAdapter {
   readonly adapterType: 'remote';
   readonly connectionType: 'http' | 'websocket' | 'unix';
 
@@ -156,7 +154,7 @@ export interface WebSocketMessage {
  * Programmatic adapter for direct SDK integration.
  * No subprocess or network communication - direct function calls.
  */
-export interface ProgrammaticAdapter extends BaseAgentAdapterInterface {
+export interface ProgrammaticAdapter extends LegacyAgentAdapter {
   readonly adapterType: 'programmatic';
 
   execute(options: RunOptions): AsyncIterableIterator<AgentEvent>;

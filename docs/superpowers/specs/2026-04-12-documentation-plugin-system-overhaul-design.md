@@ -94,7 +94,7 @@ amux plugin marketplace <agent> [cmd]    # Calls: claude plugins marketplace [cm
 - **OpenCode**: Three-tier extensibility (skills/agents/plugins)
 
 **Error Handling:**
-For agents without native plugin systems, return clear error: "Plugin management not supported for {agent}. Use 'amux mcp' for MCP servers."
+For agents without native plugin systems, return clear error: "Plugin management not supported for `{agent}`. Use 'amux mcp' for MCP servers."
 
 ### 3. Systematic Documentation Updates
 

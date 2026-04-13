@@ -36,7 +36,7 @@ const config: Config = {
     navbar: {
       title: 'agent-mux',
       items: [
-        { to: '/docs/README', label: 'Docs', position: 'left' },
+        { to: '/docs/', label: 'Docs', position: 'left' },
         { href: 'https://github.com/a5c-ai/agent-mux', label: 'GitHub', position: 'right' },
         { href: 'https://www.npmjs.com/package/@a5c-ai/agent-mux', label: 'npm', position: 'right' },
       ],

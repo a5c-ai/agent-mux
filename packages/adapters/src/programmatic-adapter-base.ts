@@ -22,6 +22,8 @@ import type {
   AgentEvent,
   ProgrammaticAdapter,
   CostRecord,
+  SpawnArgs,
+  ParseContext,
 } from '@a5c-ai/agent-mux-core';
 
 /**
@@ -32,6 +34,16 @@ export abstract class BaseProgrammaticAdapter implements ProgrammaticAdapter {
   // ── Adapter Type ──────────────────────────────────────────────────
 
   readonly adapterType = 'programmatic' as const;
+
+  // ── Legacy Compatibility (for validation with old interface) ────────
+
+  readonly cliCommand = '[programmatic]'; // Stub for legacy validation
+  buildSpawnArgs(_options: RunOptions): SpawnArgs {
+    throw new Error('buildSpawnArgs not supported on programmatic adapters');
+  }
+  parseEvent(_line: string, _context: ParseContext): AgentEvent | AgentEvent[] | null {
+    throw new Error('parseEvent not supported on programmatic adapters');
+  }
 
   // ── Abstract members (must be implemented by subclasses) ──────────
 

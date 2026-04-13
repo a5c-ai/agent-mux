@@ -24,6 +24,9 @@ import type {
   ServerOptions,
   ServerInfo,
   ServerHealth,
+  SpawnArgs,
+  ParseContext,
+  AgentEvent,
 } from '@a5c-ai/agent-mux-core';
 
 /**
@@ -34,6 +37,16 @@ export abstract class BaseRemoteAdapter implements RemoteAdapter {
   // ── Adapter Type ──────────────────────────────────────────────────
 
   readonly adapterType = 'remote' as const;
+
+  // ── Legacy Compatibility (for validation with old interface) ────────
+
+  readonly cliCommand = '[remote]'; // Stub for legacy validation
+  buildSpawnArgs(_options: RunOptions): SpawnArgs {
+    throw new Error('buildSpawnArgs not supported on remote adapters');
+  }
+  parseEvent(_line: string, _context: ParseContext): AgentEvent | AgentEvent[] | null {
+    throw new Error('parseEvent not supported on remote adapters');
+  }
 
   // ── Abstract members (must be implemented by subclasses) ──────────
 

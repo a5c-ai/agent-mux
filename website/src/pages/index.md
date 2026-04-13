@@ -58,7 +58,7 @@ console.log(sumCost(events).totalUsd);
 
 ## Learn more
 
-- [Adapter pages](/docs/category/agents) — per-agent install, auth, flags, and limits
+- [Adapter pages](/docs/agents/claude) — per-agent install, auth, flags, and limits
 - [Invocation Modes](/docs/invocation-modes) — docker, k8s, ssh
 - [Hooks](/docs/tutorials/hooks) and [Plugins](/docs/tutorials/plugins)
 - [Multi-agent dispatch](/docs/tutorials/multi-agent)

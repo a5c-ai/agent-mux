@@ -9,10 +9,12 @@
 // Agent Names (§1.4)
 // ---------------------------------------------------------------------------
 
-/** The ten built-in agent names supported in v1. */
+/** Built-in agent names supported in v1. */
 export type BuiltInAgentName =
   | 'claude'
   | 'codex'
+  | 'droid'
+  | 'amp'
   | 'gemini'
   | 'copilot'
   | 'cursor'

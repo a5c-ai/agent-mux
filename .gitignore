@@ -16,3 +16,4 @@ node_modules/
 website/.docusaurus/
 website/build/
 website/node_modules/
+tuitest.log

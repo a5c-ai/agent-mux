@@ -26,7 +26,16 @@ export type HarnessType =
   | 'hermes'
   | 'aider'
   | 'goose'
-  | 'custom';
+  | 'custom'
+  // New adapter types
+  | 'claude-agent-sdk'
+  | 'codex-sdk'
+  | 'codex-websocket'
+  | 'pi-sdk'
+  | 'opencode-http';
+
+/** Adapter execution types supported by harness-mock. */
+export type AdapterExecutionType = 'subprocess' | 'http' | 'websocket' | 'sdk';
 
 // ---------------------------------------------------------------------------
 // File operation simulation
@@ -120,6 +129,153 @@ export interface MockEvent {
 }
 
 // ---------------------------------------------------------------------------
+// HTTP/WebSocket/SDK behavior simulation
+// ---------------------------------------------------------------------------
+
+/** Configuration for HTTP server mocking. */
+export interface HttpServerConfig {
+  /** Port to bind the mock server to. */
+  port?: number;
+
+  /** Host to bind to (default: localhost). */
+  host?: string;
+
+  /** Startup delay in milliseconds. */
+  startupDelayMs?: number;
+
+  /** Whether server startup should fail. */
+  startupFails?: boolean;
+
+  /** Routes and their response configurations. */
+  routes?: Record<string, HttpRouteConfig>;
+
+  /** Global response delay (applies to all routes). */
+  globalDelayMs?: number;
+
+  /** Enable CORS headers. */
+  enableCors?: boolean;
+}
+
+/** Configuration for a single HTTP route. */
+export interface HttpRouteConfig {
+  /** HTTP method (GET, POST, etc.). */
+  method?: string;
+
+  /** Response status code. */
+  status?: number;
+
+  /** Response headers. */
+  headers?: Record<string, string>;
+
+  /** Response body (string, object, or function). */
+  body?: string | object | ((req: unknown) => unknown);
+
+  /** Response delay for this specific route. */
+  delayMs?: number;
+
+  /** Whether to stream the response. */
+  streaming?: boolean;
+
+  /** For streaming responses, chunks to send. */
+  streamChunks?: Array<{ data: string; delayMs?: number }>;
+}
+
+/** Configuration for WebSocket server mocking. */
+export interface WebSocketConfig {
+  /** Port to bind the WebSocket server to. */
+  port?: number;
+
+  /** Host to bind to (default: localhost). */
+  host?: string;
+
+  /** Startup delay in milliseconds. */
+  startupDelayMs?: number;
+
+  /** Whether server startup should fail. */
+  startupFails?: boolean;
+
+  /** Channels to support. */
+  channels?: string[];
+
+  /** Ping interval in milliseconds. */
+  pingIntervalMs?: number;
+
+  /** Connection timeout in milliseconds. */
+  connectionTimeoutMs?: number;
+
+  /** Maximum number of concurrent connections. */
+  maxConnections?: number;
+
+  /** Whether to simulate connection drops. */
+  simulateDrops?: {
+    /** Drop connections after this many messages. */
+    afterMessages?: number;
+    /** Delay before reconnection is allowed. */
+    reconnectDelayMs?: number;
+  };
+}
+
+/** Configuration for SDK mocking. */
+export interface SdkConfig {
+  /** SDK name/identifier. */
+  sdkName?: string;
+
+  /** Version to simulate. */
+  version?: string;
+
+  /** Authentication configuration. */
+  auth?: {
+    /** Whether authentication should succeed. */
+    succeeds: boolean;
+    /** Delay for auth operations. */
+    delayMs?: number;
+    /** Required API keys or tokens. */
+    requiredKeys?: string[];
+  };
+
+  /** API call simulation. */
+  apiCalls?: Record<string, SdkMethodConfig>;
+
+  /** Global settings for all SDK methods. */
+  globalConfig?: {
+    /** Default delay for all operations. */
+    defaultDelayMs?: number;
+    /** Rate limiting simulation. */
+    rateLimitMs?: number;
+    /** Network failure simulation rate (0-1). */
+    failureRate?: number;
+  };
+}
+
+/** Configuration for a single SDK method. */
+export interface SdkMethodConfig {
+  /** Response to return. */
+  response?: unknown;
+
+  /** Delay before response. */
+  delayMs?: number;
+
+  /** Whether this method should fail. */
+  shouldFail?: boolean;
+
+  /** Error to throw if shouldFail is true. */
+  error?: {
+    code: string;
+    message: string;
+  };
+
+  /** Whether this method supports streaming. */
+  streaming?: boolean;
+
+  /** For streaming methods, events to emit. */
+  streamEvents?: Array<{
+    type: string;
+    data: unknown;
+    delayMs?: number;
+  }>;
+}
+
+// ---------------------------------------------------------------------------
 // Harness scenario
 // ---------------------------------------------------------------------------
 
@@ -134,17 +290,16 @@ export interface HarnessScenario {
   /** Human-readable scenario name (for test output). */
   name?: string;
 
+  /** The execution type for this harness (default: subprocess). */
+  executionType?: AdapterExecutionType;
+
+  // ── Subprocess-specific configuration ──────────────────────────────
+
   /** Process behavior (exit code, timing, crashes). */
-  process: ProcessBehavior;
+  process?: ProcessBehavior;
 
   /** Sequence of output chunks to emit. */
-  output: OutputChunk[];
-
-  /** Sequence of events the harness would produce. */
-  events?: MockEvent[];
-
-  /** File operations the harness would perform. */
-  fileOperations?: FileOperation[];
+  output?: OutputChunk[];
 
   /** Interactive stdin/stdout exchanges. */
   interactions?: StdinInteraction[];
@@ -157,23 +312,79 @@ export interface HarnessScenario {
 
   /** Expected working directory. */
   expectedCwd?: string;
+
+  // ── Common configuration ────────────────────────────────────────────
+
+  /** Sequence of events the harness would produce. */
+  events?: MockEvent[];
+
+  /** File operations the harness would perform. */
+  fileOperations?: FileOperation[];
+
+  // ── HTTP-specific configuration ─────────────────────────────────────
+
+  /** HTTP server configuration (for HTTP adapters). */
+  httpServer?: HttpServerConfig;
+
+  // ── WebSocket-specific configuration ────────────────────────────────
+
+  /** WebSocket server configuration (for WebSocket adapters). */
+  websocketServer?: WebSocketConfig;
+
+  // ── SDK-specific configuration ──────────────────────────────────────
+
+  /** SDK configuration (for programmatic adapters). */
+  sdk?: SdkConfig;
 }
 
 // ---------------------------------------------------------------------------
 // Mock harness handle
 // ---------------------------------------------------------------------------
 
-/** Handle to a running mock harness process. */
+/** Base handle to a running mock harness. */
 export interface MockHarnessHandle {
   /** The scenario being executed. */
   readonly scenario: HarnessScenario;
 
-  /** PID-like identifier for this mock process. */
-  readonly pid: number;
+  /** Unique identifier for this mock instance. */
+  readonly id: number;
 
-  /** Whether the process has exited. */
+  /** Whether the mock has stopped. */
   readonly exited: boolean;
 
+  /** Files that were "modified" by this mock. */
+  readonly fileChanges: FileOperation[];
+
+  /** Stop the mock (gracefully if possible). */
+  stop(): Promise<void>;
+
+  /** Force stop the mock immediately. */
+  forceStop(): void;
+
+  /** Wait for the mock to complete. */
+  waitForCompletion(): Promise<MockExecutionResult>;
+}
+
+/** Result of mock execution. */
+export interface MockExecutionResult {
+  /** Whether execution completed successfully. */
+  success: boolean;
+
+  /** Duration of execution in milliseconds. */
+  durationMs: number;
+
+  /** Any error that occurred. */
+  error?: {
+    code: string;
+    message: string;
+  };
+
+  /** Execution-type specific results. */
+  results: SubprocessResult | HttpServerResult | WebSocketServerResult | SdkResult;
+}
+
+/** Subprocess-specific handle (traditional harness mock). */
+export interface SubprocessMockHandle extends MockHarnessHandle {
   /** The exit code (undefined until exited). */
   readonly exitCode: number | undefined;
 
@@ -183,9 +394,6 @@ export interface MockHarnessHandle {
   /** All stderr data collected so far. */
   readonly stderr: string;
 
-  /** Files that were "modified" by this mock. */
-  readonly fileChanges: FileOperation[];
-
   /** Write to the mock's stdin. */
   write(data: string): void;
 
@@ -194,6 +402,143 @@ export interface MockHarnessHandle {
 
   /** Wait for the mock process to exit. */
   waitForExit(): Promise<{ exitCode: number; stdout: string; stderr: string }>;
+}
+
+/** HTTP server-specific handle. */
+export interface HttpServerMockHandle extends MockHarnessHandle {
+  /** Server endpoint URL. */
+  readonly serverUrl: string;
+
+  /** Server port. */
+  readonly port: number;
+
+  /** Whether the server is running. */
+  readonly isRunning: boolean;
+
+  /** Request history. */
+  readonly requestHistory: Array<{
+    method: string;
+    path: string;
+    headers: Record<string, string>;
+    body: unknown;
+    timestamp: Date;
+  }>;
+
+  /** Get server status. */
+  getStatus(): {
+    isRunning: boolean;
+    requestCount: number;
+    uptime: number;
+  };
+
+  /** Reset request history and state. */
+  reset(): void;
+}
+
+/** WebSocket server-specific handle. */
+export interface WebSocketServerMockHandle extends MockHarnessHandle {
+  /** Server endpoint URL. */
+  readonly serverUrl: string;
+
+  /** Server port. */
+  readonly port: number;
+
+  /** Whether the server is running. */
+  readonly isRunning: boolean;
+
+  /** Connected clients count. */
+  readonly connectionCount: number;
+
+  /** Message history for all connections. */
+  readonly messageHistory: Array<{
+    connectionId: string;
+    direction: 'inbound' | 'outbound';
+    message: unknown;
+    timestamp: Date;
+  }>;
+
+  /** Send message to all connected clients. */
+  broadcast(message: unknown): void;
+
+  /** Send message to specific connection. */
+  sendTo(connectionId: string, message: unknown): void;
+
+  /** Simulate connection drop for a specific client. */
+  dropConnection(connectionId: string): void;
+
+  /** Get connection status. */
+  getConnectionStatus(): Array<{
+    connectionId: string;
+    connectedAt: Date;
+    messageCount: number;
+  }>;
+}
+
+/** SDK-specific handle. */
+export interface SdkMockHandle extends MockHarnessHandle {
+  /** SDK instance name. */
+  readonly sdkName: string;
+
+  /** Method call history. */
+  readonly methodHistory: Array<{
+    method: string;
+    args: unknown[];
+    result: unknown;
+    durationMs: number;
+    timestamp: Date;
+  }>;
+
+  /** Whether authentication was successful. */
+  readonly isAuthenticated: boolean;
+
+  /** Simulate a method call. */
+  callMethod(method: string, ...args: unknown[]): Promise<unknown>;
+
+  /** Get method call statistics. */
+  getStats(): {
+    totalCalls: number;
+    uniqueMethods: string[];
+    averageDurationMs: number;
+  };
+
+  /** Reset method history and state. */
+  reset(): void;
+}
+
+// ── Result types for different execution types ──────────────────────────
+
+/** Subprocess execution result. */
+export interface SubprocessResult {
+  type: 'subprocess';
+  exitCode: number;
+  stdout: string;
+  stderr: string;
+  signalKilled?: string;
+}
+
+/** HTTP server execution result. */
+export interface HttpServerResult {
+  type: 'http';
+  requestCount: number;
+  requestHistory: Array<{ method: string; path: string; status: number }>;
+  averageResponseTimeMs: number;
+}
+
+/** WebSocket server execution result. */
+export interface WebSocketServerResult {
+  type: 'websocket';
+  connectionCount: number;
+  messageCount: number;
+  averageConnectionDurationMs: number;
+}
+
+/** SDK execution result. */
+export interface SdkResult {
+  type: 'sdk';
+  methodCallCount: number;
+  uniqueMethods: string[];
+  averageMethodDurationMs: number;
+  authenticationAttempts: number;
 }
 
 // ---------------------------------------------------------------------------
