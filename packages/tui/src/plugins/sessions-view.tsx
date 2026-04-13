@@ -48,6 +48,10 @@ function SessionsView({ client, active, emit }: TuiViewProps) {
         if (!sel) return;
         emit({ type: 'session:detail', agent: sel.agent, sessionId: sel.sessionId });
         emit({ type: 'view:switch', id: 'session-detail' });
+      } else if (_input === 'D') {
+        const sel = sessions[cursor];
+        if (!sel) return;
+        emit({ type: 'session:diff', agent: sel.agent, sessionId: sel.sessionId });
       }
     },
     { isActive: active },
@@ -66,7 +70,7 @@ function SessionsView({ client, active, emit }: TuiViewProps) {
           </Text>
         );
       })}
-      <Text dimColor>↑/↓ navigate · Enter: resume · d: details</Text>
+      <Text dimColor>↑/↓ navigate · Enter: resume · d: details · D: mark/diff</Text>
     </Box>
   );
 }

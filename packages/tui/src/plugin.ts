@@ -51,7 +51,8 @@ export type TuiInternalEvent =
   | { type: 'status'; message: string }
   | { type: 'event'; event: AgentEvent }
   | { type: 'session:select'; agent: string; sessionId: string }
-  | { type: 'session:detail'; agent: string; sessionId: string };
+  | { type: 'session:detail'; agent: string; sessionId: string }
+  | { type: 'session:diff'; agent: string; sessionId: string };
 
 export interface TuiPlugin {
   name: string;

@@ -44,6 +44,7 @@ export function App({ client, plugins, defaultAgent = 'claude-code' }: AppProps)
   const [profilePickerMode, setProfilePickerMode] = useState<boolean>(false);
   const [currentProfile, setCurrentProfile] = useState<string | undefined>(undefined);
   const [availableProfiles, setAvailableProfiles] = useState<string[]>([]);
+  const diffLeftRef = React.useRef<{ agent: string; sessionId: string } | null>(null);
 
   const availableModels = useMemo<ModelOption[]>(() => {
     try {
@@ -74,6 +75,9 @@ export function App({ client, plugins, defaultAgent = 'claude-code' }: AppProps)
         }
         if (ev.type === 'session:detail') {
           setSelection({ agent: ev.agent, sessionId: ev.sessionId });
+        }
+        if (ev.type === 'session:diff') {
+          void handleSessionDiff(ev.agent, ev.sessionId);
         }
       },
       s,
@@ -169,8 +173,51 @@ export function App({ client, plugins, defaultAgent = 'claude-code' }: AppProps)
       setStatus(`Resuming ${ev.agent}/${ev.sessionId} — press p to send next message`);
     } else if (ev.type === 'session:detail') {
       setSelection({ agent: ev.agent, sessionId: ev.sessionId });
+    } else if (ev.type === 'session:diff') {
+      void handleSessionDiff(ev.agent, ev.sessionId);
     } else if (ev.type === 'event') stream.push(ev.event);
   };
+
+  async function handleSessionDiff(agent: string, sessionId: string) {
+    const left = diffLeftRef.current;
+    if (!left) {
+      diffLeftRef.current = { agent, sessionId };
+      setStatus(`diff: marked ${agent}/${sessionId} as A — press D on another session to compare`);
+      return;
+    }
+    diffLeftRef.current = null;
+    setStatus(`diff: computing ${left.agent}/${left.sessionId} ↔ ${agent}/${sessionId}…`);
+    try {
+      const result = await client.sessions.diff(
+        { agent: left.agent as never, sessionId: left.sessionId },
+        { agent: agent as never, sessionId },
+      );
+      const sum = result.summary;
+      const head = result.operations
+        .slice(0, 30)
+        .map((o, i) => `${i + 1}. ${(o as { kind?: string }).kind ?? 'op'}`)
+        .join('\n');
+      const text =
+        `\n--- session diff ---\n` +
+        `A: ${left.agent}/${left.sessionId}\n` +
+        `B: ${agent}/${sessionId}\n` +
+        `+${sum.added} -${sum.removed} ~${sum.modified} =${sum.unchanged}\n` +
+        head +
+        (result.operations.length > 30 ? `\n… ${result.operations.length - 30} more ops` : '') +
+        `\n`;
+      stream.push({
+        runId: 'diff',
+        agent: left.agent,
+        timestamp: new Date().toISOString(),
+        type: 'text_delta',
+        delta: text,
+      } as never);
+      setActiveId('chat');
+      setStatus('diff: done.');
+    } catch (e) {
+      setStatus(`diff failed: ${(e as Error).message}`);
+    }
+  }
 
   // Inject renderers+stream into whichever view is active by using a thin wrapper.
   const ViewWithRenderers = ActiveView
