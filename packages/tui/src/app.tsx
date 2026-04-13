@@ -62,6 +62,11 @@ export function App({ client, plugins, defaultAgent = 'claude-code' }: AppProps)
       setPromptMode(true);
       return;
     }
+    if (input === 'i' && currentHandleRef.current) {
+      void currentHandleRef.current.interrupt();
+      setStatus('Interrupting current run…');
+      return;
+    }
     if (pendingApproval && currentHandleRef.current) {
       if (input === 'y') {
         void currentHandleRef.current.approve();
@@ -194,8 +199,29 @@ export function App({ client, plugins, defaultAgent = 'claude-code' }: AppProps)
           onCancel={() => setPromptMode(false)}
         />
       ) : (
-        <Box>
-          <Text dimColor>{status || 'p: prompt · q: quit'}</Text>
+        <Box flexDirection="column">
+          {status ? <Text dimColor>{status}</Text> : null}
+          <Box>
+            <Text dimColor>p: prompt</Text>
+            {currentHandleRef.current ? <Text color="yellow"> · i: interrupt</Text> : null}
+            {pendingApproval ? <Text color="yellow"> · y/n: approve/deny</Text> : null}
+            <Text dimColor> · q: quit</Text>
+            {registry.views.length > 1 ? (
+              <Text dimColor>
+                {' · '}
+                {registry.views
+                  .filter((v) => v.hotkey)
+                  .map((v) => `${v.hotkey}:${v.title.toLowerCase()}`)
+                  .join(' ')}
+              </Text>
+            ) : null}
+            {registry.commands.length > 0 ? (
+              <Text dimColor>
+                {' · '}
+                {registry.commands.map((c) => `${c.hotkey}:${c.label}`).join(' ')}
+              </Text>
+            ) : null}
+          </Box>
         </Box>
       )}
     </Box>
