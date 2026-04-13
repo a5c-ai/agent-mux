@@ -32,9 +32,17 @@ amux run pi --prompt "Draft a commit message"
 - Location: `~/.pi/agent/sessions/*.jsonl`
 - JSONL; parses `text`, `message`, and `tool_call` events.
 
-## Plugins (MCP)
+## Plugins
 
-Plugin support: **no** (`supportsMCP: false`, `supportsPlugins: false`).
+Plugin support: **no**. Use MCP servers for extensibility.
+
+### MCP Servers
+```bash
+amux mcp install pi <mcp-server>
+amux mcp list pi
+```
+
+Registry: https://modelcontextprotocol.io
 
 ## Capabilities
 

@@ -35,13 +35,20 @@ amux run opencode --prompt "Write a release note for v1.2"
 - Location: `~/.local/share/opencode/*.jsonl`
 - Standard JSONL session format.
 
-## Plugins (MCP)
+## Plugins
 
-Plugin support: **yes** (`pluginFormats: ['mcp-server']`). Manage via:
+Plugin support: **yes** — OpenCode three-tier plugin system with registry.
 
+### Plugin Management
 ```bash
-amux plugin install opencode <name>
+amux plugin install opencode <plugin>
 amux plugin list opencode
+```
+
+### MCP Servers
+```bash
+amux mcp install opencode <mcp-server>
+amux mcp list opencode
 ```
 
 ## Capabilities

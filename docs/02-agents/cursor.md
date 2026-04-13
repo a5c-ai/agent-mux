@@ -33,9 +33,21 @@ amux run cursor --prompt "Refactor this function"
 - Location: `~/.cursor/sessions/*.jsonl`
 - JSONL format; events of type `text`, `message`, `tool_call` are parsed.
 
-## Plugins (MCP)
+## Plugins
 
-Plugin support: **yes** (`supportsMCP: true`, `pluginFormats: ['mcp-server']`). Use `amux plugin install cursor <name>` to register MCP servers.
+Plugin support: **yes** — Cursor editor marketplace with extensions and integrations.
+
+### Plugin Management
+```bash
+amux plugin install cursor <plugin>
+amux plugin list cursor
+```
+
+### MCP Servers
+```bash
+amux mcp install cursor <mcp-server>
+amux mcp list cursor
+```
 
 ## Capabilities
 

@@ -33,9 +33,17 @@ amux run openclaw --prompt "Generate a CHANGELOG entry"
 - Location: `~/.openclaw/sessions/*.jsonl`
 - JSONL; events `text`, `message`, `tool_call` are parsed.
 
-## Plugins (MCP)
+## Plugins
 
-Plugin support: **yes** (`supportsMCP: true`, `pluginFormats: ['mcp-server']`).
+Plugin support: **no**. Use MCP servers for extensibility.
+
+### MCP Servers
+```bash
+amux mcp install openclaw <mcp-server>
+amux mcp list openclaw
+```
+
+Registry: https://modelcontextprotocol.io
 
 ## Capabilities
 

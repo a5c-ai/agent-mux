@@ -32,9 +32,17 @@ amux run omp --prompt "Lint this file"
 - Location: `~/.omp/agent/sessions/*.jsonl`
 - JSONL; events `text`, `message`, `tool_call` are recognized.
 
-## Plugins (MCP)
+## Plugins
 
-Plugin support: **no** (`supportsMCP: false`, `supportsPlugins: false`).
+Plugin support: **no**. Use MCP servers for extensibility.
+
+### MCP Servers
+```bash
+amux mcp install omp <mcp-server>
+amux mcp list omp
+```
+
+Registry: https://modelcontextprotocol.io
 
 ## Capabilities
 

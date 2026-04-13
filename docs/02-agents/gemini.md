@@ -34,13 +34,23 @@ amux run gemini --prompt "Explain this diff"
 - Location: `~/.gemini/sessions/*.jsonl`
 - JSONL-formatted; standard agent-mux parser.
 
-## Plugins (MCP)
+## Extensions
 
-Plugin support: **yes** — MCP server format. Registry: https://modelcontextprotocol.io.
+Extension support: **yes** — Gemini CLI extension format for prompts, MCP servers, commands, themes, and hooks.
 
+### Extension Management
 ```bash
-amux plugin install gemini <mcp-server>
+amux plugin install gemini <extension>
+amux plugin list gemini
 ```
+
+### MCP Servers  
+```bash
+amux mcp install gemini <mcp-server>
+amux mcp list gemini
+```
+
+Registry: https://modelcontextprotocol.io for MCP servers.
 
 ## Capabilities
 

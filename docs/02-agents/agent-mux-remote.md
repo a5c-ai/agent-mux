@@ -54,9 +54,17 @@ The **invocation mode** (ssh/docker/k8s) wraps these args. See [Invocation Modes
 
 - `sessionDir()` returns `''` — sessions live on the remote target under that agent's own session directory.
 
-## Plugins (MCP)
+## Plugins
 
-Plugin support: **no**. Install plugins on the remote target against the underlying agent.
+Plugin support: **no**. Use MCP servers for extensibility.
+
+### MCP Servers
+```bash
+amux mcp install agent-mux-remote <mcp-server>
+amux mcp list agent-mux-remote
+```
+
+Registry: https://modelcontextprotocol.io
 
 ## Known limitations
 

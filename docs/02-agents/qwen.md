@@ -41,10 +41,21 @@ for await (const ev of run.events()) {
 }
 ```
 
+## Plugins
+
+Plugin support: **no**. Use MCP servers for extensibility.
+
+### MCP Servers
+```bash
+amux mcp install qwen <mcp-server>
+amux mcp list qwen
+```
+
+Registry: https://modelcontextprotocol.io
+
 ## Notes
 
 - Session files live under `~/.qwen/sessions` (JSONL).
-- MCP servers are configured under `mcpServers` in `~/.qwen/settings.json`;
-  use `client.plugins.install('qwen', ...)` to manage them.
+- MCP servers are configured under `mcpServers` in `~/.qwen/settings.json`.
 - Capabilities are set conservatively — thinking, JSON mode, and image input
   default to `false` pending upstream confirmation.

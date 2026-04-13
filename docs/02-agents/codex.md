@@ -34,9 +34,17 @@ amux run codex --prompt "Write a unit test for utils.ts"
 - Parsed via the standard JSONL session reader.
 - Resume/fork supported by the adapter layer.
 
-## Plugins (MCP)
+## Plugins
 
-Plugin support: **no**. `supportsMCP = false`, `supportsPlugins = false`.
+Plugin support: **no**. Use MCP servers for extensibility.
+
+### MCP Servers
+```bash
+amux mcp install codex <mcp-server>
+amux mcp list codex
+```
+
+Registry: https://modelcontextprotocol.io
 
 ## Capabilities
 

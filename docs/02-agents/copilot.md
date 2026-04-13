@@ -38,9 +38,21 @@ It does not currently forward `--model` or approval modes — Copilot CLI select
 - Location: `~/.config/github-copilot/sessions/*.jsonl`
 - Output is parsed line-by-line; non-JSON lines are treated as plain text deltas.
 
-## Plugins (MCP)
+## Plugins
 
-Plugin support: **no** (`supportsMCP: false`, `supportsPlugins: false`).
+Plugin support: **yes** — GitHub Copilot marketplace with extensions and integrations.
+
+### Plugin Management
+```bash
+amux plugin install copilot <plugin>
+amux plugin list copilot
+```
+
+### MCP Servers
+```bash
+amux mcp install copilot <mcp-server>
+amux mcp list copilot
+```
 
 ## Capabilities
 

@@ -40,9 +40,17 @@ amux run hermes --prompt "Summarize the latest commits"
 - Location: `~/.hermes/sessions/*.jsonl`
 - JSONL; standard parser.
 
-## Plugins (MCP)
+## Plugins
 
-Plugin support: **no** at the plugin layer (`supportsPlugins: false`, empty `pluginFormats`), but `supportsMCP: true` — Hermes can talk to MCP servers directly via its own config.
+Plugin support: **no**. Use MCP servers for extensibility.
+
+### MCP Servers
+```bash
+amux mcp install hermes <mcp-server>
+amux mcp list hermes
+```
+
+Registry: https://modelcontextprotocol.io
 
 ## Capabilities
 

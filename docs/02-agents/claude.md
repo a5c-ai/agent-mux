@@ -50,17 +50,25 @@ The adapter forwards these `RunOptions` to the CLI:
 - Format: JSONL, one event per line
 - Resume and fork are both supported (`canResume`, `canFork`).
 
-## Plugins (MCP)
+## Plugins
 
-Plugin support: **yes**. Claude Code uses MCP servers as its plugin format. Use:
+Plugin support: **yes**. Claude Code has a full plugin ecosystem with marketplace.
 
+### Native Plugin Management
 ```bash
-amux plugin install claude <mcp-server>
+amux plugin install claude <plugin>
 amux plugin list claude
-amux plugin uninstall claude <name>
+amux plugin marketplace claude
 ```
 
-Registry: https://modelcontextprotocol.io.
+### MCP Servers
+```bash
+amux mcp install claude <mcp-server>
+amux mcp list claude
+```
+
+Registry: https://modelcontextprotocol.io for MCP servers.
+Plugin marketplace: Available through `claude plugins marketplace`.
 
 ## Capabilities
 
