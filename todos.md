@@ -20,7 +20,7 @@ Legend: [x] done · [~] initial pass done, deep-dive process authored · [>] pro
 
 ## Next
 
-- [~] TUI package scaffold landed at `packages/tui` (Ink + plugin-first). Built-in plugins: text-delta, tool-call, cost, chat-view, sessions-view. Next: run-dispatch wiring so chat-view actually streams events, diff renderer, config view, plugin discovery from `~/.amux/tui-plugins/`.
+- [x] TUI package at `packages/tui` (Ink + plugin-first). Run dispatch wired (`p` opens prompt → `client.run` streams to chat). Renderers: text-delta, tool-call, diff, shell, mcp, subagent, file-ops, session-lifecycle, approval, plugin-skill, image, control, lifecycle, cost, fallback. Views: chat, sessions, session-detail (export json/markdown, watch, diff), cost, runs, adapters, models, profiles, plugins, mcp, doctor, help. Overlays: command palette (`:`/Ctrl-K), filter (`/`), model picker (`m`), profile picker (`P`). Cost-threshold alerts via `AMUX_TUI_COST_ALERT`. Persistent prompt history (`AMUX_TUI_PROMPT_HISTORY`, default `~/.agent-mux/tui-prompt-history`) with up/down recall. User plugin discovery from `~/.amux/tui-plugins/` (override with `$AMUX_TUI_PLUGINS_DIR` or `--user-plugins-dir`; opt out with `--no-user-plugins`). 85 tests.
 
 
 - [ ] Cut a release: `npx changeset version && npm install --package-lock-only && git commit` once all four pipelines on `main` are green simultaneously.
@@ -61,6 +61,11 @@ then perform the same research and analysis as mentioned above for these new ref
 
 [~] - create a tui package based on a popular framework like Ink or Blessed, that provides a user interface for interacting with the agent-mux, such as running agents, viewing sessions, managing configurations, etc. this tui should be designed to be extensible and customizable, allowing users to add their own features and functionalities as needed (with plugins). and all almost all (all if possible, except the framework, tui process, embedded sdk dependecy - injected to plugins, etc.) the basic views, layouts, functionalities should be implemented as plugins (messages renderes, diff renderer, tool call rendering, chat, sessesion mgt, ...).
 
+[ ] - skill management cli command (for global and for repo), like mcp, hooks and plugins. each harness with its own implementation for discover, add/remove, etc.
+[ ] - polish plugin management command (for global and for repo)
+[ ] - polish hooks management command (for global and for repo)
+[ ] - polish mcp management command (for global and for repo)
+[ ] - polish per adapter config management command (for global and for repo)
 ---
 
 Run remaining [>] / [~] items:

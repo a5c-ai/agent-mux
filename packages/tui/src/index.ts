@@ -4,6 +4,11 @@ export type { Registry } from './registry.js';
 export { EventStream } from './event-stream.js';
 export type { EventSubscriber, Unsubscribe } from './event-stream.js';
 export { PromptInput } from './prompt-input.js';
+export {
+  loadExternalPlugins,
+  defaultExternalPluginsDir,
+  type LoadResult as ExternalPluginsLoadResult,
+} from './external-plugins.js';
 export * from './plugin.js';
 
 import textDelta from './plugins/text-delta.js';

@@ -15,13 +15,23 @@ export async function tuiCommand(
         'Launches the Ink-based agent-mux TUI with the default plugin set.',
         '',
         'Options:',
-        '  --agent <name>  Default agent for new prompts (default: claude-code)',
+        '  --agent <name>            Default agent for new prompts (default: claude-code)',
+        '  --user-plugins-dir <dir>  Override user-plugin discovery dir',
+        '                            (default: $AMUX_TUI_PLUGINS_DIR or ~/.amux/tui-plugins)',
+        '  --no-user-plugins         Skip discovering user plugins from the directory',
       ].join('\n') + '\n',
     );
     return ExitCode.SUCCESS;
   }
 
-  let tui: { App: unknown; builtinPlugins: unknown };
+  let tui: {
+    App: unknown;
+    builtinPlugins: unknown[];
+    loadExternalPlugins: (
+      dir?: string,
+    ) => Promise<{ plugins: unknown[]; errors: { source: string; error: string }[] }>;
+    defaultExternalPluginsDir: () => string;
+  };
   try {
     tui = (await import('@a5c-ai/agent-mux-tui')) as never;
   } catch (err) {
@@ -35,11 +45,30 @@ export async function tuiCommand(
 
   const React = await import('react');
   const defaultAgent = (args.flags.agent as string | undefined) ?? 'claude-code';
+  const noUser = args.flags['no-user-plugins'] === true;
+  const userDir =
+    typeof args.flags['user-plugins-dir'] === 'string'
+      ? (args.flags['user-plugins-dir'] as string)
+      : tui.defaultExternalPluginsDir();
+
+  const plugins: unknown[] = [...tui.builtinPlugins];
+  if (!noUser) {
+    try {
+      const ext = await tui.loadExternalPlugins(userDir);
+      plugins.push(...ext.plugins);
+      for (const e of ext.errors) {
+        process.stderr.write(`tui: failed to load plugin from ${e.source}: ${e.error}\n`);
+      }
+    } catch (e) {
+      process.stderr.write(`tui: external plugin discovery failed: ${(e as Error).message}\n`);
+    }
+  }
+
   const { render } = await import('ink');
   render(
     React.createElement(tui.App as never, {
       client: client as never,
-      plugins: tui.builtinPlugins as never,
+      plugins: plugins as never,
       defaultAgent,
     }),
   );

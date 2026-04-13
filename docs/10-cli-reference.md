@@ -587,26 +587,23 @@ Refresh the model list from the agent's remote source (where applicable).
 
 ---
 
-## 11. `amux plugins` -- Plugin Management
+## 11. `amux plugin` -- Native Plugin Management
 
-Unified interface for discovering, installing, and managing plugins across agents. All subcommands are capability-gated: invoking on an agent where `supportsPlugins` is `false` (Codex, Gemini, Copilot) produces exit code 6 (`CAPABILITY_ERROR`).
+Unified interface for managing native agent plugins through CLI delegation. Commands delegate to each agent's native plugin system (e.g., `claude plugins`, `copilot plugin`, `gemini extensions`). All subcommands are capability-gated: invoking on an agent where native plugin CLI commands don't exist produces exit code 6 (`CAPABILITY_ERROR`).
 
 ### 11.1 Syntax
 
 ```
-amux plugins list <agent> [flags...]
-amux plugins install <agent> <plugin-id> [flags...]
-amux plugins uninstall <agent> <plugin-id> [flags...]
-amux plugins update <agent> <plugin-id> [flags...]
-amux plugins update <agent> --all [flags...]
-amux plugins search <query> [flags...]
-amux plugins browse [agent] [flags...]
-amux plugins info <plugin-id> [flags...]
+amux plugin list <agent> [flags...]
+amux plugin install <agent> <plugin-id> [flags...]
+amux plugin uninstall <agent> <plugin-id> [flags...]
+amux plugin update <agent> <plugin-id> [flags...]
+amux plugin marketplace <agent> [subcommand] [flags...]
 ```
 
-### 11.2 `amux plugins list <agent>`
+### 11.2 `amux plugin list <agent>`
 
-List installed plugins for an agent.
+List installed plugins for an agent via native CLI.
 
 **Flags:**
 
@@ -614,36 +611,11 @@ List installed plugins for an agent.
 |---|---|---|---|
 | `--json` | `boolean` | `false` | Output as JSON array. |
 
-**Output columns (human mode):**
+**API mapping:** Delegates to agent's native command (e.g., `claude plugins list`).
 
-| Column | Description |
-|---|---|
-| Plugin ID | Unique plugin identifier. |
-| Name | Human-readable name. |
-| Version | Installed version. |
-| Format | Plugin format (`npm-package`, `skill-file`, etc.). |
-| Enabled | `yes` / `no`. |
-| Installed | ISO date of installation. |
+### 11.3 `amux plugin install <agent> <plugin-id>`
 
-**API mapping:** `mux.plugins.list('openclaw')` returns `InstalledPlugin[]`. See `09-plugin-manager.md`, Section 2.
-
-### 11.3 `amux plugins install <agent> <plugin-id>`
-
-Install a plugin for an agent.
-
-**Flags:**
-
-| Flag | Short | Type | Default | Description |
-|---|---|---|---|---|
-| `--version` | -- | `string` | Latest | Pin to a specific version. |
-| `--global` | -- | `boolean` | `false` | Install globally (vs. project-local) where the agent supports both scopes. |
-| `--yes` | `-y` | `boolean` | `false` | Skip confirmation prompt. |
-
-**API mapping:** `mux.plugins.install('opencode', 'opencode-tokenscope', { version, global })`. See `09-plugin-manager.md`, Section 2.
-
-### 11.4 `amux plugins uninstall <agent> <plugin-id>`
-
-Uninstall a plugin from an agent.
+Install a plugin via agent's native CLI.
 
 **Flags:**
 
@@ -651,121 +623,140 @@ Uninstall a plugin from an agent.
 |---|---|---|---|---|
 | `--yes` | `-y` | `boolean` | `false` | Skip confirmation prompt. |
 
-**API mapping:** `mux.plugins.uninstall('openclaw', '@openclaw/browser-skill')`.
+**API mapping:** Delegates to agent's native install command.
 
-### 11.5 `amux plugins update <agent> <plugin-id>` / `amux plugins update <agent> --all`
+### 11.4 `amux plugin uninstall <agent> <plugin-id>`
 
-Update a single plugin or all plugins for an agent.
-
-**Flags:**
-
-| Flag | Type | Default | Description |
-|---|---|---|---|
-| `--all` | `boolean` | `false` | Update all installed plugins for the agent. |
-
-**API mapping:**
-
-| CLI | SDK |
-|---|---|
-| `amux plugins update openclaw @openclaw/browser-skill` | `mux.plugins.update('openclaw', '@openclaw/browser-skill')` |
-| `amux plugins update openclaw --all` | `mux.plugins.updateAll('openclaw')` |
-
-### 11.6 `amux plugins search <query>`
-
-Search plugin registries.
+Uninstall a plugin via agent's native CLI.
 
 **Flags:**
 
-| Flag | Type | Default | Description |
-|---|---|---|---|
-| `--agent` | `AgentName` | All | Filter results to plugins supporting a specific agent. |
-| `--format` | `string` | All | Filter by plugin format: `npm-package`, `skill-file`, `skill-directory`, `extension-ts`, `channel-plugin`, `mcp-server`. |
-| `--registry` | `string` | All | Search a specific registry only. |
-| `--json` | `boolean` | `false` | Output as JSON array. |
+| Flag | Short | Type | Default | Description |
+|---|---|---|---|---|
+| `--yes` | `-y` | `boolean` | `false` | Skip confirmation prompt. |
 
-**Output columns (human mode):**
+**API mapping:** Delegates to agent's native uninstall command.
 
-| Column | Description |
-|---|---|
-| Plugin ID | Unique identifier. |
-| Name | Human-readable name. |
-| Version | Latest version. |
-| Agents | Supported agents. |
-| Downloads | Weekly download count. |
-| Description | Short description. |
+### 11.5 `amux plugin update <agent> <plugin-id>`
 
-**API mapping:** `mux.plugins.search('web browser', { agents: ['openclaw'], format, registry })` returns `PluginListing[]`. See `09-plugin-manager.md`, Section 2.
+Update a plugin via agent's native CLI.
 
-### 11.7 `amux plugins browse [agent]`
+**API mapping:** Delegates to agent's native update command.
 
-Browse plugin marketplaces by agent or category.
+### 11.6 `amux plugin marketplace <agent> [subcommand]`
 
-**Flags:**
+Access agent's native plugin marketplace commands.
 
-| Flag | Type | Default | Description |
-|---|---|---|---|
-| `--category` | `string` | -- | Filter by category: `coding`, `communication`, `automation`, etc. |
-| `--sort` | `string` | `downloads` | Sort order: `downloads`, `updated`, `name`. |
-| `--json` | `boolean` | `false` | Output as JSON array. |
+**API mapping:** Delegates to agent's marketplace commands (e.g., `claude plugins marketplace`).
 
-**API mapping:** `mux.plugins.browse({ category, sortBy })` returns `PluginListing[]`.
+### 11.7 Plugin Support per Agent
 
-### 11.8 `amux plugins info <plugin-id>`
-
-Show detailed information about a specific plugin.
-
-**Flags:**
-
-| Flag | Type | Default | Description |
-|---|---|---|---|
-| `--agent` | `AgentName` | -- | Scope to a specific agent (affects compatibility display). |
-
-**Output (human mode):** Key-value display showing all `PluginDetail` fields including description, author, supported agents, versions, dependencies, and readme excerpt.
-
-**API mapping:** `mux.plugins.info('@openclaw/browser-skill', 'openclaw')` returns `PluginDetail`. See `09-plugin-manager.md`, Section 2.
-
-### 11.9 Plugin Support per Agent
-
-| Agent | `supportsPlugins` | Available Subcommands |
+| Agent | Native Plugin Support | CLI Command |
 |---|---|---|
-| Claude Code | partial | `list`, `install` (skill-directory, mcp-server only) |
-| Codex CLI | no | None (exit code 6) |
-| Gemini CLI | no | None (exit code 6) |
-| Copilot CLI | no | None (exit code 6) |
-| Cursor | yes | All |
-| OpenCode | yes | All |
-| Pi | yes | All |
-| omp | yes | All |
-| OpenClaw | yes | All |
-| Hermes | yes | All |
+| Claude | ✅ Full marketplace | `claude plugins` |
+| Gemini | ✅ Extensions | `gemini extensions` |
+| Codex | ✅ Plugin directory | `codex plugins` |
+| Copilot | ✅ Plugin marketplace | `copilot plugin` |
+| OpenCode | ✅ Three-tier system | `opencode plugins` |
+| Cursor | ❌ Hook-only (see Section 12) | N/A |
+| All others | ❌ MCP-only (see Section 12) | N/A |
 
-### 11.10 Examples
+### 11.8 Examples
 
 ```bash
-# List installed plugins
-amux plugins list openclaw
+# List installed plugins via native CLI
+amux plugin list claude
+amux plugin list gemini
 
-# Install a plugin
-amux plugins install openclaw @openclaw/browser-skill
-amux plugins install opencode opencode-tokenscope
-amux plugins install pi @mariozechner/pi-subagents
+# Install plugins via native marketplace
+amux plugin install claude @anthropic/frontend-design
+amux plugin install copilot github/copilot-agent
 
-# Search across all registries
-amux plugins search "web browser" --agent openclaw
-
-# Browse by category
-amux plugins browse opencode --category coding
-
-# Update all plugins for an agent
-amux plugins update openclaw --all
-
-# Get plugin details
-amux plugins info @openclaw/browser-skill --agent openclaw
+# Access native marketplace
+amux plugin marketplace claude
+amux plugin marketplace copilot
 ```
 
 ---
 
-## 12. `amux sessions` -- Session Management
+## 12. `amux mcp` -- MCP Server Management
+
+Unified interface for managing Model Context Protocol servers across all agents. MCP servers provide cross-agent capabilities and integrations. All agents support MCP servers.
+
+### 12.1 Syntax
+
+```
+amux mcp list <agent> [flags...]
+amux mcp install <agent> <mcp-server> [flags...]
+amux mcp uninstall <agent> <mcp-server> [flags...]
+```
+
+### 12.2 `amux mcp list <agent>`
+
+List installed MCP servers for an agent.
+
+**Flags:**
+
+| Flag | Type | Default | Description |
+|---|---|---|---|
+| `--json` | `boolean` | `false` | Output as JSON array. |
+| `--project` | `boolean` | `false` | List project-specific MCP servers only. |
+
+**Output columns (human mode):**
+
+| Column | Description |
+|---|---|
+| Server Name | MCP server identifier. |
+| Status | `enabled` / `disabled`. |
+| Command | Executable command. |
+| Scope | `global` / `project`. |
+
+### 12.3 `amux mcp install <agent> <mcp-server>`
+
+Install an MCP server for an agent.
+
+**Flags:**
+
+| Flag | Short | Type | Default | Description |
+|---|---|---|---|---|
+| `--project` | `-p` | `boolean` | `false` | Install to project scope (vs. global). |
+| `--yes` | `-y` | `boolean` | `false` | Skip confirmation prompt. |
+
+### 12.4 `amux mcp uninstall <agent> <mcp-server>`
+
+Uninstall an MCP server from an agent.
+
+**Flags:**
+
+| Flag | Short | Type | Default | Description |
+|---|---|---|---|---|
+| `--yes` | `-y` | `boolean` | `false` | Skip confirmation prompt. |
+
+### 12.5 MCP Server Registry
+
+All MCP servers are available from the official registry at [https://modelcontextprotocol.io](https://modelcontextprotocol.io).
+
+### 12.6 Examples
+
+```bash
+# List MCP servers for an agent
+amux mcp list claude
+amux mcp list cursor
+
+# Install MCP server globally
+amux mcp install claude filesystem
+amux mcp install gemini postgres
+
+# Install MCP server to project
+amux mcp install claude web-browser --project
+
+# Remove MCP server
+amux mcp uninstall claude filesystem
+```
+
+---
+
+## 13. `amux sessions` -- Session Management
 
 Read-only access to agent session data. The CLI delegates to `SessionManager` (see `07-session-manager.md`, Section 2). Session data is never modified by these commands.
 
@@ -1441,8 +1432,8 @@ amux --completions powershell >> $PROFILE
 ### 22.2 Completion Scope
 
 Completions are provided for:
-- Top-level commands (`run`, `install`, `adapters`, `capabilities`, `models`, `plugins`, `sessions`, `cost`, `config`, `profiles`, `auth`, `init`).
-- Subcommands (e.g., `plugins list`, `plugins install`, `config mcp add`).
+- Top-level commands (`run`, `install`, `adapters`, `capabilities`, `models`, `plugin`, `mcp`, `sessions`, `cost`, `config`, `profiles`, `auth`, `init`).
+- Subcommands (e.g., `plugin list`, `mcp install`, `config mcp add`).
 - Flag names and their valid values (e.g., `--agent` completes to registered agent names, `--thinking-effort` completes to `low`, `medium`, `high`, `max`).
 - Agent names (positional argument for many commands).
 - Model IDs (for `--model` flag, dynamically queried from the model registry).
@@ -1466,10 +1457,10 @@ error: <message>
 Example:
 
 ```
-error: Agent 'codex' does not support plugins
+error: Agent 'cursor' does not support native plugin CLI commands
   code: CAPABILITY_ERROR
-  agent: codex
-  hint: Only these agents support plugins: claude (partial), cursor, opencode, pi, omp, openclaw, hermes
+  agent: cursor
+  hint: Agents with native plugin CLI: claude, gemini, codex, copilot, opencode
 ```
 
 ### 23.2 JSON Errors
@@ -1481,8 +1472,8 @@ In JSON mode (`--json`), errors are emitted as a JSON object to stdout:
   "ok": false,
   "error": {
     "code": "CAPABILITY_ERROR",
-    "message": "Agent 'codex' does not support plugins",
-    "agent": "codex",
+    "message": "Agent 'cursor' does not support native plugin CLI commands",
+    "agent": "cursor",
     "recoverable": false
   }
 }
@@ -1565,13 +1556,14 @@ Quick reference of all commands and their SDK method mappings.
 | `amux models` | `list` | `mux.models.models()` |
 | `amux models` | `get` | `mux.models.model()` |
 | `amux models` | `refresh` | `mux.models.refresh()` |
-| `amux plugins` | `list` | `mux.plugins.list()` |
-| `amux plugins` | `install` | `mux.plugins.install()` |
-| `amux plugins` | `uninstall` | `mux.plugins.uninstall()` |
-| `amux plugins` | `update` | `mux.plugins.update()` / `mux.plugins.updateAll()` |
-| `amux plugins` | `search` | `mux.plugins.search()` |
-| `amux plugins` | `browse` | `mux.plugins.browse()` |
-| `amux plugins` | `info` | `mux.plugins.info()` |
+| `amux plugin` | `list` | Native CLI delegation |
+| `amux plugin` | `install` | Native CLI delegation |
+| `amux plugin` | `uninstall` | Native CLI delegation |
+| `amux plugin` | `update` | Native CLI delegation |
+| `amux plugin` | `marketplace` | Native CLI delegation |
+| `amux mcp` | `list` | `mux.mcp.list()` |
+| `amux mcp` | `install` | `mux.mcp.install()` |
+| `amux mcp` | `uninstall` | `mux.mcp.uninstall()` |
 | `amux sessions` | `list` | `mux.sessions.list()` |
 | `amux sessions` | `show` | `mux.sessions.export()` |
 | `amux sessions` | `tail` | `mux.sessions.watch()` |
@@ -1613,8 +1605,8 @@ amux -h
 
 # Command-specific help
 amux run --help
-amux plugins --help
-amux plugins install --help
+amux plugin --help
+amux mcp --help
 ```
 
 `--version` prints the package version of `@a5c-ai/agent-mux-cli` and exits with code 0.
@@ -1689,5 +1681,5 @@ Default `--mode` is `ssh` when `<host>` is given, else `local`. Default `--harne
 
 ### Global flags actually accepted
 
-From `packages/cli/src/parse-args.ts` the recognized globals are: `--agent/-a`, `--model/-m`, `--json`, `--debug`, `--config-dir`, `--project-dir`, `--no-color`, `--version/-V`, `--help/-h`, `--completions <shell>`. The top-level commands: `run`, `install`, `uninstall`, `update`, `detect`, `detect-host`, `remote`, `adapters`, `capabilities`, `models`, `plugins`, `sessions`, `cost`, `config`, `profiles`, `auth`, `init`, `version`, `help`.
+From `packages/cli/src/parse-args.ts` the recognized globals are: `--agent/-a`, `--model/-m`, `--json`, `--debug`, `--config-dir`, `--project-dir`, `--no-color`, `--version/-V`, `--help/-h`, `--completions <shell>`. The top-level commands: `run`, `install`, `uninstall`, `update`, `detect`, `detect-host`, `remote`, `adapters`, `capabilities`, `models`, `plugin`, `mcp`, `sessions`, `cost`, `config`, `profiles`, `auth`, `init`, `version`, `help`.
 

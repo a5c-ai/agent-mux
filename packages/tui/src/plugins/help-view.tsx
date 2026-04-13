@@ -15,17 +15,12 @@ const GLOBAL_KEYS: { key: string; desc: string }[] = [
 ];
 
 function HelpView({ client }: TuiViewProps) {
-  let viewCount = 0;
-  let cmdCount = 0;
   let agentList: string[] = [];
   try {
     agentList = client.adapters.list().map((a) => a.agent);
   } catch {
     agentList = [];
   }
-  // Registry isn't passed to views; we surface counts via the conf bar instead.
-  void viewCount;
-  void cmdCount;
   return (
     <Box flexDirection="column">
       <Text bold>Keybindings</Text>
