@@ -50,5 +50,8 @@
     "build": "tsc --build",
     "prepublishOnly": "npm run build",
     "test": "vitest run --config ../../vitest.config.ts"
+  },
+  "dependencies": {
+    "@a5c-ai/agent-mux-observability": "*"
   }
 }

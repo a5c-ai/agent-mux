@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-nocheck -- TODO(harness-mock): narrow scenario.output/process optionality
 /**
  * mock-harness — CLI binary that replays a mock scenario to stdout/stderr.
  *

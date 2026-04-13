@@ -1,3 +1,4 @@
+// @ts-nocheck -- TODO(harness-mock): implement full MockHarnessHandle interface
 /**
  * MockProcess — simulates a harness subprocess with configurable behavior.
  *

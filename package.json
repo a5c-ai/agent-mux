@@ -13,7 +13,8 @@
     "packages/cli",
     "packages/agent-mux",
     "packages/harness-mock",
-    "packages/tui"
+    "packages/tui",
+    "packages/observability"
   ],
   "scripts": {
     "build": "tsc --build",
@@ -43,5 +44,15 @@
     "typescript": "^5.4",
     "typescript-eslint": "^8.58.1",
     "vitest": "^4.1.4"
+  },
+  "dependencies": {
+    "@opentelemetry/api": "^1.9.1",
+    "@opentelemetry/auto-instrumentations-node": "^0.72.0",
+    "@opentelemetry/instrumentation": "^0.214.0",
+    "@opentelemetry/instrumentation-fs": "^0.33.0",
+    "@opentelemetry/instrumentation-http": "^0.214.0",
+    "@opentelemetry/sdk-node": "^0.214.0",
+    "pino": "^10.3.1",
+    "pino-pretty": "^13.1.3"
   }
 }

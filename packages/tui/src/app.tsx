@@ -393,7 +393,7 @@ export function App({ client, plugins, defaultAgent = 'claude' }: AppProps) {
         ) {
           pendingApprovalRef.current = null;
           setPendingApproval(null);
-        } else if (agentEv.type === 'session_started') {
+        } else if (agentEv.type === 'session_start') {
           const sid = (agentEv as unknown as { sessionId?: string }).sessionId;
           if (sid && !resumedSessionId) {
             resumedSessionId = sid;

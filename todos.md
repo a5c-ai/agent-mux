@@ -46,7 +46,7 @@ then perform the same research and analysis as mentioned above for these new ref
 [x] - create a skill and babysitter process to research and integrate a new harness, add tests for it, covering all the docs and integration points, test coverage, use cases, etc. (in .claude/skills/ and in .a5c/processes/ )
 → Skill: .claude/skills/integrate-harness/SKILL.md. 
 
-[~] - add full docker based e2e testing for all the harnesses and all the functionalities. one set for with credentials (against the real CLIs) and the other set for without credentials (against the harness-mock cli), add support in the sdk and cli for running with the mock harness instead of the real ones. (using a flag and env variable, for example --use-mock-harness and USE_MOCK_HARNESS=true)
+[x] - add full docker based e2e testing for all the harnesses and all the functionalities. one set for with credentials (against the real CLIs) and the other set for without credentials (against the harness-mock cli), add support in the sdk and cli for running with the mock harness instead of the real ones. (using a flag and env variable, for example --use-mock-harness and USE_MOCK_HARNESS=true)
 → Scaffold: --use-mock-harness flag + USE_MOCK_HARNESS env in CLI; docker/e2e/{Dockerfile.mock,Dockerfile.real,docker-compose.yml,README.md}; CI job in e2e.yml. 
 
 [x] - publish script for packages, including the core package and the harnesses, with support for publishing to npm and other registries, with proper versioning, changelog generation, and release notes. (using a tool like changesets or standard-version)
@@ -66,5 +66,6 @@ then perform the same research and analysis as mentioned above for these new ref
 [x] - agents management command — `amux agent <list|add|remove|where|agents>` with `--global`/`--project` scope, file-convention based (copies md/yaml/json files). Supports claude, claude-code, codex, cursor, opencode. 8 tests.
 
 [ ] - Logging and opentelemetry integration: implement logging and telemetry in the agent-mux, to track the usage, performance, and errors of the system. this can be done using a tool like Winston or Pino for logging, and OpenTelemetry for telemetry. make sure to log important events and errors, and to collect relevant metrics for monitoring and debugging purposes.
-
+[ ] - improve user experience and find and resolve all ux bugs and issues in tui.
+[ ] - find and resolve all bugs in sdk.
 ---

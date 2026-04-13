@@ -13,6 +13,7 @@
     "composite": true
   },
   "references": [
+    { "path": "packages/observability" },
     { "path": "packages/core" },
     { "path": "packages/adapters" },
     { "path": "packages/cli" },

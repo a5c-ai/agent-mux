@@ -25,6 +25,7 @@ import {
   type CostAccumulator,
   type TokenAccumulator,
 } from './run-handle-cost.js';
+import { createComponentLogger, telemetry } from '@a5c-ai/agent-mux-observability';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -120,6 +121,9 @@ export class RunHandleImpl implements RunHandle {
 
   readonly interaction: InteractionChannelImpl;
 
+  /** Logger instance for this run. */
+  private readonly logger: any;
+
   // ── Constructor ───────────────────────────────────────────────────────────
 
   constructor(options: RunHandleImplOptions) {
@@ -131,6 +135,9 @@ export class RunHandleImpl implements RunHandle {
     this._tags = options.tags ?? [];
 
     this.interaction = new InteractionChannelImpl(options.approvalMode ?? 'prompt');
+
+    // Initialize logger for this run
+    this.logger = createComponentLogger(this.agent) as any;
 
     // Wire up the interaction channel's response dispatcher.
     this.interaction.setDispatch(async (id, response) => {
@@ -167,6 +174,9 @@ export class RunHandleImpl implements RunHandle {
    * 4. Dispatches to registered EventEmitter handlers.
    */
   emit(event: AgentEvent): void {
+    // Log important events
+    this._logEvent(event);
+
     // Accumulate run result fields.
     this._accumulate(event);
 
@@ -212,6 +222,76 @@ export class RunHandleImpl implements RunHandle {
   }
 
   /**
+   * Log important events for observability.
+   */
+  private _logEvent(event: AgentEvent): void {
+    switch (event.type) {
+      case 'tool_call_start':
+        this.logger.toolCallStart({
+          runId: this.runId,
+          toolName: event.toolName,
+          toolCallId: event.toolCallId,
+          args: event.inputAccumulated,
+        });
+        break;
+
+      case 'tool_call_ready':
+        // Track tool call completion time
+        const duration = Date.now() - event.timestamp;
+        this.logger.toolCallComplete({
+          runId: this.runId,
+          toolName: event.toolName,
+          toolCallId: event.toolCallId,
+          duration,
+        });
+        telemetry.recordToolCall(event.toolName, duration, true);
+        break;
+
+      case 'error':
+        this.logger.error({
+          runId: this.runId,
+          agent: this.agent,
+          error: {
+            code: event.code,
+            message: event.message,
+            recoverable: event.recoverable,
+          },
+        }, 'Agent error occurred');
+        break;
+
+      case 'session_start':
+        this.logger.session('Session started', {
+          runId: this.runId,
+          sessionId: event.sessionId,
+          action: 'create',
+        });
+        break;
+
+      case 'session_resume':
+        this.logger.session('Session resumed', {
+          runId: this.runId,
+          sessionId: event.sessionId,
+          action: 'resume',
+        });
+        break;
+
+      case 'cost':
+        this.logger.debug({
+          runId: this.runId,
+          cost: event.cost,
+        }, 'Cost update received');
+        break;
+
+      // Log other important events as debug
+      default:
+        if (['approval_request', 'input_required'].includes(event.type)) {
+          this.logger.debug({ runId: this.runId, eventType: event.type }, 'Interaction event');
+        }
+        break;
+    }
+  }
+
+  /**
    * Signal that the run has ended with the given exit information.
    * Resolves the result promise and terminates all async iterators.
    */
@@ -220,6 +300,34 @@ export class RunHandleImpl implements RunHandle {
     this._signal = signal;
     this._done = true;
     this.interaction.terminate();
+
+    // Log run completion
+    const duration = Date.now() - this._startTime;
+    const cost = this._cost ? {
+      totalUsd: this._cost.totalUsd,
+      inputTokens: this._tokenUsage.inputTokens,
+      outputTokens: this._tokenUsage.outputTokens,
+      thinkingTokens: this._tokenUsage.thinkingTokens,
+    } : undefined;
+
+    if (exitReason === 'completed') {
+      this.logger.runComplete({
+        runId: this.runId,
+        agent: this.agent,
+        duration,
+        cost,
+      });
+      telemetry.recordRunComplete(this.agent, this.model, duration);
+      void cost;
+    } else {
+      const error = this._runError || { message: `Run failed with reason: ${exitReason}` };
+      this.logger.runError({
+        runId: this.runId,
+        agent: this.agent,
+        error,
+      });
+      telemetry.recordRunError(this.agent, this.model, error.message);
+    }
 
     // Wake all waiting iterators with done = true.
     for (const iter of this._iterators) {

@@ -3,6 +3,7 @@
  */
 
 import * as path from 'node:path';
+import { createComponentLogger, telemetry } from '@a5c-ai/agent-mux-observability';
 
 import type { AgentName, ErrorCode, RetryPolicy } from './types.js';
 import { AgentMuxError, ValidationError } from './errors.js';
@@ -129,6 +130,9 @@ export class AgentMuxClient {
   /** Plugin manager — install, list, remove plugins per agent. */
   readonly plugins: PluginManager;
 
+  /** Logger instance for this client. */
+  private readonly logger = createComponentLogger('client');
+
   /** @internal — use `createClient()` instead. */
   constructor(options: ClientOptions, storagePaths: StoragePaths) {
     this.options = Object.freeze({ ...options });
@@ -198,6 +202,16 @@ export class AgentMuxClient {
       collectEvents: merged.collectEvents ?? false,
       tags: merged.tags,
     });
+
+    // Log and trace the agent run
+    this.logger.runStart({
+      runId,
+      agent: merged.agent,
+      prompt: Array.isArray(merged.prompt) ? merged.prompt.join('\n') : merged.prompt,
+      model: merged.model,
+    });
+
+    telemetry.recordRunStart(merged.agent, merged.model);
 
     startSpawnLoop(handle, adapter, merged);
 

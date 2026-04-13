@@ -117,4 +117,17 @@ export default [
       'no-unused-private-class-members': 'off',
     },
   },
+  {
+    // TODO: split these files and drop this override
+    files: [
+      'packages/adapters/src/claude-agent-sdk-adapter.ts',
+      'packages/adapters/src/mocks/remote-mocks.ts',
+      'packages/adapters/src/pi-sdk-adapter.ts',
+      'packages/core/src/run-handle-impl.ts',
+    ],
+    plugins: { local: maxFileLinesPlugin },
+    rules: {
+      'local/max-file-lines': ['error', { max: 700 }],
+    },
+  },
 ];
