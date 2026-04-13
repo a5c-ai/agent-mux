@@ -33,7 +33,8 @@ export async function tuiCommand(
     defaultExternalPluginsDir: () => string;
   };
   try {
-    tui = (await import('@a5c-ai/agent-mux-tui')) as never;
+    const dynImport = new Function('m', 'return import(m)') as (m: string) => Promise<unknown>;
+    tui = (await dynImport('@a5c-ai/agent-mux-tui')) as never;
   } catch (err) {
     printError(
       'The TUI package is not installed. Install it with:\n' +
