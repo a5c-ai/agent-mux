@@ -61,11 +61,9 @@ then perform the same research and analysis as mentioned above for these new ref
 
 [~] - create a tui package based on a popular framework like Ink or Blessed, that provides a user interface for interacting with the agent-mux, such as running agents, viewing sessions, managing configurations, etc. this tui should be designed to be extensible and customizable, allowing users to add their own features and functionalities as needed (with plugins). and all almost all (all if possible, except the framework, tui process, embedded sdk dependecy - injected to plugins, etc.) the basic views, layouts, functionalities should be implemented as plugins (messages renderes, diff renderer, tool call rendering, chat, sessesion mgt, ...).
 
-[ ] - skill management cli command (for global and for repo), like mcp, hooks and plugins. each harness with its own implementation for discover, add/remove, etc.
-[ ] - polish plugin management command (for global and for repo)
-[ ] - polish hooks management command (for global and for repo)
-[ ] - polish mcp management command (for global and for repo)
-[ ] - polish per adapter config management command (for global and for repo)
+[x] - skill management cli command (for global and for repo). File-convention only (no native harness command): `amux skill <list|add|remove|where|agents>` with `--global`/`--project` scope. Per-agent path registry in `packages/cli/src/lib/agent-skill-paths.ts` (claude, codex, cursor, opencode, gemini, copilot). 7 tests.
+[x] - polish mcp management command — added explicit `--global` flag (was project-only).
+[~] - polish plugin / hooks / per-adapter config management commands — already accept `--global`/`--project`; further polish (uniform JSON envelope, exhaustive subcommand help) deferred.
 ---
 
 Run remaining [>] / [~] items:

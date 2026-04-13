@@ -58,13 +58,13 @@ const COMMANDS = new Set([
   'remote', 'hooks',
   'adapters', 'capabilities', 'models',
   'plugins', 'plugin', 'mcp', 'sessions', 'cost', 'config', 'profiles',
-  'auth', 'init', 'version', 'help', 'doctor',
+  'auth', 'init', 'version', 'help', 'doctor', 'tui', 'skill',
 ]);
 
 /** Commands that have subcommands. */
 const SUBCOMMAND_COMMANDS = new Set([
   'adapters', 'models', 'plugins', 'plugin', 'mcp', 'sessions', 'config', 'profiles', 'auth',
-  'remote', 'hooks',
+  'remote', 'hooks', 'skill',
 ]);
 
 /**

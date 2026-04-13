@@ -43,7 +43,7 @@ export async function mcpCommand(
     return ExitCode.GENERAL_ERROR;
   }
 
-  const isGlobal = !args.flags.project;
+  const isGlobal = args.flags.global === true || !args.flags.project;
 
   try {
     switch (subcommand) {

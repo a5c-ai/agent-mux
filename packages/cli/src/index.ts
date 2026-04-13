@@ -40,6 +40,7 @@ import { remoteCommand, REMOTE_FLAGS } from './commands/remote.js';
 import { hooksCommand, HOOKS_FLAGS } from './commands/hooks.js';
 import { doctorCommand } from './commands/doctor.js';
 import { tuiCommand } from './commands/tui.js';
+import { skillCommand, SKILL_FLAGS } from './commands/skill.js';
 import { registerBuiltInAdapters } from './bootstrap.js';
 
 /**
@@ -52,7 +53,7 @@ export async function main(argv?: string[]): Promise<number> {
   const rawArgs = argv ?? process.argv.slice(2);
 
   // First pass: parse with all known flags to capture global flags
-  const args = parseArgs(rawArgs, { ...RUN_FLAGS, ...INSTALL_FLAGS, ...REMOTE_FLAGS, ...HOOKS_FLAGS });
+  const args = parseArgs(rawArgs, { ...RUN_FLAGS, ...INSTALL_FLAGS, ...REMOTE_FLAGS, ...HOOKS_FLAGS, ...SKILL_FLAGS });
 
   // Handle --no-color
   if (flagBool(args.flags, 'no-color') === true) {
@@ -171,6 +172,9 @@ export async function main(argv?: string[]): Promise<number> {
 
       case 'tui':
         return await tuiCommand(client, args);
+
+      case 'skill':
+        return await skillCommand(client, args);
 
       default:
         if (jsonMode) {
