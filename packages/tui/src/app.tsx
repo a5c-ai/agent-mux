@@ -256,8 +256,16 @@ export function App({ client, plugins, defaultAgent = 'claude' }: AppProps) {
       const baseOpts: Partial<{ agent: string; model: string }> = currentProfile
         ? ((await client.profiles.apply(currentProfile)) as Partial<{ agent: string; model: string }>)
         : {};
+      const selectedAgent = currentModel?.agent ?? currentAgent ?? baseOpts.agent ?? defaultAgent;
+      // TODO: cross-harness resume/fork — if the user picked a different
+      // agent than the session's origin we'd need a transcript-export /
+      // re-import path. For now, refuse explicitly.
+      if (pendingResume && pendingResume.agent !== selectedAgent && (currentModel || currentAgent)) {
+        setStatus(`Cannot resume ${pendingResume.agent} session with ${selectedAgent}: cross-harness resume not implemented yet.`);
+        return;
+      }
       const runOpts: { agent: string; prompt: string; sessionId?: string; model?: string } = {
-        agent: pendingResume?.agent ?? currentModel?.agent ?? currentAgent ?? baseOpts.agent ?? defaultAgent,
+        agent: pendingResume?.agent ?? selectedAgent,
         prompt,
       };
       if (pendingResume) runOpts.sessionId = pendingResume.sessionId;
@@ -288,7 +296,14 @@ export function App({ client, plugins, defaultAgent = 'claude' }: AppProps) {
       currentHandleRef.current = null;
       setStatus('Run complete.');
     } catch (e) {
-      setStatus(`Error: ${(e as Error).message}`);
+      const msg = (e as Error).message;
+      if (/ENOENT/.test(msg)) {
+        const m = msg.match(/spawn (\S+)/);
+        const bin = m?.[1] ?? 'agent CLI';
+        setStatus(`Error: ${bin} is not installed. Try: amux install ${bin}`);
+      } else {
+        setStatus(`Error: ${msg}`);
+      }
     }
   }
 

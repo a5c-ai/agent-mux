@@ -31,15 +31,12 @@ describe('mcp-view', () => {
     const stream = new EventStream();
     const client = {
       adapters: { list: () => [{ agent: 'claude-code' }, { agent: 'codex' }] },
-      plugins: {
-        list: vi.fn(async (agent: string) => {
-          if (agent === 'claude-code')
-            return [
-              { pluginId: 'filesystem', enabled: true },
-              { pluginId: 'github', enabled: false },
-            ];
-          throw new Error('CAPABILITY_ERROR plugins not supported');
-        }),
+      config: {
+        getMcpServers: vi.fn((agent: string) =>
+          agent === 'claude-code'
+            ? [{ name: 'filesystem' }, { name: 'github' }]
+            : [],
+        ),
       },
     } as never;
     const { lastFrame, rerender } = render(
@@ -60,7 +57,7 @@ describe('mcp-view', () => {
     const stream = new EventStream();
     const client = {
       adapters: { list: () => [{ agent: 'claude-code' }] },
-      plugins: { list: vi.fn(async () => []) },
+      config: { getMcpServers: vi.fn(() => []) },
     } as never;
     const { lastFrame, rerender } = render(
       <View client={client} active={true} eventStream={stream} emit={() => {}} />,

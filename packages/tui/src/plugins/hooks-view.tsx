@@ -1,4 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import * as os from 'node:os';
 import { Box, Text, useInput } from 'ink';
 import { HookConfigManager } from '@a5c-ai/agent-mux-core';
 import { definePlugin, type TuiViewProps } from '../plugin.js';
@@ -10,6 +13,33 @@ interface Row {
   target?: string;
   enabled?: boolean;
   priority?: number;
+  source?: 'amux' | 'claude' | 'codex' | 'cursor' | 'opencode' | 'gemini';
+}
+
+function readJson(p: string): unknown {
+  try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch { return null; }
+}
+
+function discoverNativeHooks(): Row[] {
+  const HOME = os.homedir() || '.';
+  const out: Row[] = [];
+  const claude = readJson(path.join(HOME, '.claude', 'settings.json')) as { hooks?: Record<string, Array<{ matcher?: string; hooks?: Array<{ type?: string; command?: string }> }>> } | null;
+  if (claude?.hooks) {
+    for (const [hookType, arr] of Object.entries(claude.hooks)) {
+      for (const grp of arr ?? []) {
+        for (const h of grp.hooks ?? []) {
+          out.push({
+            id: `claude:${hookType}:${grp.matcher ?? '*'}`,
+            hookType,
+            handler: h.type ?? 'command',
+            target: h.command,
+            source: 'claude',
+          });
+        }
+      }
+    }
+  }
+  return out;
 }
 
 const ADD_FIELDS = ['id', 'agent', 'hookType', 'handler', 'target'] as const;
@@ -29,16 +59,18 @@ function HooksView({ active }: TuiViewProps) {
     try {
       const mgr = new HookConfigManager();
       const list = await mgr.list();
-      const mapped = list.map((h) => ({
+      const mapped: Row[] = list.map((h) => ({
         id: h.id,
         hookType: h.hookType,
         handler: h.handler,
         target: h.target,
         enabled: h.enabled,
         priority: h.priority,
+        source: 'amux' as const,
       }));
-      setRows(mapped);
-      setCursor((c) => Math.min(c, Math.max(mapped.length - 1, 0)));
+      const all = [...mapped, ...discoverNativeHooks()];
+      setRows(all);
+      setCursor((c) => Math.min(c, Math.max(all.length - 1, 0)));
       setError(null);
     } catch (e) {
       setError(String(e));
@@ -132,6 +164,7 @@ function HooksView({ active }: TuiViewProps) {
         return (
           <Text key={r.id + ':' + i} color={sel ? 'green' : undefined}>
             {sel ? '> ' : '  '}
+            <Text color={r.source === 'amux' ? 'magenta' : 'blue'}>[{(r.source ?? 'amux').padEnd(6)}]</Text>{' '}
             <Text color="cyan">{r.id.padEnd(20)}</Text>{' '}
             <Text>{r.hookType.padEnd(18)}</Text>{' '}
             <Text color="gray">{r.handler.padEnd(8)}</Text>{' '}

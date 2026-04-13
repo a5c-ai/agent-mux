@@ -6,7 +6,9 @@ import SessionsViewPlugin from '../src/plugins/sessions-view.js';
 import type { TuiInternalEvent } from '../src/plugin.js';
 
 function makeClient(sessions: { sessionId: string; agent: string }[]) {
+  const agents = [...new Set(sessions.map((s) => s.agent))];
   return {
+    adapters: { list: () => agents.map((agent) => ({ agent })) },
     sessions: {
       list: vi.fn(async (agent: string) =>
         sessions.filter((s) => s.agent === agent).map((s) => ({ sessionId: s.sessionId })),

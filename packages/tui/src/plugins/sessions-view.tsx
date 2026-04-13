@@ -17,17 +17,16 @@ function SessionsView({ client, active, emit }: TuiViewProps) {
     if (!active) return;
     (async () => {
       try {
-        const agents = ['claude-code', 'codex', 'gemini'] as const;
         const all: Row[] = [];
-        for (const a of agents) {
+        for (const ad of client.adapters.list()) {
           try {
-            const list = await client.sessions.list(a);
-            for (const s of list) all.push({ sessionId: s.sessionId, agent: a });
+            const list = await client.sessions.list(ad.agent);
+            for (const s of list) all.push({ sessionId: s.sessionId, agent: ad.agent });
           } catch {
-            // ignore per-agent listing errors
+            // ignore per-agent listing errors (e.g. adapter without sessions)
           }
         }
-        setSessions(all.slice(0, 20));
+        setSessions(all.slice(0, 50));
       } catch (e) {
         setError(String(e));
       }

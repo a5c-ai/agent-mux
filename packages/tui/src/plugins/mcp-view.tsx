@@ -31,16 +31,12 @@ function McpView({ client, active }: TuiViewProps) {
         const all: Row[] = [];
         for (const a of client.adapters.list()) {
           try {
-            const list = await client.plugins.list(a.agent);
-            for (const p of list) {
-              all.push({ agent: a.agent, pluginId: p.pluginId, enabled: !!p.enabled });
-            }
+            const cfg = client.config as unknown as { getMcpServers?: (agent: string) => Array<{ name: string; command?: string }> };
+            const servers = cfg.getMcpServers?.(a.agent) ?? [];
+            for (const s of servers) all.push({ agent: a.agent, pluginId: s.name, enabled: true });
           } catch (e) {
             const msg = (e as Error).message ?? String(e);
-            // capability errors are expected for adapters without plugin support
-            if (!/capability|not supported|CAPABILITY/i.test(msg)) {
-              all.push({ agent: a.agent, pluginId: '(error)', enabled: false, error: msg });
-            }
+            all.push({ agent: a.agent, pluginId: '(error)', enabled: false, error: msg });
           }
         }
         setRows(all);
