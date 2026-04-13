@@ -24,6 +24,10 @@ import pluginSkill from './plugins/plugin-skill.js';
 import image from './plugins/image.js';
 import control from './plugins/control.js';
 import lifecycle from './plugins/lifecycle.js';
+import adaptersView from './plugins/adapters-view.js';
+import modelsView from './plugins/models-view.js';
+import profilesView from './plugins/profiles-view.js';
+import pluginsView from './plugins/plugins-view.js';
 import type { TuiPlugin } from './plugin.js';
 
 // Order matters: specific renderers first, fallback LAST so it only matches
@@ -46,5 +50,9 @@ export const builtinPlugins: TuiPlugin[] = [
   chatView,
   sessionsView,
   costView,
+  adaptersView,
+  modelsView,
+  profilesView,
+  pluginsView,
   fallback,
 ];
