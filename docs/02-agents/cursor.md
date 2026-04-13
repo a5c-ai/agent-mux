@@ -35,13 +35,16 @@ amux run cursor --prompt "Refactor this function"
 
 ## Plugins
 
-Plugin support: **yes** — cursor-cli plugin marketplace with single-click installs.
+Plugin support: **IDE-only**. Plugin management via Cursor editor (`/add-plugin`) or marketplace UI. No CLI plugin commands.
 
-### Plugin Management
-```bash
-amux plugin install cursor <plugin>
-amux plugin list cursor
-```
+### Hooks
+
+Hook support: **yes** — Compatible with Claude Code hooks. Supports lifecycle events with cross-platform configuration.
+
+Hook configuration:
+- Global: `~/.cursor/hooks.json`
+- Project: `.cursor/hooks.json`
+- Enterprise: `/etc/cursor/hooks.json`
 
 ### MCP Servers
 ```bash

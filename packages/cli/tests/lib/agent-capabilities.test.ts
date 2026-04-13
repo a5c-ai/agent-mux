@@ -86,7 +86,6 @@ describe('agent capabilities detection', () => {
       { agent: 'claude', expectedCommand: 'claude plugins' },
       { agent: 'gemini', expectedCommand: 'gemini extensions' },
       { agent: 'codex', expectedCommand: 'codex plugins' },
-      { agent: 'cursor', expectedCommand: 'cursor-cli plugins' },
       { agent: 'copilot', expectedCommand: 'copilot plugin' },
       { agent: 'opencode', expectedCommand: 'opencode plugins' },
     ];

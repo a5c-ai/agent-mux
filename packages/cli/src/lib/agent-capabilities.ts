@@ -22,10 +22,6 @@ const AGENT_PLUGIN_CONFIGS = {
     command: 'codex plugins',
     commands: ['list', 'install'],
   },
-  cursor: {
-    command: 'cursor-cli plugins',
-    commands: ['list', 'install'],
-  },
   copilot: {
     command: 'copilot plugin',
     commands: ['list', 'install', 'update', 'uninstall'],
