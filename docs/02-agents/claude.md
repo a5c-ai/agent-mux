@@ -5,7 +5,7 @@ Adapter for Anthropic's **Claude Code** CLI.
 ## Install
 
 ```bash
-npm install -g @anthropic-ai/claude-code
+amux install claude
 ```
 
 Minimum CLI version: `1.0.0`. Supported on macOS, Linux and Windows.

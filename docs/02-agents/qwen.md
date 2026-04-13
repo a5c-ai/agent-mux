@@ -7,8 +7,7 @@ models. agent-mux drives it via the `qwen` binary.
 ## Install
 
 ```bash
-npm install -g @qwen-code/qwen-code
-qwen --version
+amux install qwen
 ```
 
 ## Authenticate

@@ -4,10 +4,8 @@ Meta-adapter that invokes `amux` on a **remote target** (SSH host, Docker contai
 
 ## Install
 
-The local side needs no install — just `@a5c-ai/agent-mux`. On the **target**:
-
-```
-Install amux on the target (see `amux remote install <host>`).
+```bash
+amux install agent-mux-remote
 ```
 
 ## Auth

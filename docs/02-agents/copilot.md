@@ -5,9 +5,7 @@ Adapter for **GitHub Copilot CLI** (`gh copilot`).
 ## Install
 
 ```bash
-npm install -g @github/copilot-cli
-# or as a gh extension
-gh extension install github/gh-copilot
+amux install copilot
 ```
 
 The adapter spawns `gh copilot suggest ...`, so the `gh` CLI must be on `PATH`.

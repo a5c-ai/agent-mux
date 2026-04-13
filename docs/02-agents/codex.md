@@ -5,7 +5,7 @@ Adapter for OpenAI's **Codex** CLI.
 ## Install
 
 ```bash
-npm install -g @openai/codex
+amux install codex
 ```
 
 Supported on macOS, Linux and Windows.

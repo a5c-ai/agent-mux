@@ -5,7 +5,7 @@ Adapter for the **Pi** agent CLI.
 ## Install
 
 ```bash
-npm install -g pi-cli
+amux install pi
 ```
 
 ## Auth

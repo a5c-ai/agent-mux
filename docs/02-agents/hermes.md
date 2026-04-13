@@ -5,7 +5,7 @@ Adapter for Nous Research's **Hermes** agent CLI.
 ## Install
 
 ```bash
-npm install -g hermes-agent
+amux install hermes
 ```
 
 ## Auth

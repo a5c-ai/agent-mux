@@ -4,13 +4,9 @@ Adapter for the **Cursor** editor's agent CLI.
 
 ## Install
 
-Cursor is distributed as a desktop application:
-
+```bash
+amux install cursor
 ```
-Download from https://cursor.com
-```
-
-The `cursor` binary on `PATH` is required for headless use.
 
 ## Auth
 

@@ -5,7 +5,7 @@ Adapter for the **OpenClaw** CLI.
 ## Install
 
 ```bash
-npm install -g openclaw-cli
+amux install openclaw
 ```
 
 ## Auth

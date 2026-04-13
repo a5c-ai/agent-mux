@@ -5,7 +5,7 @@ Adapter for Google's **Gemini CLI**.
 ## Install
 
 ```bash
-npm install -g @google/gemini-cli
+amux install gemini
 ```
 
 Supported on macOS, Linux and Windows.

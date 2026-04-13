@@ -5,9 +5,7 @@ Adapter for the **OpenCode** multi-provider agent CLI.
 ## Install
 
 ```bash
-npm install -g opencode-ai
-# or on macOS
-brew install opencode-ai
+amux install opencode
 ```
 
 ## Auth

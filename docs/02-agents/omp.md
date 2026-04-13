@@ -5,7 +5,7 @@ Adapter for the **OMP** agent CLI.
 ## Install
 
 ```bash
-npm install -g omp-cli
+amux install omp
 ```
 
 ## Auth
