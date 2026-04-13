@@ -35,6 +35,9 @@ export function App({ client, plugins, defaultAgent = 'claude-code' }: AppProps)
   const [filterMode, setFilterMode] = useState<boolean>(false);
   const [filter, setFilter] = useState<string>('');
   const [paletteMode, setPaletteMode] = useState<boolean>(false);
+  const [selection, setSelection] = useState<{ agent: string; sessionId: string } | undefined>(
+    undefined,
+  );
 
   const { registry, stream } = useMemo(() => {
     const r: Registry = createRegistry();
@@ -48,6 +51,9 @@ export function App({ client, plugins, defaultAgent = 'claude-code' }: AppProps)
         if (ev.type === 'session:select') {
           setPendingResume({ agent: ev.agent, sessionId: ev.sessionId });
           setStatus(`Resuming ${ev.agent}/${ev.sessionId} — press p to send next message`);
+        }
+        if (ev.type === 'session:detail') {
+          setSelection({ agent: ev.agent, sessionId: ev.sessionId });
         }
       },
       s,
@@ -125,6 +131,8 @@ export function App({ client, plugins, defaultAgent = 'claude-code' }: AppProps)
     else if (ev.type === 'session:select') {
       setPendingResume({ agent: ev.agent, sessionId: ev.sessionId });
       setStatus(`Resuming ${ev.agent}/${ev.sessionId} — press p to send next message`);
+    } else if (ev.type === 'session:detail') {
+      setSelection({ agent: ev.agent, sessionId: ev.sessionId });
     } else if (ev.type === 'event') stream.push(ev.event);
   };
 
@@ -199,6 +207,7 @@ export function App({ client, plugins, defaultAgent = 'claude-code' }: AppProps)
             eventStream={stream}
             emit={viewEmit}
             filter={filter || undefined}
+            selection={selection}
           />
         ) : (
           <Text dimColor>No views registered.</Text>

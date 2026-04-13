@@ -28,6 +28,8 @@ export interface TuiViewProps {
   emit: (event: TuiInternalEvent) => void;
   /** Optional global filter string (e.g. set via top-level `/` in chat). */
   filter?: string;
+  /** Optional session selection routed by emit(session:detail). */
+  selection?: { agent: string; sessionId: string };
 }
 
 export interface EventRenderer {
@@ -48,7 +50,8 @@ export type TuiInternalEvent =
   | { type: 'run:attach'; handle: RunHandle }
   | { type: 'status'; message: string }
   | { type: 'event'; event: AgentEvent }
-  | { type: 'session:select'; agent: string; sessionId: string };
+  | { type: 'session:select'; agent: string; sessionId: string }
+  | { type: 'session:detail'; agent: string; sessionId: string };
 
 export interface TuiPlugin {
   name: string;

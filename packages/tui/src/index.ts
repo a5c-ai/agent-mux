@@ -11,6 +11,7 @@ import toolCall from './plugins/tool-call.js';
 import cost from './plugins/cost.js';
 import chatView from './plugins/chat-view.js';
 import sessionsView from './plugins/sessions-view.js';
+import sessionDetailView from './plugins/session-detail-view.js';
 import costView from './plugins/cost-view.js';
 import fallback from './plugins/fallback.js';
 import diff from './plugins/diff.js';
@@ -50,6 +51,7 @@ export const builtinPlugins: TuiPlugin[] = [
   cost,
   chatView,
   sessionsView,
+  sessionDetailView,
   costView,
   adaptersView,
   modelsView,
