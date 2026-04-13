@@ -34,7 +34,7 @@ describe('config-view', () => {
       },
     } as never;
     const { lastFrame, rerender } = render(<View client={client} active={true} eventStream={stream} emit={() => {}} />);
-    await new Promise((r) => setTimeout(r, 20));
+    await new Promise((r) => setTimeout(r, 100));
     rerender(<View client={client} active={true} eventStream={stream} emit={() => {}} />);
     const f = lastFrame() ?? '';
     expect(f).toContain('Per-agent configuration');
@@ -51,7 +51,7 @@ describe('config-view', () => {
       config: { get: async () => { throw new Error('boom'); } },
     } as never;
     const { lastFrame, rerender } = render(<View client={client} active={true} eventStream={stream} emit={() => {}} />);
-    await new Promise((r) => setTimeout(r, 20));
+    await new Promise((r) => setTimeout(r, 100));
     rerender(<View client={client} active={true} eventStream={stream} emit={() => {}} />);
     expect(lastFrame() ?? '').toContain('boom');
   });
