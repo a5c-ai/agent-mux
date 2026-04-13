@@ -41,6 +41,9 @@ export function App({ client, plugins, defaultAgent = 'claude-code' }: AppProps)
   );
   const [modelPickerMode, setModelPickerMode] = useState<boolean>(false);
   const [currentModel, setCurrentModel] = useState<ModelOption | undefined>(undefined);
+  const [profilePickerMode, setProfilePickerMode] = useState<boolean>(false);
+  const [currentProfile, setCurrentProfile] = useState<string | undefined>(undefined);
+  const [availableProfiles, setAvailableProfiles] = useState<string[]>([]);
 
   const availableModels = useMemo<ModelOption[]>(() => {
     try {
@@ -80,7 +83,7 @@ export function App({ client, plugins, defaultAgent = 'claude-code' }: AppProps)
   }, [client, plugins]);
 
   useInput((input, key) => {
-    if (promptMode || filterMode || paletteMode || modelPickerMode) return; // child input owns keys while open
+    if (promptMode || filterMode || paletteMode || modelPickerMode || profilePickerMode) return; // child input owns keys while open
     if (input === 'q' || (key.ctrl && input === 'c')) {
       exit();
       return;
@@ -99,6 +102,18 @@ export function App({ client, plugins, defaultAgent = 'claude-code' }: AppProps)
     }
     if (input === 'm' && availableModels.length > 0) {
       setModelPickerMode(true);
+      return;
+    }
+    if (input === 'P') {
+      void (async () => {
+        try {
+          const list = await client.profiles.list();
+          setAvailableProfiles(list.map((p) => p.name));
+          setProfilePickerMode(true);
+        } catch (e) {
+          setStatus(`profiles: ${(e as Error).message}`);
+        }
+      })();
       return;
     }
     if (input === 'i' && currentHandleRef.current) {
@@ -177,12 +192,16 @@ export function App({ client, plugins, defaultAgent = 'claude-code' }: AppProps)
     }
 
     try {
+      const baseOpts: Partial<{ agent: string; model: string }> = currentProfile
+        ? ((await client.profiles.apply(currentProfile)) as Partial<{ agent: string; model: string }>)
+        : {};
       const runOpts: { agent: string; prompt: string; sessionId?: string; model?: string } = {
-        agent: pendingResume?.agent ?? currentModel?.agent ?? defaultAgent,
+        agent: pendingResume?.agent ?? currentModel?.agent ?? baseOpts.agent ?? defaultAgent,
         prompt,
       };
       if (pendingResume) runOpts.sessionId = pendingResume.sessionId;
       if (currentModel) runOpts.model = currentModel.modelId;
+      else if (baseOpts.model) runOpts.model = baseOpts.model;
       setPendingResume(null);
       const handle = client.run(runOpts as never);
       currentHandleRef.current = handle;
@@ -253,6 +272,17 @@ export function App({ client, plugins, defaultAgent = 'claude-code' }: AppProps)
           onCancel={() => setFilterMode(false)}
         />
       ) : null}
+      {profilePickerMode ? (
+        <ModelPicker
+          models={availableProfiles.map((n) => ({ agent: 'profile', modelId: n }))}
+          onCancel={() => setProfilePickerMode(false)}
+          onPick={(m) => {
+            setCurrentProfile(m.modelId);
+            setProfilePickerMode(false);
+            setStatus(`Profile: ${m.modelId}`);
+          }}
+        />
+      ) : null}
       {modelPickerMode ? (
         <ModelPicker
           models={availableModels}
@@ -303,10 +333,13 @@ export function App({ client, plugins, defaultAgent = 'claude-code' }: AppProps)
         <Box flexDirection="column">
           {status ? <Text dimColor>{status}</Text> : null}
           <Box>
-            <Text dimColor>p: prompt · /: filter · :: palette · m: model</Text>
+            <Text dimColor>p: prompt · /: filter · :: palette · m: model · P: profile</Text>
             {filter ? <Text color="cyan"> · filter=&quot;{filter}&quot;</Text> : null}
             {currentModel ? (
               <Text color="magenta"> · model={currentModel.agent}/{currentModel.modelId}</Text>
+            ) : null}
+            {currentProfile ? (
+              <Text color="blue"> · profile={currentProfile}</Text>
             ) : null}
             {currentHandleRef.current ? <Text color="yellow"> · i: interrupt</Text> : null}
             {pendingApproval ? <Text color="yellow"> · y/n: approve/deny</Text> : null}
