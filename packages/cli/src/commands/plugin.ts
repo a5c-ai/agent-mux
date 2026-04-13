@@ -3,7 +3,8 @@ import { promisify } from 'util';
 import type { AgentMuxClient } from '@a5c-ai/agent-mux-core';
 import type { ParsedArgs } from '../parse-args.js';
 import { ExitCode } from '../exit-codes.js';
-import { printError } from '../output.js';
+import { printError, printJsonError } from '../output.js';
+import { flagBool } from '../parse-args.js';
 import { detectAgentCapabilities } from '../lib/agent-capabilities.js';
 
 const execAsync = promisify(exec);
@@ -50,8 +51,11 @@ export async function pluginCommand(
 
   const capabilities = await detectAgentCapabilities(agentName);
 
+  const json = flagBool(args.flags, 'json') === true;
   if (!capabilities.supportsPlugins) {
-    printError(`Plugin management not supported for ${agentName}. Use 'amux mcp' for MCP servers.`);
+    const msg = `Plugin management not supported for ${agentName}. Use 'amux mcp' for MCP servers.`;
+    if (json) printJsonError('CAPABILITY_ERROR', msg);
+    else printError(msg);
     return ExitCode.GENERAL_ERROR;
   }
 

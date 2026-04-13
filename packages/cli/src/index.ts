@@ -147,6 +147,7 @@ export async function main(argv?: string[]): Promise<number> {
         return await profilesCommand(client, args);
 
       case 'plugin':
+      case 'plugins':
         return await pluginCommand(client, args);
 
       case 'mcp':

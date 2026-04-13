@@ -23,7 +23,7 @@ const renderers: EventRenderer[] = [
 const ev = (e: object): AgentEvent => ({ runId: 'r', agent: 'claude-code', timestamp: 't', ...e }) as AgentEvent;
 
 describe('chat-view filter', () => {
-  it('substring filter only renders matching events', () => {
+  it('substring filter only renders matching events', async () => {
     const stream = new EventStream();
     stream.push(ev({ type: 'text_delta', delta: 'hello world' }));
     stream.push(ev({ type: 'text_delta', delta: 'goodbye world' }));
@@ -37,12 +37,13 @@ describe('chat-view filter', () => {
         filter="hello"
       />,
     );
+    await new Promise((r) => setTimeout(r, 20));
     const f = lastFrame() ?? '';
     expect(f).toContain('hello world');
     expect(f).not.toContain('goodbye world');
   });
 
-  it('type:<prefix> filter restricts by event type', () => {
+  it('type:<prefix> filter restricts by event type', async () => {
     const stream = new EventStream();
     stream.push(ev({ type: 'text_delta', delta: 'msg' }));
     stream.push(ev({ type: 'shell_start', command: 'ls', cwd: '/' }));
@@ -56,12 +57,13 @@ describe('chat-view filter', () => {
         filter="type:shell"
       />,
     );
+    await new Promise((r) => setTimeout(r, 20));
     const f = lastFrame() ?? '';
     expect(f).not.toContain('msg');
     expect(f).toContain('shell_start');
   });
 
-  it('shows no-match message when filter excludes all', () => {
+  it('shows no-match message when filter excludes all', async () => {
     const stream = new EventStream();
     stream.push(ev({ type: 'text_delta', delta: 'a' }));
     const { lastFrame } = render(
@@ -74,6 +76,7 @@ describe('chat-view filter', () => {
         filter="zzzz"
       />,
     );
+    await new Promise((r) => setTimeout(r, 20));
     expect(lastFrame()).toContain('No events match');
   });
 });
