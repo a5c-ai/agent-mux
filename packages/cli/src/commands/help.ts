@@ -38,6 +38,7 @@ Commands:
   plugin                  Manage native agent plugins
   mcp                     Manage MCP servers
   skill                   Manage agent skills
+  agent                   Manage custom sub-agents
   detect-host             Detect which agent harness we are running under
   remote                  Install / update amux on a remote host
   hooks                   Manage and dispatch unified agent hooks
@@ -387,6 +388,29 @@ Examples:
   amux skill list claude
   amux skill add claude ./skills/my-skill --global
   amux skill remove claude my-skill --project
+`,
+  agent: `amux agent - Manage custom sub-agents for harnesses
+
+Usage: amux agent <subcommand> <agent> [args] [--global|--project]
+
+Manage custom sub-agents for a harness (file-convention based, no native command).
+
+Subcommands:
+  list <agent>                       List installed sub-agents
+  add <agent> <source>               Copy an agent file or folder into the agents dir
+                                     [--name <name>] [--force]
+  remove <agent> <name>              Remove an agent file or folder
+  where <agent>                      Show agent directory paths
+  agents                             List harnesses with known agent conventions
+
+Scope flags (default: --project):
+  --global                           Use the user-level agents dir
+  --project                          Use the project-level agents dir
+
+Examples:
+  amux agent list claude
+  amux agent add claude ./my-agent.md --global
+  amux agent remove claude my-agent.md --project
 `,
 };
 
