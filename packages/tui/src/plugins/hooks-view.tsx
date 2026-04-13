@@ -12,12 +12,18 @@ interface Row {
   priority?: number;
 }
 
+const ADD_FIELDS = ['id', 'agent', 'hookType', 'handler', 'target'] as const;
+type AddField = typeof ADD_FIELDS[number];
+
 function HooksView({ active }: TuiViewProps) {
   const [rows, setRows] = useState<Row[]>([]);
   const [cursor, setCursor] = useState(0);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [addField, setAddField] = useState<AddField | null>(null);
+  const [addValues, setAddValues] = useState<Record<AddField, string>>({ id: '', agent: '*', hookType: '*', handler: 'command', target: '' });
+  const [addInput, setAddInput] = useState('');
 
   const refresh = useCallback(async () => {
     try {
@@ -44,8 +50,48 @@ function HooksView({ active }: TuiViewProps) {
     refresh();
   }, [active, refresh]);
 
+  const performAdd = useCallback(async (vals: Record<AddField, string>) => {
+    try {
+      if (!vals.id || !vals.target) { setStatus('id and target required'); return; }
+      const handler = (vals.handler === 'builtin' || vals.handler === 'script') ? vals.handler : 'command';
+      const mgr = new HookConfigManager();
+      await mgr.add({
+        id: vals.id,
+        agent: vals.agent as never,
+        hookType: vals.hookType,
+        handler,
+        target: vals.target,
+      });
+      setStatus(`Added ${vals.id}`);
+      refresh();
+    } catch (e) {
+      setStatus(`Add failed: ${String(e)}`);
+    }
+  }, [refresh]);
+
   useInput((input, key) => {
     if (!active) return;
+    if (addField) {
+      if (key.escape) { setAddField(null); setStatus('Cancelled'); return; }
+      if (key.return) {
+        const next = { ...addValues, [addField]: addInput || addValues[addField] };
+        setAddValues(next);
+        const idx = ADD_FIELDS.indexOf(addField);
+        if (idx < ADD_FIELDS.length - 1) {
+          const nf = ADD_FIELDS[idx + 1]!;
+          setAddField(nf);
+          setAddInput('');
+        } else {
+          setAddField(null);
+          setAddInput('');
+          performAdd(next);
+        }
+        return;
+      }
+      if (key.backspace || key.delete) { setAddInput((s) => s.slice(0, -1)); return; }
+      if (input && !key.ctrl && !key.meta) setAddInput((s) => s + input);
+      return;
+    }
     if (confirmDelete) {
       if (input === 'y' || input === 'Y') {
         const row = rows[cursor];
@@ -72,14 +118,15 @@ function HooksView({ active }: TuiViewProps) {
     else if (key.upArrow || input === 'k') setCursor((c) => Math.max(c - 1, 0));
     else if (input === 'r') refresh();
     else if (input === 'd' && rows[cursor]) setConfirmDelete(true);
+    else if (input === 'a') { setAddField('id'); setAddInput(''); setAddValues({ id: '', agent: '*', hookType: '*', handler: 'command', target: '' }); }
   }, { isActive: active });
 
   if (error) return <Text color="red">{error}</Text>;
-  if (rows.length === 0) return <Text dimColor>No hooks registered. Use `amux hooks &lt;agent&gt; add` to register.</Text>;
   return (
     <Box flexDirection="column">
       <Text bold>Hooks</Text>
-      <Text dimColor>j/k or arrows: move · d: remove · r: refresh · (amux hooks &lt;agent&gt; &lt;discover|list|add|remove|set&gt;)</Text>
+      <Text dimColor>j/k: move · a: add · d: remove · r: refresh · (amux hooks &lt;agent&gt; &lt;discover|list|add|remove|set&gt;)</Text>
+      {rows.length === 0 && !addField ? <Text dimColor>No hooks registered.</Text> : null}
       {rows.slice(0, 40).map((r, i) => {
         const sel = i === cursor;
         return (
@@ -94,6 +141,17 @@ function HooksView({ active }: TuiViewProps) {
         );
       })}
       {rows.length > 40 ? <Text dimColor>… {rows.length - 40} more</Text> : null}
+      {addField ? (
+        <Box flexDirection="column">
+          <Text color="yellow">Add hook ({ADD_FIELDS.indexOf(addField) + 1}/{ADD_FIELDS.length}) — Enter to accept, Esc to cancel</Text>
+          {ADD_FIELDS.map((f) => (
+            <Text key={f} color={f === addField ? 'green' : undefined}>
+              {f === addField ? '> ' : '  '}{f.padEnd(10)} {f === addField ? (addInput || addValues[f]) : addValues[f]}
+              {f === addField ? <Text color="gray">_</Text> : null}
+            </Text>
+          ))}
+        </Box>
+      ) : null}
       {confirmDelete && rows[cursor] ? (
         <Text color="yellow">Remove hook {rows[cursor]!.id}? (y/n)</Text>
       ) : null}
