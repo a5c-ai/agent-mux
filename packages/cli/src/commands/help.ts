@@ -37,6 +37,7 @@ Commands:
   plugins                 Manage agent plugins
   plugin                  Manage native agent plugins
   mcp                     Manage MCP servers
+  skill                   Manage agent skills
   detect-host             Detect which agent harness we are running under
   remote                  Install / update amux on a remote host
   hooks                   Manage and dispatch unified agent hooks
@@ -363,6 +364,29 @@ Aggregates:
   - Hook registry + .amux paths
 
 Use this first when filing a bug. The text report is stable for copy/paste.
+`,
+  skill: `amux skill - Manage skill folders for agents
+
+Usage: amux skill <subcommand> <agent> [args] [--global|--project]
+
+Manage skill folders for an agent (file-convention based, no native command).
+
+Subcommands:
+  list <agent>                       List installed skills
+  add <agent> <source-folder>        Copy a skill folder into the agent skills dir
+                                     [--name <name>] [--force]
+  remove <agent> <name>              Remove a skill folder
+  where <agent>                      Show skill directory paths for the agent
+  agents                             List agents with known skill conventions
+
+Scope flags (default: --project):
+  --global                           Use the user-level skills dir
+  --project                          Use the project-level skills dir
+
+Examples:
+  amux skill list claude
+  amux skill add claude ./skills/my-skill --global
+  amux skill remove claude my-skill --project
 `,
 };
 
