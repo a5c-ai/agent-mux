@@ -1,6 +1,7 @@
 import React from 'react';
 import { describe, it, expect } from 'vitest';
 import { render } from 'ink-testing-library';
+import { Text } from 'ink';
 import { ChatViewInner } from '../src/plugins/chat-view.js';
 import { EventStream } from '../src/event-stream.js';
 import type { EventRenderer } from '../src/plugin.js';
@@ -11,12 +12,12 @@ const renderers: EventRenderer[] = [
     id: 'text',
     match: (ev) => ev.type === 'text_delta',
     component: ({ event }) =>
-      event.type === 'text_delta' ? <>{event.delta}</> : null,
+      event.type === 'text_delta' ? <Text>{event.delta}</Text> : null,
   },
   {
     id: 'fallback',
     match: () => true,
-    component: ({ event }) => <>{`· ${event.type}`}</>,
+    component: ({ event }) => <Text>{`· ${event.type}`}</Text>,
   },
 ];
 
