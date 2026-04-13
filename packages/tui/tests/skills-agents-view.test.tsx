@@ -72,4 +72,19 @@ describe('agents-view', () => {
     expect(f).toContain('bar.md');
   });
 
+  it('deletes selected sub-agent on d + y', async () => {
+    const file = path.join(tmp, '.claude', 'agents', 'zap.md');
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, 'x');
+    const View = extract(AgentsPlugin);
+    const stream = new EventStream();
+    const { stdin, rerender } = render(<View client={{} as never} active={true} eventStream={stream} emit={() => {}} />);
+    await new Promise((r) => setTimeout(r, 20));
+    rerender(<View client={{} as never} active={true} eventStream={stream} emit={() => {}} />);
+    stdin.write('d');
+    await new Promise((r) => setTimeout(r, 20));
+    stdin.write('y');
+    await new Promise((r) => setTimeout(r, 20));
+    expect(fs.existsSync(file)).toBe(false);
+  });
 });
