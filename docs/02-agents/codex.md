@@ -36,7 +36,13 @@ amux run codex --prompt "Write a unit test for utils.ts"
 
 ## Plugins
 
-Plugin support: **no**. Use MCP servers for extensibility.
+Plugin support: **yes**. Codex has a plugin directory with @plugin-creator skill.
+
+### Plugin Management
+```bash
+amux plugin install codex <plugin>
+amux plugin list codex
+```
 
 ### MCP Servers
 ```bash
@@ -44,7 +50,7 @@ amux mcp install codex <mcp-server>
 amux mcp list codex
 ```
 
-Registry: https://modelcontextprotocol.io
+Registry: https://modelcontextprotocol.io for MCP servers.
 
 ## Capabilities
 

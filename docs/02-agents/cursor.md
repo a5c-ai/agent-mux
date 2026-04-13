@@ -35,7 +35,7 @@ amux run cursor --prompt "Refactor this function"
 
 ## Plugins
 
-Plugin support: **yes** — Cursor editor marketplace with extensions and integrations.
+Plugin support: **yes** — cursor-cli plugin marketplace with single-click installs.
 
 ### Plugin Management
 ```bash

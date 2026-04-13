@@ -40,7 +40,7 @@ It does not currently forward `--model` or approval modes — Copilot CLI select
 
 ## Plugins
 
-Plugin support: **yes** — GitHub Copilot marketplace with extensions and integrations.
+Plugin support: **yes** — github-copilot CLI plugin marketplace with agents/skills/hooks/MCP packages.
 
 ### Plugin Management
 ```bash

@@ -23,11 +23,11 @@ const AGENT_PLUGIN_CONFIGS = {
     commands: ['list', 'install'],
   },
   cursor: {
-    command: 'cursor plugins',
+    command: 'cursor-cli plugins',
     commands: ['list', 'install'],
   },
   copilot: {
-    command: 'gh copilot plugin',
+    command: 'github-copilot plugins',
     commands: ['list', 'install'],
   },
   opencode: {
