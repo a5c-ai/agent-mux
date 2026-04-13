@@ -23,7 +23,6 @@ export async function tuiCommand(
 
   let tui: { App: unknown; builtinPlugins: unknown };
   try {
-    // @ts-expect-error optional peer package — resolved at runtime if installed
     tui = (await import('@a5c-ai/agent-mux-tui')) as never;
   } catch (err) {
     printError(

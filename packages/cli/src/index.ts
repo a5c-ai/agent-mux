@@ -32,7 +32,6 @@ import { configCommand } from './commands/config.js';
 import { authCommand } from './commands/auth.js';
 import { modelsCommand } from './commands/models.js';
 import { profilesCommand } from './commands/profiles.js';
-import { pluginsCommand } from './commands/plugins.js';
 import { pluginCommand } from './commands/plugin.js';
 import { mcpCommand } from './commands/mcp.js';
 import { installCommand } from './commands/install.js';
@@ -145,9 +144,6 @@ export async function main(argv?: string[]): Promise<number> {
 
       case 'profiles':
         return await profilesCommand(client, args);
-
-      case 'plugins':
-        return await pluginsCommand(client, args);
 
       case 'plugin':
         return await pluginCommand(client, args);

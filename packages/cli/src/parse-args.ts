@@ -57,13 +57,13 @@ const COMMANDS = new Set([
   'run', 'install', 'uninstall', 'update', 'detect', 'detect-host',
   'remote', 'hooks',
   'adapters', 'capabilities', 'models',
-  'plugins', 'mcp', 'sessions', 'cost', 'config', 'profiles',
+  'plugins', 'plugin', 'mcp', 'sessions', 'cost', 'config', 'profiles',
   'auth', 'init', 'version', 'help', 'doctor',
 ]);
 
 /** Commands that have subcommands. */
 const SUBCOMMAND_COMMANDS = new Set([
-  'adapters', 'models', 'plugins', 'mcp', 'sessions', 'config', 'profiles', 'auth',
+  'adapters', 'models', 'plugins', 'plugin', 'mcp', 'sessions', 'config', 'profiles', 'auth',
   'remote', 'hooks',
 ]);
 
