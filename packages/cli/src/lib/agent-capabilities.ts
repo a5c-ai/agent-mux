@@ -27,8 +27,8 @@ const AGENT_PLUGIN_CONFIGS = {
     commands: ['list', 'install'],
   },
   copilot: {
-    command: 'github-copilot plugins',
-    commands: ['list', 'install'],
+    command: 'copilot plugin',
+    commands: ['list', 'install', 'update', 'uninstall'],
   },
   opencode: {
     command: 'opencode plugins',

@@ -40,12 +40,14 @@ It does not currently forward `--model` or approval modes — Copilot CLI select
 
 ## Plugins
 
-Plugin support: **yes** — github-copilot CLI plugin marketplace with agents/skills/hooks/MCP packages.
+Plugin support: **yes** — GitHub Copilot CLI plugin marketplace with agents/skills/hooks/MCP packages.
 
 ### Plugin Management
 ```bash
 amux plugin install copilot <plugin>
 amux plugin list copilot
+amux plugin update copilot <plugin>
+amux plugin uninstall copilot <plugin>
 ```
 
 ### MCP Servers
