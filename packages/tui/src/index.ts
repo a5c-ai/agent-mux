@@ -9,6 +9,7 @@ export * from './plugin.js';
 import textDelta from './plugins/text-delta.js';
 import toolCall from './plugins/tool-call.js';
 import cost from './plugins/cost.js';
+import costAlerts from './plugins/cost-alerts.js';
 import chatView from './plugins/chat-view.js';
 import sessionsView from './plugins/sessions-view.js';
 import sessionDetailView from './plugins/session-detail-view.js';
@@ -49,6 +50,7 @@ export const builtinPlugins: TuiPlugin[] = [
   control,
   lifecycle,
   cost,
+  costAlerts,
   chatView,
   sessionsView,
   sessionDetailView,
