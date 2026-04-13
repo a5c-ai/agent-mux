@@ -15,6 +15,7 @@ export {
   type Logger,
   type LogLevel,
   type LogContext,
+  type CostInfo,
 } from './logger-simple.js';
 
 // Telemetry exports

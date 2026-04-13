@@ -88,42 +88,54 @@ class SimpleLogger implements Logger {
     this.baseContext = baseContext;
   }
 
-  private log(level: LogLevel, msg: string, context: LogContext = {}): void {
+  private log(level: LogLevel, msgOrObj: string | object, msg?: string): void {
     const timestamp = new Date().toISOString();
+
+    let message: string;
+    let context: LogContext;
+
+    if (typeof msgOrObj === 'string') {
+      message = msgOrObj;
+      context = {};
+    } else {
+      message = msg || 'Log message';
+      context = msgOrObj as LogContext;
+    }
+
     const mergedContext = { ...this.baseContext, ...context };
 
     const logEntry = {
       timestamp,
       level,
-      msg,
+      msg: message,
       ...mergedContext,
     };
 
     console.log(JSON.stringify(logEntry));
   }
 
-  trace(msg: string, context?: LogContext): void {
-    this.log('trace', msg, context);
+  trace(msgOrObj: string | object, msg?: string): void {
+    this.log('trace', msgOrObj, msg);
   }
 
-  debug(msg: string, context?: LogContext): void {
-    this.log('debug', msg, context);
+  debug(msgOrObj: string | object, msg?: string): void {
+    this.log('debug', msgOrObj, msg);
   }
 
-  info(msg: string, context?: LogContext): void {
-    this.log('info', msg, context);
+  info(msgOrObj: string | object, msg?: string): void {
+    this.log('info', msgOrObj, msg);
   }
 
-  warn(msg: string, context?: LogContext): void {
-    this.log('warn', msg, context);
+  warn(msgOrObj: string | object, msg?: string): void {
+    this.log('warn', msgOrObj, msg);
   }
 
-  error(msg: string, context?: LogContext): void {
-    this.log('error', msg, context);
+  error(msgOrObj: string | object, msg?: string): void {
+    this.log('error', msgOrObj, msg);
   }
 
-  fatal(msg: string, context?: LogContext): void {
-    this.log('fatal', msg, context);
+  fatal(msgOrObj: string | object, msg?: string): void {
+    this.log('fatal', msgOrObj, msg);
   }
 
   child(context: LogContext): Logger {
@@ -131,32 +143,61 @@ class SimpleLogger implements Logger {
   }
 
   runStart(context: { runId: string; agent: string; prompt: string; model?: string }): void {
-    this.info('Agent run started', {
+    this.info({
       runId: context.runId,
       agent: context.agent,
       model: context.model,
       prompt: context.prompt.slice(0, 100) + (context.prompt.length > 100 ? '...' : ''),
-    });
+    }, 'Agent run started');
   }
 
-  runComplete(context: { runId: string; agent: string; duration: number }): void {
-    this.info('Agent run completed', {
+  runComplete(context: { runId: string; agent: string; duration: number; cost?: CostInfo }): void {
+    this.info({
       runId: context.runId,
       agent: context.agent,
       duration: context.duration,
-    });
+      cost: context.cost,
+    }, 'Agent run completed');
   }
 
-  runError(context: { runId: string; agent: string; error: Error }): void {
-    this.error('Agent run failed', {
+  runError(context: { runId: string; agent: string; error: Error | { message: string; name?: string } }): void {
+    const error = context.error instanceof Error ? {
+      message: context.error.message,
+      stack: context.error.stack,
+      name: context.error.name,
+    } : context.error;
+
+    this.error({
       runId: context.runId,
       agent: context.agent,
-      error: {
-        message: context.error.message,
-        stack: context.error.stack,
-        name: context.error.name,
-      },
-    });
+      error,
+    }, 'Agent run failed');
+  }
+
+  toolCallStart(context: { runId: string; toolName: string; toolCallId: string; args?: unknown }): void {
+    this.debug({
+      runId: context.runId,
+      toolName: context.toolName,
+      toolCallId: context.toolCallId,
+      args: context.args,
+    }, 'Tool call started');
+  }
+
+  toolCallComplete(context: { runId: string; toolName: string; toolCallId: string; duration: number; result?: unknown }): void {
+    this.debug({
+      runId: context.runId,
+      toolName: context.toolName,
+      toolCallId: context.toolCallId,
+      duration: context.duration,
+      result: typeof context.result === 'string' ? context.result.slice(0, 200) : context.result,
+    }, 'Tool call completed');
+  }
+
+  session(message: string, context: LogContext & { action?: 'create' | 'resume' | 'fork' | 'end' }): void {
+    this.info({
+      ...context,
+      type: 'session',
+    }, message);
   }
 }
 
