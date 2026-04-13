@@ -64,4 +64,26 @@ describe('hooks-view', () => {
     expect(f).toContain('h1');
     expect(f).toContain('PreToolUse');
   });
+
+  it('removes hook on d + y', async () => {
+    const hooksPath = path.join(tmp, '.amux', 'hooks.json');
+    fs.mkdirSync(path.dirname(hooksPath), { recursive: true });
+    fs.writeFileSync(hooksPath, JSON.stringify({
+      version: 1,
+      hooks: [
+        { id: 'h1', agent: '*', hookType: 'PreToolUse', handler: 'builtin', target: 'noop', enabled: true },
+      ],
+    }));
+    const View = extract();
+    const stream = new EventStream();
+    const { stdin, rerender } = render(<View client={{} as never} active={true} eventStream={stream} emit={() => {}} />);
+    await new Promise((r) => setTimeout(r, 30));
+    rerender(<View client={{} as never} active={true} eventStream={stream} emit={() => {}} />);
+    stdin.write('d');
+    await new Promise((r) => setTimeout(r, 20));
+    stdin.write('y');
+    await new Promise((r) => setTimeout(r, 50));
+    const after = JSON.parse(fs.readFileSync(hooksPath, 'utf8')) as { hooks: unknown[] };
+    expect(after.hooks.length).toBe(0);
+  });
 });

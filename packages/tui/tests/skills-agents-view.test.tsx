@@ -30,14 +30,24 @@ function extract(plugin: TuiPlugin) {
 
 let tmp: string;
 let prevCwd: string;
+let prevHome: string | undefined;
+let prevUserProfile: string | undefined;
 
 beforeEach(() => {
   tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'amux-view-'));
   prevCwd = process.cwd();
+  prevHome = process.env.HOME;
+  prevUserProfile = process.env.USERPROFILE;
   process.chdir(tmp);
+  process.env.HOME = tmp;
+  process.env.USERPROFILE = tmp;
 });
 afterEach(() => {
   process.chdir(prevCwd);
+  if (prevHome === undefined) delete process.env.HOME;
+  else process.env.HOME = prevHome;
+  if (prevUserProfile === undefined) delete process.env.USERPROFILE;
+  else process.env.USERPROFILE = prevUserProfile;
   fs.rmSync(tmp, { recursive: true, force: true });
 });
 
@@ -55,6 +65,21 @@ describe('skills-view', () => {
     expect(f).toContain('foo');
   });
 
+  it('deletes selected skill on d + y', async () => {
+    const skillDir = path.join(tmp, '.claude', 'skills', 'zap');
+    fs.mkdirSync(skillDir, { recursive: true });
+    fs.writeFileSync(path.join(skillDir, 'SKILL.md'), 'x');
+    const View = extract(SkillsPlugin);
+    const stream = new EventStream();
+    const { stdin, rerender } = render(<View client={{} as never} active={true} eventStream={stream} emit={() => {}} />);
+    await new Promise((r) => setTimeout(r, 20));
+    rerender(<View client={{} as never} active={true} eventStream={stream} emit={() => {}} />);
+    stdin.write('d');
+    await new Promise((r) => setTimeout(r, 20));
+    stdin.write('y');
+    await new Promise((r) => setTimeout(r, 20));
+    expect(fs.existsSync(skillDir)).toBe(false);
+  });
 });
 
 describe('agents-view', () => {

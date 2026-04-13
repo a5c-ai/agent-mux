@@ -13,13 +13,15 @@ interface Row {
   fullPath: string;
 }
 
-const HOME = os.homedir() || '.';
-const REGISTRY: Record<string, { global: string; project: string }> = {
-  claude: { global: path.join(HOME, '.claude', 'agents'), project: path.join('.claude', 'agents') },
-  codex: { global: path.join(HOME, '.codex', 'agents'), project: path.join('.codex', 'agents') },
-  cursor: { global: path.join(HOME, '.cursor', 'agents'), project: path.join('.cursor', 'agents') },
-  opencode: { global: path.join(HOME, '.opencode', 'agents'), project: path.join('.opencode', 'agents') },
-};
+function buildRegistry(): Record<string, { global: string; project: string }> {
+  const HOME = os.homedir() || '.';
+  return {
+    claude: { global: path.join(HOME, '.claude', 'agents'), project: path.join('.claude', 'agents') },
+    codex: { global: path.join(HOME, '.codex', 'agents'), project: path.join('.codex', 'agents') },
+    cursor: { global: path.join(HOME, '.cursor', 'agents'), project: path.join('.cursor', 'agents') },
+    opencode: { global: path.join(HOME, '.opencode', 'agents'), project: path.join('.opencode', 'agents') },
+  };
+}
 
 function readDir(dir: string): string[] {
   try {
@@ -32,7 +34,7 @@ function readDir(dir: string): string[] {
 
 function scan(): Row[] {
   const all: Row[] = [];
-  for (const [agent, paths] of Object.entries(REGISTRY)) {
+  for (const [agent, paths] of Object.entries(buildRegistry())) {
     for (const name of readDir(paths.global)) {
       all.push({ agent, scope: 'global', name, dir: paths.global, fullPath: path.join(paths.global, name) });
     }
