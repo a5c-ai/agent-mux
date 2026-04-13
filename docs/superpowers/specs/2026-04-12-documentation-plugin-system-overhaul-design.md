@@ -89,7 +89,7 @@ amux plugin marketplace <agent> [cmd]    # Calls: claude plugins marketplace [cm
 - **Claude**: Full plugin system with marketplace
 - **Gemini**: Extension system for prompts, MCP servers, commands, themes, hooks
 - **Codex**: Plugin directory with @plugin-creator skill
-- **Cursor**: Hook support (Claude Code compatible), IDE-only plugin marketplace (no CLI plugin commands)  
+- **Cursor**: Hook support (Claude Code compatible), MCP-only CLI  
 - **GitHub Copilot**: GitHub Copilot CLI plugin marketplace with agents/skills/hooks/MCP packages
 - **OpenCode**: Three-tier extensibility (skills/agents/plugins)
 

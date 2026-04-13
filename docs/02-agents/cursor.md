@@ -33,11 +33,7 @@ amux run cursor --prompt "Refactor this function"
 - Location: `~/.cursor/sessions/*.jsonl`
 - JSONL format; events of type `text`, `message`, `tool_call` are parsed.
 
-## Plugins
-
-Plugin support: **IDE-only**. Plugin management via Cursor editor (`/add-plugin`) or marketplace UI. No CLI plugin commands.
-
-### Hooks
+## Hooks
 
 Hook support: **yes** — Compatible with Claude Code hooks. Supports lifecycle events with cross-platform configuration.
 
@@ -46,11 +42,13 @@ Hook configuration:
 - Project: `.cursor/hooks.json`
 - Enterprise: `/etc/cursor/hooks.json`
 
-### MCP Servers
+## MCP Servers
 ```bash
 amux mcp install cursor <mcp-server>
 amux mcp list cursor
 ```
+
+Registry: https://modelcontextprotocol.io
 
 ## Capabilities
 
