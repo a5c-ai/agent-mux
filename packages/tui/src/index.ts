@@ -20,6 +20,10 @@ import subagent from './plugins/subagent.js';
 import fileOps from './plugins/file-ops.js';
 import sessionLifecycle from './plugins/session-lifecycle.js';
 import approval from './plugins/approval.js';
+import pluginSkill from './plugins/plugin-skill.js';
+import image from './plugins/image.js';
+import control from './plugins/control.js';
+import lifecycle from './plugins/lifecycle.js';
 import type { TuiPlugin } from './plugin.js';
 
 // Order matters: specific renderers first, fallback LAST so it only matches
@@ -34,6 +38,10 @@ export const builtinPlugins: TuiPlugin[] = [
   fileOps,
   sessionLifecycle,
   approval,
+  pluginSkill,
+  image,
+  control,
+  lifecycle,
   cost,
   chatView,
   sessionsView,
