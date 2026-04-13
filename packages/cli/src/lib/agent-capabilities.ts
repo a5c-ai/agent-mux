@@ -18,10 +18,6 @@ const AGENT_PLUGIN_CONFIGS = {
     command: 'gemini extensions',
     commands: ['list', 'install', 'update'],
   },
-  codex: {
-    command: 'codex plugins',
-    commands: ['list', 'install'],
-  },
   copilot: {
     command: 'copilot plugin',
     commands: ['list', 'install', 'update', 'uninstall'],
