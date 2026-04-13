@@ -1319,6 +1319,63 @@ Print setup guidance for authenticating with an agent. Does not perform authenti
 
 ---
 
+## 18b. `amux skill` -- Skill Management
+
+File-convention only (no native harness command). Skills are folders containing
+a `SKILL.md` plus assets, installed under per-harness conventions.
+
+```bash
+amux skill list <agent> [--global|--project]
+amux skill add <agent> <source-folder> [--name <n>] [--force] [--global|--project]
+amux skill remove <agent> <name> [--global|--project]
+amux skill where <agent>
+amux skill agents           # list supported harnesses
+```
+
+Supported harnesses: `claude`, `codex`, `cursor`, `opencode`, `gemini`, `copilot`.
+Paths: `$HOME/.<agent>/skills/` (global) or `<cwd>/.<agent>/skills/` (project).
+
+---
+
+## 18c. `amux agent` -- Sub-agent Management
+
+File-convention only. Copies agent definition files (markdown/yaml/json) into
+per-harness sub-agent directories.
+
+```bash
+amux agent list <agent> [--global|--project]
+amux agent add <agent> <source> [--name <n>] [--force] [--global|--project]
+amux agent remove <agent> <name> [--global|--project]
+amux agent where <agent>
+amux agent agents           # list supported harnesses
+```
+
+Supported: `claude`, `claude-code`, `codex`, `cursor`, `opencode`.
+Paths: `$HOME/.<agent>/agents/` (global) or `<cwd>/.<agent>/agents/` (project).
+
+References:
+- Claude: https://code.claude.com/docs/en/sub-agents
+- Codex: https://developers.openai.com/codex/subagents#custom-agents
+
+---
+
+## 18d. `amux hooks` -- Hook Management
+
+Manage hook registrations and dispatch. Backed by `HookConfigManager` in core.
+
+```bash
+amux hooks <agent> discover                      # native hook types
+amux hooks <agent> list
+amux hooks <agent> add <hookType> [--handler builtin|command|script] [--target <t>] [--id <id>] [--global]
+amux hooks <agent> remove <id> [--global]
+amux hooks <agent> set <id> [--priority N] [--enabled true|false] [--target <t>]
+amux hooks <agent> handle <hookType>             # stdin JSON → dispatch → result
+```
+
+Storage: `$HOME/.amux/hooks.json` (global), `<cwd>/.amux/hooks.json` (project).
+
+---
+
 ## 19. `amux init` -- Project Initialization
 
 Create the `.agent-mux/` directory in the current working directory with default configuration.
@@ -1588,6 +1645,11 @@ Quick reference of all commands and their SDK method mappings.
 | `amux profiles` | `apply` | `mux.profiles.apply()` |
 | `amux auth` | `check` | `mux.auth.check()` / `mux.auth.checkAll()` |
 | `amux auth` | `setup` | `mux.auth.getSetupGuidance()` |
+| `amux skill` | `list` / `add` / `remove` / `where` / `agents` | File-convention (copy into `.{agent}/skills/`) |
+| `amux agent` | `list` / `add` / `remove` / `where` / `agents` | File-convention (copy into `.{agent}/agents/`) |
+| `amux hooks` | `discover` / `list` / `add` / `remove` / `set` / `handle` | `HookConfigManager` (core) |
+| `amux doctor` | -- | Capability / auth / runtime diagnostics |
+| `amux tui` | -- | Launch interactive Ink UI (`@a5c-ai/agent-mux-tui`) |
 | `amux init` | -- | `createClient()` + directory creation |
 
 ---
