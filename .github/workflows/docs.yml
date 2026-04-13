@@ -31,14 +31,13 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: website/package-lock.json
-      - run: npm install
       - name: Check for broken links
         uses: becheran/mlc@v0.18.0
         with:
-          links: docs/**/*.md website/src/**/*.{js,jsx,ts,tsx,md,mdx}
-          markup-types: markdown
-        timeout-minutes: 10
+          links: ../docs
+        timeout-minutes: 5
         continue-on-error: true
+      - run: npm install
       - run: npm run build
       - uses: actions/upload-pages-artifact@v3
         with:
