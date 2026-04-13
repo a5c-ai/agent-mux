@@ -39,40 +39,52 @@ export async function mcpCommand(
   }
 
   if (!agentName) {
-    printError(`Missing required argument: <agent>`);
+    printError('Missing required argument: <agent>');
     return ExitCode.GENERAL_ERROR;
   }
 
-  // For now, delegate to existing plugin management logic
-  // This will be enhanced in future iterations with proper MCP config handling
-  switch (subcommand) {
-    case 'list':
-      // TODO: Implement proper MCP server listing
-      process.stdout.write('(no results)\n');
-      return ExitCode.SUCCESS;
+  const isGlobal = !args.flags.project;
 
-    case 'install':
-      const serverName = args.positionals[1];
-      if (!serverName) {
-        printError('Missing required argument: <server>');
-        return ExitCode.GENERAL_ERROR;
+  try {
+    switch (subcommand) {
+      case 'list': {
+        const installed = await client.plugins.list(agentName as never);
+        if (installed.length === 0) {
+          process.stdout.write('(no MCP servers installed)\n');
+          return ExitCode.SUCCESS;
+        }
+        for (const p of installed) {
+          process.stdout.write(`${p.pluginId}\t${p.enabled ? 'enabled' : 'disabled'}\n`);
+        }
+        return ExitCode.SUCCESS;
       }
-      // TODO: Implement proper MCP server installation
-      process.stdout.write(`Would install MCP server '${serverName}' for agent '${agentName}'\n`);
-      return ExitCode.SUCCESS;
-
-    case 'uninstall':
-      const serverToRemove = args.positionals[1];
-      if (!serverToRemove) {
-        printError('Missing required argument: <server>');
-        return ExitCode.GENERAL_ERROR;
+      case 'install': {
+        const serverName = args.positionals[1];
+        if (!serverName) {
+          printError('Missing required argument: <server>');
+          return ExitCode.GENERAL_ERROR;
+        }
+        const installed = await client.plugins.install(agentName as never, serverName, { global: isGlobal });
+        process.stdout.write(`installed: ${installed.pluginId} (${isGlobal ? 'global' : 'project'})\n`);
+        return ExitCode.SUCCESS;
       }
-      // TODO: Implement proper MCP server removal
-      process.stdout.write(`Would uninstall MCP server '${serverToRemove}' for agent '${agentName}'\n`);
-      return ExitCode.SUCCESS;
-
-    default:
-      printError(`Unknown subcommand: ${subcommand}`);
-      return ExitCode.GENERAL_ERROR;
+      case 'uninstall': {
+        const serverToRemove = args.positionals[1];
+        if (!serverToRemove) {
+          printError('Missing required argument: <server>');
+          return ExitCode.GENERAL_ERROR;
+        }
+        await client.plugins.uninstall(agentName as never, serverToRemove);
+        process.stdout.write(`uninstalled: ${serverToRemove}\n`);
+        return ExitCode.SUCCESS;
+      }
+      default:
+        printError(`Unknown subcommand: ${subcommand}`);
+        return ExitCode.GENERAL_ERROR;
+    }
+  } catch (err) {
+    const msg = (err as Error).message ?? String(err);
+    printError(`mcp ${subcommand} failed: ${msg}`);
+    return ExitCode.GENERAL_ERROR;
   }
 }

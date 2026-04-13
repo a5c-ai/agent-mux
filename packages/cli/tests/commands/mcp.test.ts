@@ -9,7 +9,13 @@ describe('mcp command', () => {
   let mockArgs: ParsedArgs;
 
   beforeEach(() => {
-    mockClient = {} as AgentMuxClient;
+    mockClient = {
+      plugins: {
+        list: vi.fn().mockResolvedValue([]),
+        install: vi.fn(),
+        uninstall: vi.fn(),
+      },
+    } as unknown as AgentMuxClient;
     mockArgs = {
       command: 'mcp',
       subcommand: 'list',
@@ -24,7 +30,7 @@ describe('mcp command', () => {
     const exitCode = await mcpCommand(mockClient, mockArgs);
 
     expect(exitCode).toBe(ExitCode.SUCCESS);
-    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('(no results)'));
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('(no MCP servers installed)'));
   });
 
   it('should show help when requested', async () => {
