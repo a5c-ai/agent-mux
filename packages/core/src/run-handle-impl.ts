@@ -107,7 +107,7 @@ export class RunHandleImpl implements RunHandle {
   private _sessionId: string | undefined;
   private _cost: CostAccumulator | null = null;
   private _startTime = Date.now();
-  private _tokenUsage: TokenAccumulator = { inputTokens: 0, outputTokens: 0, thinkingTokens: 0, cachedTokens: 0 };
+  private _tokenUsage: TokenAccumulator = { inputTokens: 0, outputTokens: 0, thinkingTokens: 0, cachedTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0 };
   private _turnCount = 0;
   private _exitCode: number | null = null;
   private _signal: string | null = null;

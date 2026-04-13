@@ -17,6 +17,8 @@ export interface CostAccumulator {
   outputTokens: number;
   thinkingTokens: number;
   cachedTokens: number;
+  cacheCreationTokens: number;
+  cacheReadTokens: number;
 }
 
 export interface TokenAccumulator {
@@ -24,6 +26,8 @@ export interface TokenAccumulator {
   outputTokens: number;
   thinkingTokens: number;
   cachedTokens: number;
+  cacheCreationTokens: number;
+  cacheReadTokens: number;
 }
 
 /** Fold a `token_usage` event into the running accumulator. */
@@ -32,6 +36,8 @@ export function accumulateTokenUsage(acc: TokenAccumulator, event: TokenUsageEve
   acc.outputTokens += event.outputTokens;
   if (event.thinkingTokens) acc.thinkingTokens += event.thinkingTokens;
   if (event.cachedTokens) acc.cachedTokens += event.cachedTokens;
+  // Note: TokenUsageEvent doesn't have granular cache fields yet, so we
+  // accumulate them from CostEvents instead for now
 }
 
 /**
@@ -47,6 +53,8 @@ export function accumulateCost(current: CostAccumulator | null, event: CostEvent
       outputTokens: c.outputTokens,
       thinkingTokens: c.thinkingTokens ?? 0,
       cachedTokens: c.cachedTokens ?? 0,
+      cacheCreationTokens: c.cacheCreationTokens ?? 0,
+      cacheReadTokens: c.cacheReadTokens ?? 0,
     };
   }
   current.totalUsd += c.totalUsd;
@@ -54,6 +62,8 @@ export function accumulateCost(current: CostAccumulator | null, event: CostEvent
   current.outputTokens += c.outputTokens;
   current.thinkingTokens += c.thinkingTokens ?? 0;
   current.cachedTokens += c.cachedTokens ?? 0;
+  current.cacheCreationTokens += c.cacheCreationTokens ?? 0;
+  current.cacheReadTokens += c.cacheReadTokens ?? 0;
   return current;
 }
 

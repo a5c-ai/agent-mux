@@ -10,7 +10,14 @@ const GLOBAL_KEYS: { key: string; desc: string }[] = [
   { key: 'P', desc: 'pick run-options profile' },
   { key: 'i', desc: 'interrupt current run' },
   { key: 'y / n', desc: 'approve / deny pending tool request' },
-  { key: '1-9', desc: 'switch to view by hotkey' },
+  { key: '1-9', desc: 'switch to numeric view (chat, sessions, cost, adapters, models, profiles, plugins, runs, help)' },
+  { key: 'c', desc: 'config view' },
+  { key: 'a', desc: 'auth view' },
+  { key: 'k', desc: 'skills view' },
+  { key: 'g', desc: 'agents (sub-agents) view' },
+  { key: 'h', desc: 'hooks view' },
+  { key: '0', desc: 'mcp view' },
+  { key: '-', desc: 'doctor view' },
   { key: 'q / Ctrl-C', desc: 'quit' },
 ];
 

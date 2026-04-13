@@ -295,7 +295,14 @@ export abstract class BaseAgentAdapter implements AgentAdapter {
     const inputTokens = extractNumber(obj, ['inputTokens', 'input_tokens', 'prompt_tokens']) ?? 0;
     const outputTokens = extractNumber(obj, ['outputTokens', 'output_tokens', 'completion_tokens']) ?? 0;
     const thinkingTokens = extractNumber(obj, ['thinkingTokens', 'thinking_tokens', 'reasoning_tokens']);
-    const cachedTokens = extractNumber(obj, ['cachedTokens', 'cached_tokens', 'cache_read_input_tokens']);
+
+    // Granular cache token attribution (following ccusage/ai-usage pattern)
+    const cacheCreationTokens = extractNumber(obj, ['cacheCreationTokens', 'cache_creation_tokens', 'cache_write_tokens']);
+    const cacheReadTokens = extractNumber(obj, ['cacheReadTokens', 'cache_read_tokens', 'cache_read_input_tokens']);
+
+    // Legacy cached tokens (backward compatibility)
+    const cachedTokens = extractNumber(obj, ['cachedTokens', 'cached_tokens']) ??
+      ((cacheCreationTokens != null && cacheReadTokens != null) ? cacheCreationTokens + cacheReadTokens : undefined);
 
     // Must have at least some recognizable data
     if (totalUsd === 0 && inputTokens === 0 && outputTokens === 0) return null;
@@ -308,6 +315,8 @@ export abstract class BaseAgentAdapter implements AgentAdapter {
 
     if (thinkingTokens != null) record.thinkingTokens = thinkingTokens;
     if (cachedTokens != null) record.cachedTokens = cachedTokens;
+    if (cacheCreationTokens != null) record.cacheCreationTokens = cacheCreationTokens;
+    if (cacheReadTokens != null) record.cacheReadTokens = cacheReadTokens;
 
     return record;
   }

@@ -236,8 +236,14 @@ export interface CostRecord {
   /** Thinking/reasoning tokens (if applicable). */
   thinkingTokens?: number;
 
-  /** Cached input tokens (if applicable). */
+  /** Cached input tokens (if applicable). @deprecated Use cacheCreationTokens + cacheReadTokens for granular attribution. */
   cachedTokens?: number;
+
+  /** Cache creation tokens - tokens used to create new cache entries. */
+  cacheCreationTokens?: number;
+
+  /** Cache read tokens - tokens read from existing cache entries. */
+  cacheReadTokens?: number;
 }
 
 // ---------------------------------------------------------------------------
