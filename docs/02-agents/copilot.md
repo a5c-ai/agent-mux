@@ -8,7 +8,7 @@ Adapter for **GitHub Copilot CLI** (`gh copilot`).
 amux install copilot
 ```
 
-The adapter spawns `gh copilot suggest ...`, so the `gh` CLI must be on `PATH`.
+Supported on macOS, Linux and Windows. The adapter spawns `gh copilot suggest ...`, so the `gh` CLI must be on `PATH`.
 
 ## Auth
 

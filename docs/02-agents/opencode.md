@@ -8,6 +8,8 @@ Adapter for the **OpenCode** multi-provider agent CLI.
 amux install opencode
 ```
 
+Supported on macOS, Linux and Windows.
+
 ## Auth
 
 OpenCode routes to multiple providers; set one or more of:

@@ -8,6 +8,8 @@ Adapter for Nous Research's **Hermes** agent CLI.
 amux install hermes
 ```
 
+Supported on macOS, Linux and Windows.
+
 ## Auth
 
 Hermes is multi-provider; the adapter accepts any of:

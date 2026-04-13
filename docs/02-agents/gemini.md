@@ -8,7 +8,7 @@ Adapter for Google's **Gemini CLI**.
 amux install gemini
 ```
 
-Supported on macOS, Linux and Windows.
+Minimum CLI version: `1.0.0`. Supported on macOS, Linux and Windows.
 
 ## Auth
 

@@ -8,6 +8,8 @@ Adapter for the **OpenClaw** CLI.
 amux install openclaw
 ```
 
+Supported on macOS, Linux and Windows.
+
 ## Auth
 
 - **Provider API keys** — OpenClaw is provider-agnostic; set provider-specific env vars (e.g. `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`).

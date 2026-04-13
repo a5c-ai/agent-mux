@@ -8,7 +8,7 @@ Adapter for OpenAI's **Codex** CLI.
 amux install codex
 ```
 
-Supported on macOS, Linux and Windows.
+Minimum CLI version: `1.0.0`. Supported on macOS, Linux and Windows.
 
 ## Auth
 

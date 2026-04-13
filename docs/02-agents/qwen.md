@@ -10,6 +10,8 @@ models. agent-mux drives it via the `qwen` binary.
 amux install qwen
 ```
 
+Supported on macOS, Linux and Windows.
+
 ## Authenticate
 
 Qwen Code speaks the OpenAI-compatible API. The quickest path is DashScope:

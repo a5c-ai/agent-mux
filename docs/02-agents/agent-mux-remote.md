@@ -8,6 +8,8 @@ Meta-adapter that invokes `amux` on a **remote target** (SSH host, Docker contai
 amux install agent-mux-remote
 ```
 
+Supported on macOS, Linux and Windows.
+
 ## Auth
 
 Auth is delegated to the invocation mode:

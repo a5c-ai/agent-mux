@@ -8,6 +8,8 @@ Adapter for the **OMP** agent CLI.
 amux install omp
 ```
 
+Supported on macOS, Linux and Windows.
+
 ## Auth
 
 - **Provider API keys** — provider-specific env vars.

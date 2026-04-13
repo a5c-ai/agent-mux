@@ -8,6 +8,8 @@ Adapter for the **Pi** agent CLI.
 amux install pi
 ```
 
+Supported on macOS, Linux and Windows.
+
 ## Auth
 
 - **Provider API keys** — provider-specific env vars.

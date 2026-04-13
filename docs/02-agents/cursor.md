@@ -8,6 +8,8 @@ Adapter for the **Cursor** editor's agent CLI.
 amux install cursor
 ```
 
+Supported on macOS, Linux and Windows.
+
 ## Auth
 
 - **API key** — `CURSOR_API_KEY`.
