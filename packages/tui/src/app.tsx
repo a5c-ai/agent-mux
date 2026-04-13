@@ -6,6 +6,7 @@ import type { TuiPlugin, TuiViewProps, EventRenderer } from './plugin.js';
 import { EventStream } from './event-stream.js';
 import { PromptInput } from './prompt-input.js';
 import { CommandPalette, type PaletteAction } from './command-palette.js';
+import { ModelPicker, type ModelOption } from './model-picker.js';
 
 export interface AppProps {
   client: AgentMuxClient;
@@ -38,6 +39,22 @@ export function App({ client, plugins, defaultAgent = 'claude-code' }: AppProps)
   const [selection, setSelection] = useState<{ agent: string; sessionId: string } | undefined>(
     undefined,
   );
+  const [modelPickerMode, setModelPickerMode] = useState<boolean>(false);
+  const [currentModel, setCurrentModel] = useState<ModelOption | undefined>(undefined);
+
+  const availableModels = useMemo<ModelOption[]>(() => {
+    try {
+      const out: ModelOption[] = [];
+      for (const a of client.adapters.list()) {
+        for (const m of client.models.models(a.agent)) {
+          out.push({ agent: a.agent, modelId: m.modelId });
+        }
+      }
+      return out;
+    } catch {
+      return [];
+    }
+  }, [client]);
 
   const { registry, stream } = useMemo(() => {
     const r: Registry = createRegistry();
@@ -63,7 +80,7 @@ export function App({ client, plugins, defaultAgent = 'claude-code' }: AppProps)
   }, [client, plugins]);
 
   useInput((input, key) => {
-    if (promptMode || filterMode || paletteMode) return; // child input owns keys while open
+    if (promptMode || filterMode || paletteMode || modelPickerMode) return; // child input owns keys while open
     if (input === 'q' || (key.ctrl && input === 'c')) {
       exit();
       return;
@@ -78,6 +95,10 @@ export function App({ client, plugins, defaultAgent = 'claude-code' }: AppProps)
     }
     if (input === ':' || (key.ctrl && input === 'k')) {
       setPaletteMode(true);
+      return;
+    }
+    if (input === 'm' && availableModels.length > 0) {
+      setModelPickerMode(true);
       return;
     }
     if (input === 'i' && currentHandleRef.current) {
@@ -156,11 +177,12 @@ export function App({ client, plugins, defaultAgent = 'claude-code' }: AppProps)
     }
 
     try {
-      const runOpts: { agent: string; prompt: string; sessionId?: string } = {
-        agent: pendingResume?.agent ?? defaultAgent,
+      const runOpts: { agent: string; prompt: string; sessionId?: string; model?: string } = {
+        agent: pendingResume?.agent ?? currentModel?.agent ?? defaultAgent,
         prompt,
       };
       if (pendingResume) runOpts.sessionId = pendingResume.sessionId;
+      if (currentModel) runOpts.model = currentModel.modelId;
       setPendingResume(null);
       const handle = client.run(runOpts as never);
       currentHandleRef.current = handle;
@@ -231,6 +253,17 @@ export function App({ client, plugins, defaultAgent = 'claude-code' }: AppProps)
           onCancel={() => setFilterMode(false)}
         />
       ) : null}
+      {modelPickerMode ? (
+        <ModelPicker
+          models={availableModels}
+          onCancel={() => setModelPickerMode(false)}
+          onPick={(m) => {
+            setCurrentModel(m);
+            setModelPickerMode(false);
+            setStatus(`Model: ${m.agent}/${m.modelId}`);
+          }}
+        />
+      ) : null}
       {paletteMode ? (
         <CommandPalette
           views={registry.views}
@@ -270,8 +303,11 @@ export function App({ client, plugins, defaultAgent = 'claude-code' }: AppProps)
         <Box flexDirection="column">
           {status ? <Text dimColor>{status}</Text> : null}
           <Box>
-            <Text dimColor>p: prompt · /: filter · :: palette</Text>
+            <Text dimColor>p: prompt · /: filter · :: palette · m: model</Text>
             {filter ? <Text color="cyan"> · filter=&quot;{filter}&quot;</Text> : null}
+            {currentModel ? (
+              <Text color="magenta"> · model={currentModel.agent}/{currentModel.modelId}</Text>
+            ) : null}
             {currentHandleRef.current ? <Text color="yellow"> · i: interrupt</Text> : null}
             {pendingApproval ? <Text color="yellow"> · y/n: approve/deny</Text> : null}
             <Text dimColor> · q: quit</Text>
