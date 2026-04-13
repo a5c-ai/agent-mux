@@ -35,7 +35,6 @@ import adaptersView from './plugins/adapters-view.js';
 import modelsView from './plugins/models-view.js';
 import profilesView from './plugins/profiles-view.js';
 import pluginsView from './plugins/plugins-view.js';
-import runsView from './plugins/runs-view.js';
 import helpView from './plugins/help-view.js';
 import mcpView from './plugins/mcp-view.js';
 import doctorView from './plugins/doctor-view.js';
@@ -72,7 +71,6 @@ export const builtinPlugins: TuiPlugin[] = [
   modelsView,
   profilesView,
   pluginsView,
-  runsView,
   helpView,
   mcpView,
   doctorView,

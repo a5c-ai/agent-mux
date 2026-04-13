@@ -59,9 +59,10 @@ export default definePlugin({
       id: 'chat',
       title: 'Chat',
       hotkey: '1',
-      component: (props) => (
-        <ChatViewInner {...props} renderers={[]} />
-      ),
+      component: (props) => {
+        const renderers = (props as unknown as { renderers?: EventRenderer[] }).renderers ?? [];
+        return <ChatViewInner {...props} renderers={renderers} />;
+      },
     });
   },
 });

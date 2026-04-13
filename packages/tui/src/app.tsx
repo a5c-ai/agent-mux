@@ -21,7 +21,7 @@ function pickRenderers(renderers: EventRenderer[], ev: AgentEvent): EventRendere
   return renderers.find((r) => r.id === 'fallback');
 }
 
-export function App({ client, plugins, defaultAgent = 'claude-code' }: AppProps) {
+export function App({ client, plugins, defaultAgent = 'claude' }: AppProps) {
   const { exit } = useApp();
   const [status, setStatus] = useState<string>('');
   const [activeId, setActiveId] = useState<string>('chat');
@@ -42,6 +42,8 @@ export function App({ client, plugins, defaultAgent = 'claude-code' }: AppProps)
   );
   const [modelPickerMode, setModelPickerMode] = useState<boolean>(false);
   const [currentModel, setCurrentModel] = useState<ModelOption | undefined>(undefined);
+  const [agentPickerMode, setAgentPickerMode] = useState<boolean>(false);
+  const [currentAgent, setCurrentAgent] = useState<string | undefined>(undefined);
   const [profilePickerMode, setProfilePickerMode] = useState<boolean>(false);
   const [currentProfile, setCurrentProfile] = useState<string | undefined>(undefined);
   const [availableProfiles, setAvailableProfiles] = useState<string[]>([]);
@@ -89,7 +91,7 @@ export function App({ client, plugins, defaultAgent = 'claude-code' }: AppProps)
   }, [client, plugins]);
 
   useInput((input, key) => {
-    if (promptMode || filterMode || paletteMode || modelPickerMode || profilePickerMode) return; // child input owns keys while open
+    if (promptMode || filterMode || paletteMode || modelPickerMode || profilePickerMode || agentPickerMode) return; // child input owns keys while open
     if (input === 'q' || (key.ctrl && input === 'c')) {
       exit();
       return;
@@ -108,6 +110,10 @@ export function App({ client, plugins, defaultAgent = 'claude-code' }: AppProps)
     }
     if (input === 'm' && availableModels.length > 0) {
       setModelPickerMode(true);
+      return;
+    }
+    if (input === 'N') {
+      setAgentPickerMode(true);
       return;
     }
     if (input === 'P') {
@@ -251,7 +257,7 @@ export function App({ client, plugins, defaultAgent = 'claude-code' }: AppProps)
         ? ((await client.profiles.apply(currentProfile)) as Partial<{ agent: string; model: string }>)
         : {};
       const runOpts: { agent: string; prompt: string; sessionId?: string; model?: string } = {
-        agent: pendingResume?.agent ?? currentModel?.agent ?? baseOpts.agent ?? defaultAgent,
+        agent: pendingResume?.agent ?? currentModel?.agent ?? currentAgent ?? baseOpts.agent ?? defaultAgent,
         prompt,
       };
       if (pendingResume) runOpts.sessionId = pendingResume.sessionId;
@@ -349,6 +355,21 @@ export function App({ client, plugins, defaultAgent = 'claude-code' }: AppProps)
           }}
         />
       ) : null}
+      {agentPickerMode ? (
+        <ModelPicker
+          models={(() => {
+            try { return client.adapters.list().map((a) => ({ agent: a.agent, modelId: a.displayName })); }
+            catch { return []; }
+          })()}
+          onCancel={() => setAgentPickerMode(false)}
+          onPick={(m) => {
+            setCurrentAgent(m.agent);
+            setCurrentModel(undefined);
+            setAgentPickerMode(false);
+            setStatus(`Agent: ${m.agent}`);
+          }}
+        />
+      ) : null}
       {paletteMode ? (
         <CommandPalette
           views={registry.views}
@@ -389,7 +410,8 @@ export function App({ client, plugins, defaultAgent = 'claude-code' }: AppProps)
         <Box flexDirection="column">
           {status ? <Text dimColor>{status}</Text> : null}
           <Box>
-            <Text dimColor>p: prompt · /: filter · :: palette · m: model · P: profile</Text>
+            <Text dimColor>p: prompt · /: filter · :: palette · m: model · N: agent · P: profile</Text>
+            <Text color="cyan"> · agent={currentAgent ?? defaultAgent}</Text>
             {filter ? <Text color="cyan"> · filter=&quot;{filter}&quot;</Text> : null}
             {currentModel ? (
               <Text color="magenta"> · model={currentModel.agent}/{currentModel.modelId}</Text>
