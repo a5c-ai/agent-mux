@@ -17,7 +17,7 @@ interface DetailState {
   exportNote?: string;
 }
 
-export function SessionDetailView({ client, active, selection, emit }: TuiViewProps) {
+export function SessionDetailView({ client, active, selection, emit, eventStream }: TuiViewProps) {
   const [state, setState] = useState<DetailState>({ loading: !!selection });
 
   useEffect(() => {
@@ -69,11 +69,26 @@ export function SessionDetailView({ client, active, selection, emit }: TuiViewPr
     }
   }
 
+  async function doWatch() {
+    if (!selection) return;
+    emit({ type: 'status', message: `Watching ${selection.agent}/${selection.sessionId}…` });
+    emit({ type: 'view:switch', id: 'chat' });
+    try {
+      for await (const ev of client.sessions.watch(selection.agent as never, selection.sessionId)) {
+        eventStream.push(ev);
+      }
+      emit({ type: 'status', message: 'Watch ended.' });
+    } catch (e) {
+      emit({ type: 'status', message: `Watch error: ${(e as Error).message}` });
+    }
+  }
+
   useInput(
     (input, key) => {
       if (!selection) return;
       if (input === 'e') void doExport('json');
       else if (input === 'm') void doExport('markdown');
+      else if (input === 'w') void doWatch();
       else if (input === 'r') {
         emit({ type: 'session:select', agent: selection.agent, sessionId: selection.sessionId });
         emit({ type: 'view:switch', id: 'chat' });
@@ -102,7 +117,7 @@ export function SessionDetailView({ client, active, selection, emit }: TuiViewPr
         <Text>cost: ${d.totalCost.toFixed(4)}</Text>
       ) : null}
       {state.exportNote ? <Text color="green">{state.exportNote}</Text> : null}
-      <Text dimColor>e: export json · m: export markdown · r: resume · b/Esc: back</Text>
+      <Text dimColor>e: export json · m: export markdown · w: watch · r: resume · b/Esc: back</Text>
     </Box>
   );
 }
