@@ -3,13 +3,14 @@
  *
  * The core `AdapterRegistry` starts empty — adapters must be explicitly
  * registered. This module centralises that wiring so the CLI (and any
- * consumer) gets all 15 built-in adapters with a single call.
+ * consumer) gets all 17 built-in adapters with a single call.
  */
 
 import type { AgentMuxClient } from '@a5c-ai/agent-mux-core';
 import type { MultiAgentAdapter } from '@a5c-ai/agent-mux-core';
 import {
   ClaudeAdapter,
+  ClaudeAgentSdkAdapter,
   CodexAdapter,
   CodexSdkAdapter,
   CodexWebSocketAdapter,
@@ -19,6 +20,7 @@ import {
   OpenCodeAdapter,
   OpenCodeHttpAdapter,
   PiAdapter,
+  PiSdkAdapter,
   OmpAdapter,
   OpenClawAdapter,
   HermesAdapter,
@@ -33,6 +35,7 @@ import {
 export function registerBuiltInAdapters(client: AgentMuxClient): void {
   const adapters: MultiAgentAdapter[] = [
     new ClaudeAdapter(),
+    new ClaudeAgentSdkAdapter(),
     new CodexAdapter(),
     new CodexSdkAdapter(),
     new CodexWebSocketAdapter(),
@@ -42,6 +45,7 @@ export function registerBuiltInAdapters(client: AgentMuxClient): void {
     new OpenCodeAdapter(),
     new OpenCodeHttpAdapter(),
     new PiAdapter(),
+    new PiSdkAdapter(),
     new OmpAdapter(),
     new OpenClawAdapter(),
     new HermesAdapter(),
@@ -58,10 +62,18 @@ export function registerBuiltInAdapters(client: AgentMuxClient): void {
   };
 
   for (const adapter of adapters) {
-    if (typeof registry.registerBuiltIn === 'function') {
-      registry.registerBuiltIn(adapter);
-    } else {
-      registry.register(adapter);
+    try {
+      if (typeof registry.registerBuiltIn === 'function') {
+        registry.registerBuiltIn(adapter);
+      } else {
+        registry.register(adapter);
+      }
+    } catch (e) {
+      // Skip adapters that fail validation (e.g. partially-implemented
+      // programmatic/HTTP adapters). Log to stderr so callers can diagnose
+      // without crashing the whole process.
+      const name = (adapter as { agent?: string }).agent ?? adapter.constructor.name;
+      process.stderr.write(`[amux] skipping adapter ${name}: ${(e as Error).message}\n`);
     }
   }
 }
