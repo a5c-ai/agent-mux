@@ -1,6 +1,6 @@
 {
   "name": "@a5c-ai/agent-mux-tui",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "type": "module",
   "license": "MIT",
   "description": "Extensible Ink-based TUI for agent-mux, with a plugin-first architecture",
@@ -60,7 +60,7 @@
     "test": "vitest run --config ../../vitest.config.ts"
   },
   "dependencies": {
-    "@a5c-ai/agent-mux": "0.3.0",
+    "@a5c-ai/agent-mux": "0.4.0",
     "@a5c-ai/agent-mux-observability": "*",
     "ink": "^5.0.1",
     "react": "^18.3.1"
