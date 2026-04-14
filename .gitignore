@@ -17,3 +17,8 @@ website/.docusaurus/
 website/build/
 website/node_modules/
 tuitest.log
+tasks/
+.a5c/state/
+.a5c/logs/babysitter-session-start-hook.log
+amux-debug.log
+amux-debug-auto.log

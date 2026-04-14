@@ -15,22 +15,42 @@ function SessionsView({ client, active, emit, activeSessions }: TuiViewProps) {
   const [refreshTick, setRefreshTick] = useState(0);
   useEffect(() => {
     if (!active) return;
+    let cancelled = false;
     (async () => {
       try {
-        const all: Row[] = [];
-        for (const ad of client.adapters.list()) {
-          try {
-            const list = await client.sessions.list(ad.agent);
-            for (const s of list) all.push({ sessionId: s.sessionId, agent: ad.agent });
-          } catch {
-            // ignore per-agent listing errors (e.g. adapter without sessions)
-          }
-        }
-        setSessions(all.slice(0, 50));
+        setError(null);
+        setCursor(0);
+        setSessions([]);
+        const agents = client.adapters.list();
+        const rowsByAgent = new Map<string, Row[]>();
+        const mergeRows = () =>
+          agents.flatMap((ad) => rowsByAgent.get(ad.agent) ?? []).slice(0, 50);
+
+        await Promise.all(
+          agents.map(async (ad) => {
+            try {
+              const list = await client.sessions.list(ad.agent, { limit: 20 });
+              rowsByAgent.set(
+                ad.agent,
+                list.map((s) => ({ sessionId: s.sessionId, agent: ad.agent })),
+              );
+              if (!cancelled) {
+                setSessions(mergeRows());
+              }
+            } catch {
+              // ignore per-agent listing errors (e.g. adapter without sessions)
+            }
+          }),
+        );
       } catch (e) {
-        setError(String(e));
+        if (!cancelled) {
+          setError(String(e));
+        }
       }
     })();
+    return () => {
+      cancelled = true;
+    };
   }, [active, client, refreshTick]);
 
   useInput(

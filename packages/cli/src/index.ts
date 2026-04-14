@@ -43,6 +43,7 @@ import { tuiCommand } from './commands/tui.js';
 import { skillCommand, SKILL_FLAGS } from './commands/skill.js';
 import { agentCommand, AGENT_FLAGS } from './commands/agent.js';
 import { registerBuiltInAdapters } from './bootstrap.js';
+import { reconfigureLogger } from '@a5c-ai/agent-mux-observability';
 
 /**
  * Main CLI entry point.
@@ -114,12 +115,34 @@ export async function main(argv?: string[]): Promise<number> {
     const debug = flagBool(args.flags, 'debug');
     const agent = flagStr(args.flags, 'agent');
     const model = flagStr(args.flags, 'model');
+    const logLevel = flagStr(args.flags, 'log-level');
+    const logFile = flagStr(args.flags, 'log-file');
 
     if (configDir) clientOpts['configDir'] = configDir;
     if (projectDir) clientOpts['projectConfigDir'] = projectDir;
     if (debug) clientOpts['debug'] = true;
     if (agent) clientOpts['defaultAgent'] = agent;
     if (model) clientOpts['defaultModel'] = model;
+
+    // Set observability environment variables from CLI flags
+    if (logLevel) {
+      process.env['AMUX_LOG_LEVEL'] = logLevel;
+      process.env['AMUX_OBSERVABILITY_MODE'] = 'full';
+    }
+    if (logFile) {
+      process.env['AMUX_LOG_FILE'] = logFile;
+      process.env['AMUX_OBSERVABILITY_MODE'] = 'full';
+    }
+    if (debug && !logLevel) {
+      process.env['AMUX_LOG_LEVEL'] = 'debug';
+      process.env['AMUX_OBSERVABILITY_MODE'] = 'full';
+    }
+
+    // Apply logging configuration to the global logger
+    reconfigureLogger({
+      level: (process.env['AMUX_LOG_LEVEL'] as any) || (debug ? 'debug' : 'info'),
+      logFile: process.env['AMUX_LOG_FILE'],
+    });
 
     const client = createClient(clientOpts as Parameters<typeof createClient>[0]);
     registerBuiltInAdapters(client);

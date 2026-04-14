@@ -1,4 +1,3 @@
-// @ts-nocheck -- TODO(observability): restore telemetry helpers
 /**
  * @a5c-ai/agent-mux-observability
  *
@@ -13,17 +12,15 @@ export {
   createSimpleLogger as createLogger,
   createComponentLogger,
   logger,
-  type Logger,
-  type LogLevel,
-  type LogContext,
 } from './logger-simple.js';
+
+export * from './types.js';
 
 // Telemetry exports
 export {
   telemetry,
   initializeTelemetry,
   shutdownTelemetry,
-  type SimpleTelemetry,
 } from './telemetry-simple.js';
 
 // Convenience function to initialize both logging and telemetry

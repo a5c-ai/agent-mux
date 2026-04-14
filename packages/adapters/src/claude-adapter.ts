@@ -190,8 +190,10 @@ export class ClaudeAdapter extends BaseAgentAdapter {
     }
 
     // Prompt
-    const prompt = Array.isArray(options.prompt) ? options.prompt.join('\n') : options.prompt;
-    args.push('--print', prompt);
+    const { prompt, stdin } = this.buildPromptTransport(options);
+    if (stdin === undefined) {
+      args.push('--print', prompt);
+    }
 
     return {
       command: this.cliCommand,
@@ -199,6 +201,7 @@ export class ClaudeAdapter extends BaseAgentAdapter {
       env: this.buildEnvFromOptions(options),
       cwd: options.cwd ?? process.cwd(),
       usePty: false,
+      stdin,
       timeout: options.timeout,
       inactivityTimeout: options.inactivityTimeout,
     };

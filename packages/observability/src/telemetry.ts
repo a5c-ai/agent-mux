@@ -1,4 +1,3 @@
-// @ts-nocheck -- TODO(observability): align with current OpenTelemetry SDK types
 /**
  * OpenTelemetry integration for agent-mux.
  *
@@ -7,6 +6,8 @@
  */
 
 import { NodeSDK } from '@opentelemetry/sdk-node';
+import { resourceFromAttributes } from '@opentelemetry/resources';
+import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from '@opentelemetry/semantic-conventions';
 import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
 import {
   metrics,
@@ -21,6 +22,7 @@ import {
   type Histogram,
   type Gauge,
 } from '@opentelemetry/api';
+import { Telemetry, CostInfo } from './types.js';
 
 /**
  * Telemetry configuration options.
@@ -67,7 +69,7 @@ export interface AgentMuxMetrics {
 /**
  * Telemetry manager for agent-mux observability.
  */
-export class TelemetryManager {
+export class TelemetryManager implements Telemetry {
   private sdk: NodeSDK | null = null;
   private meter: Meter;
   private tracer: Tracer;
@@ -99,8 +101,10 @@ export class TelemetryManager {
     }
 
     this.sdk = new NodeSDK({
-      serviceName: this.config.serviceName,
-      serviceVersion: this.config.serviceVersion,
+      resource: resourceFromAttributes({
+        [ATTR_SERVICE_NAME]: this.config.serviceName,
+        [ATTR_SERVICE_VERSION]: this.config.serviceVersion,
+      }),
       instrumentations: [getNodeAutoInstrumentations({
         // Disable some noisy instrumentations
         '@opentelemetry/instrumentation-dns': { enabled: false },
@@ -186,15 +190,30 @@ export class TelemetryManager {
   startToolCallSpan(toolName: string, toolCallId: string, parentSpan?: Span): Span {
     const spanContext = parentSpan ? trace.setSpan(context.active(), parentSpan) : context.active();
 
-    return this.tracer.startSpan(`tool.call.${toolName}`, {
-      parent: spanContext,
+    return context.with(spanContext, () => this.tracer.startSpan(`tool.call.${toolName}`, {
       kind: SpanKind.CLIENT,
       attributes: {
         'tool.name': toolName,
         'tool.call.id': toolCallId,
         ...this.config.baseAttributes,
       },
-    });
+    }));
+  }
+
+  /**
+   * Start tracing a subagent delegation.
+   */
+  startSubagentSpan(subagentId: string, agentName: string, parentSpan?: Span): Span {
+    const spanContext = parentSpan ? trace.setSpan(context.active(), parentSpan) : context.active();
+
+    return context.with(spanContext, () => this.tracer.startSpan(`subagent.dispatch.${agentName}`, {
+      kind: SpanKind.INTERNAL,
+      attributes: {
+        'subagent.id': subagentId,
+        'subagent.name': agentName,
+        ...this.config.baseAttributes,
+      },
+    }));
   }
 
   /**
@@ -268,12 +287,31 @@ export class TelemetryManager {
   /**
    * Record agent run error.
    */
-  recordRunError(agent: string, model: string | undefined, error: Error | string): void {
+  recordRunError(agent: string, model: string | undefined, error: Error | string, cost?: CostInfo): void {
     this.metrics.runsErrors.add(1, {
       agent,
       model: model || 'unknown',
       error_type: error instanceof Error ? error.constructor.name : 'unknown',
     });
+
+    if (cost) {
+      const totalTokens = (cost.inputTokens || 0) + (cost.outputTokens || 0) + (cost.thinkingTokens || 0);
+
+      this.metrics.tokensUsed.record(totalTokens, {
+        agent,
+        model: model || 'unknown',
+        token_type: 'total',
+        status: 'error',
+      });
+
+      if (cost.totalUsd) {
+        this.metrics.costTotal.add(cost.totalUsd, {
+          agent,
+          model: model || 'unknown',
+          status: 'error',
+        });
+      }
+    }
   }
 
   /**
@@ -333,13 +371,6 @@ export class TelemetryManager {
       span.setAttributes(attributes);
     }
     span.end();
-  }
-
-  /**
-   * Get the tracer instance.
-   */
-  getTracer(): Tracer {
-    return this.tracer;
   }
 
   /**

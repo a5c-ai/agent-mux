@@ -65,10 +65,20 @@ then perform the same research and analysis as mentioned above for these new ref
 [x] - polish plugin / hooks / per-adapter config management commands — uniform JSON envelopes (all error paths now emit `printJsonError` under `--json`), richer `--help` on `plugin`, validation failures return `USAGE_ERROR` (2) instead of `GENERAL_ERROR` (1). Hooks + config already compliant.
 [x] - agents management command — `amux agent <list|add|remove|where|agents>` with `--global`/`--project` scope, file-convention based (copies md/yaml/json files). Supports claude, claude-code, codex, cursor, opencode. 8 tests.
 
-[ ] - Logging and opentelemetry integration: implement logging and telemetry in the agent-mux, to track the usage, performance, and errors of the system. this can be done using a tool like Winston or Pino for logging, and OpenTelemetry for telemetry. make sure to log important events and errors, and to collect relevant metrics for monitoring and debugging purposes.
+[x] - Logging and opentelemetry integration: implement logging and telemetry in the agent-mux, to track the usage, performance, and errors of the system. this can be done using a tool like Winston or Pino for logging, and OpenTelemetry for telemetry. make sure to log important events and errors, and to collect relevant metrics for monitoring and debugging purposes.
 [ ] - improve user experience and find and resolve all ux bugs and issues in tui.
 [ ] - find and resolve all bugs in sdk. 
 [ ] - system bug: sessions not showing in sessions view for discovered installed agents (claude, codex, etc.) 
-[ ] - fix harnesses use of -p / --prompts (which makes the run non-interactive, we want it to be interactive by default, communicating the first (or next) prompts using stdin/stdout.) use -p / --prompts ONLY for non-interactive invocations (through OUR cli when called with --prompt flag AND --non-interactive)
-[ ] - escape in chat should go back to menu (an keep prompt for later if the user continues typeing in the chat view)
+[x] - fix harnesses use of -p / --prompts (which makes the run non-interactive, we want it to be interactive by default, communicating the first (or next) prompts using stdin/stdout.) use -p / --prompts ONLY for non-interactive invocations (through OUR cli when called with --prompt flag AND --non-interactive) - partially done.
+[ ] - tui usability:
+- escape in chat should go back to menu (an keep prompt for later if the user continues typeing in the chat view)
+- in chat view, up/down should navigate prompt history, and enter should submit (currently enter adds new line, and ctrl+enter submits)
+- in chat view, when rendering long messages or tool calls, collapse them with a "show more" option to expand, to improve readability and navigation. expanding is done by navigating to the entry (with CTRL+up/down) - the active entry is highlighted and expanded. user can navigate back to the "prompt input" when clicking CTRL+down from the last entry, or when pressing escape. (double escape should exit the chat view and go back to the menu, clearing the prompt input)
+- the tui should be responsive to different terminal sizes, and should adjust the layout and rendering accordingly. and react to terminal resizes.
+- ctrl+enter should not submit the prompt, but add a new line, to allow for multi-line prompts. 
+- when pasting to terminal, the message should contain all the pasted content, but the display should show [Pasted Text: n lines]  to prevent overwhelming the chat view with long pasted messages. also, removing that text block with backspace should remove the [] indicator block in one keypress, and it will also remove the content from the data of the message as well. (investigate claude-code and gemini cli behaviour)
+- when dragging files into the terminal while in the chat view, the full file path should be added to the prompt input where the cursor is, but the display should show only the file name with an emoji (based on file type) to prevent overwhelming the chat view with long file paths. 
+
+in the sdk and tui (end to end tasks):
+- message queueing / steering - append message to the conversation during a run, after the next tool call or next agent response is received, to steer the conversation in a certain direction. this can be used to provide additional context or information to the agent, or to correct its course if it's going off track. (investigate openai/codex queue/steering feature - its open sourced Or gemini - has it too)
 ---

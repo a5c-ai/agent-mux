@@ -163,10 +163,14 @@ export class CodexAdapter extends BaseAgentAdapter {
       args.push('--full-auto');
     }
 
+    let stdin: string | undefined;
     // For new sessions, add the prompt
     if (!isResume) {
-      const prompt = Array.isArray(options.prompt) ? options.prompt.join('\n') : options.prompt;
-      args.push(prompt);
+      const transport = this.buildPromptTransport(options);
+      stdin = transport.stdin;
+      if (stdin === undefined) {
+        args.push(transport.prompt);
+      }
     }
 
     return {
@@ -175,6 +179,7 @@ export class CodexAdapter extends BaseAgentAdapter {
       env: this.buildEnvFromOptions(options),
       cwd: options.cwd ?? process.cwd(),
       usePty: false,
+      stdin,
       timeout: options.timeout,
       inactivityTimeout: options.inactivityTimeout,
     };

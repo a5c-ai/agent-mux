@@ -195,7 +195,7 @@ describe('OpenCodeAdapter', () => {
     it('builds basic spawn args with prompt', () => {
       const result = adapter.buildSpawnArgs({
         agent: 'opencode',
-        prompt: 'Hello world',
+        prompt: 'Hello world', nonInteractive: true,
       });
 
       expect(result.command).toBe('opencode');
@@ -210,7 +210,7 @@ describe('OpenCodeAdapter', () => {
     it('includes model when specified', () => {
       const result = adapter.buildSpawnArgs({
         agent: 'opencode',
-        prompt: 'test',
+        prompt: 'test', nonInteractive: true,
         model: 'gpt-4o',
       });
 
@@ -221,7 +221,7 @@ describe('OpenCodeAdapter', () => {
     it('includes session management args', () => {
       const result = adapter.buildSpawnArgs({
         agent: 'opencode',
-        prompt: 'test',
+        prompt: 'test', nonInteractive: true,
         sessionId: 'test-session',
       });
 
@@ -233,7 +233,7 @@ describe('OpenCodeAdapter', () => {
     it('handles fork session', () => {
       const result = adapter.buildSpawnArgs({
         agent: 'opencode',
-        prompt: 'test',
+        prompt: 'test', nonInteractive: true,
         sessionId: 'new-session',
         forkSessionId: 'parent-session',
       });
@@ -246,7 +246,7 @@ describe('OpenCodeAdapter', () => {
     it('includes max turns when specified', () => {
       const result = adapter.buildSpawnArgs({
         agent: 'opencode',
-        prompt: 'test',
+        prompt: 'test', nonInteractive: true,
         maxTurns: 3,
       });
 
@@ -257,7 +257,7 @@ describe('OpenCodeAdapter', () => {
     it('includes system prompt when specified', () => {
       const result = adapter.buildSpawnArgs({
         agent: 'opencode',
-        prompt: 'test',
+        prompt: 'test', nonInteractive: true,
         systemPrompt: 'You are a helpful assistant',
       });
 
@@ -268,7 +268,7 @@ describe('OpenCodeAdapter', () => {
     it('handles array prompts', () => {
       const result = adapter.buildSpawnArgs({
         agent: 'opencode',
-        prompt: ['First line', 'Second line'],
+        prompt: ['First line', 'Second line'], nonInteractive: true,
       });
 
       expect(result.args).toContain('--prompt');
@@ -278,7 +278,7 @@ describe('OpenCodeAdapter', () => {
     it('sets working directory', () => {
       const result = adapter.buildSpawnArgs({
         agent: 'opencode',
-        prompt: 'test',
+        prompt: 'test', nonInteractive: true,
         cwd: '/test/path',
       });
 
@@ -288,7 +288,7 @@ describe('OpenCodeAdapter', () => {
     it('sets timeouts when specified', () => {
       const result = adapter.buildSpawnArgs({
         agent: 'opencode',
-        prompt: 'test',
+        prompt: 'test', nonInteractive: true,
         timeout: 30000,
         inactivityTimeout: 10000,
       });

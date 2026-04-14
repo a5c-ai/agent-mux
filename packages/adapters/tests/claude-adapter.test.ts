@@ -97,7 +97,7 @@ describe('ClaudeAdapter', () => {
     it('builds basic spawn args with prompt', () => {
       const result = adapter.buildSpawnArgs({
         agent: 'claude',
-        prompt: 'Hello world',
+        prompt: 'Hello world', nonInteractive: true,
       });
 
       expect(result.command).toBe('claude');
@@ -110,7 +110,7 @@ describe('ClaudeAdapter', () => {
     it('includes model flag when specified', () => {
       const result = adapter.buildSpawnArgs({
         agent: 'claude',
-        prompt: 'Test',
+        prompt: 'Test', nonInteractive: true,
         model: 'claude-opus-4-20250514',
       });
 
@@ -121,7 +121,7 @@ describe('ClaudeAdapter', () => {
     it('uses --resume when sessionId is set (reconnect path)', () => {
       const result = adapter.buildSpawnArgs({
         agent: 'claude',
-        prompt: 'Test',
+        prompt: 'Test', nonInteractive: true,
         sessionId: 'abc-123',
       });
 
@@ -133,7 +133,7 @@ describe('ClaudeAdapter', () => {
     it('uses --session-id when forkSessionId is set (new session from fork)', () => {
       const result = adapter.buildSpawnArgs({
         agent: 'claude',
-        prompt: 'Test',
+        prompt: 'Test', nonInteractive: true,
         forkSessionId: 'parent-xyz',
       });
 
@@ -143,7 +143,7 @@ describe('ClaudeAdapter', () => {
     it('includes max-turns when specified', () => {
       const result = adapter.buildSpawnArgs({
         agent: 'claude',
-        prompt: 'Test',
+        prompt: 'Test', nonInteractive: true,
         maxTurns: 5,
       });
 
@@ -154,7 +154,7 @@ describe('ClaudeAdapter', () => {
     it('sets yolo mode with --dangerously-skip-permissions', () => {
       const result = adapter.buildSpawnArgs({
         agent: 'claude',
-        prompt: 'Test',
+        prompt: 'Test', nonInteractive: true,
         approvalMode: 'yolo',
       });
 
@@ -164,7 +164,7 @@ describe('ClaudeAdapter', () => {
     it('uses custom cwd when specified', () => {
       const result = adapter.buildSpawnArgs({
         agent: 'claude',
-        prompt: 'Test',
+        prompt: 'Test', nonInteractive: true,
         cwd: '/tmp/project',
       });
 
@@ -174,7 +174,7 @@ describe('ClaudeAdapter', () => {
     it('includes system prompt when provided', () => {
       const result = adapter.buildSpawnArgs({
         agent: 'claude',
-        prompt: 'Test',
+        prompt: 'Test', nonInteractive: true,
         systemPrompt: 'You are a helpful assistant',
       });
 
@@ -185,7 +185,7 @@ describe('ClaudeAdapter', () => {
     it('joins array prompts with newlines', () => {
       const result = adapter.buildSpawnArgs({
         agent: 'claude',
-        prompt: ['Line 1', 'Line 2'],
+        prompt: ['Line 1', 'Line 2'], nonInteractive: true,
       });
 
       expect(result.args).toContain('Line 1\nLine 2');
@@ -194,7 +194,7 @@ describe('ClaudeAdapter', () => {
     it('passes env vars from options', () => {
       const result = adapter.buildSpawnArgs({
         agent: 'claude',
-        prompt: 'Test',
+        prompt: 'Test', nonInteractive: true,
         env: { CUSTOM_VAR: 'value' },
       });
 
@@ -204,7 +204,7 @@ describe('ClaudeAdapter', () => {
     it('sets timeout from options', () => {
       const result = adapter.buildSpawnArgs({
         agent: 'claude',
-        prompt: 'Test',
+        prompt: 'Test', nonInteractive: true,
         timeout: 30000,
       });
 

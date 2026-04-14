@@ -1,4 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import * as fsp from 'node:fs/promises';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import {
   SessionManagerImpl,
   AdapterRegistryImpl,
@@ -199,6 +202,45 @@ describe('SessionManagerImpl', () => {
 
       const result = await manager.list('claude', { limit: 2 });
       expect(result).toHaveLength(2);
+    });
+
+    it('avoids parsing the full session tree for recent date-sorted lists', async () => {
+      const tmpDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'amux-sessions-'));
+      const sessions = Array.from({ length: 20 }, (_, i) => ({
+        sessionId: `s${i + 1}`,
+        turnCount: i + 1,
+        createdAt: `2025-01-${String(i + 1).padStart(2, '0')}T00:00:00Z`,
+        updatedAt: `2025-01-${String(i + 1).padStart(2, '0')}T01:00:00Z`,
+      }));
+      const sessionFiles: string[] = [];
+      for (const session of sessions) {
+        const filePath = path.join(tmpDir, `${session.sessionId}.json`);
+        await fsp.writeFile(filePath, '{}');
+        sessionFiles.push(filePath);
+        await new Promise((resolve) => setTimeout(resolve, 2));
+      }
+
+      let parseCalls = 0;
+      registry.register({
+        ...mockAdapter('claude', sessions),
+        listSessionFiles: async () => sessionFiles,
+        parseSessionFile: async (filePath: string) => {
+          parseCalls += 1;
+          const session = sessions.find((s) => filePath.includes(s.sessionId));
+          if (!session) throw new Error(`Session file not found: ${filePath}`);
+          return {
+            sessionId: session.sessionId,
+            agent: 'claude',
+            turnCount: session.turnCount,
+            createdAt: session.createdAt,
+            updatedAt: session.updatedAt,
+          };
+        },
+      } as unknown as AgentAdapter);
+
+      const result = await manager.list('claude', { limit: 5 });
+      expect(result).toHaveLength(5);
+      expect(parseCalls).toBeLessThan(sessions.length);
     });
 
     it('sorts ascending when sortDirection is asc', async () => {

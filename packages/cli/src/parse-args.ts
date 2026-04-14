@@ -46,6 +46,8 @@ export const GLOBAL_FLAGS: Record<string, FlagDef> = {
   'debug': { type: 'boolean' },
   'config-dir': { type: 'string' },
   'project-dir': { type: 'string' },
+  'log-level': { type: 'string' },
+  'log-file': { type: 'string' },
   'no-color': { type: 'boolean' },
   'version': { short: 'V', type: 'boolean' },
   'help': { short: 'h', type: 'boolean' },

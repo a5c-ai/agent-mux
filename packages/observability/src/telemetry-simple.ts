@@ -1,32 +1,21 @@
-/**
- * Simple telemetry for agent-mux.
- * Provides basic metrics and tracing without OpenTelemetry dependencies.
- */
-
-/**
- * Simple metrics interface.
- */
-export interface SimpleTelemetry {
-  /** Record agent run start */
-  recordRunStart(agent: string, model?: string): void;
-
-  /** Record agent run completion */
-  recordRunComplete(agent: string, model: string | undefined, duration: number): void;
-
-  /** Record agent run error */
-  recordRunError(agent: string, model: string | undefined, error: Error | string): void;
-
-  /** Record tool call */
-  recordToolCall(toolName: string, duration: number, success: boolean): void;
-
-  /** Record authentication event */
-  recordAuthEvent(agent: string, method: string, success: boolean): void;
-}
+import { Telemetry, CostInfo } from './types.js';
 
 /**
  * Simple telemetry implementation that logs metrics.
  */
-class SimpleTelemetryImpl implements SimpleTelemetry {
+class SimpleTelemetryImpl implements Telemetry {
+  startRunSpan(_runId: string, _agent: string, _model?: string): null {
+    return null;
+  }
+
+  startToolCallSpan(_toolName: string, _toolCallId: string, _parentSpan?: unknown): null {
+    return null;
+  }
+
+  startSubagentSpan(_subagentId: string, _agentName: string, _parentSpan?: unknown): null {
+    return null;
+  }
+
   recordRunStart(agent: string, model?: string): void {
     console.log(JSON.stringify({
       timestamp: new Date().toISOString(),
@@ -36,17 +25,18 @@ class SimpleTelemetryImpl implements SimpleTelemetry {
     }));
   }
 
-  recordRunComplete(agent: string, model: string | undefined, duration: number): void {
+  recordRunComplete(agent: string, model: string | undefined, duration: number, cost?: CostInfo): void {
     console.log(JSON.stringify({
       timestamp: new Date().toISOString(),
       event: 'run_complete',
       agent,
       model: model || 'unknown',
       duration,
+      cost,
     }));
   }
 
-  recordRunError(agent: string, model: string | undefined, error: Error | string): void {
+  recordRunError(agent: string, model: string | undefined, error: Error | string, cost?: CostInfo): void {
     console.log(JSON.stringify({
       timestamp: new Date().toISOString(),
       event: 'run_error',
@@ -54,6 +44,7 @@ class SimpleTelemetryImpl implements SimpleTelemetry {
       model: model || 'unknown',
       error_type: error instanceof Error ? error.constructor.name : 'unknown',
       error_message: error instanceof Error ? error.message : error,
+      cost,
     }));
   }
 
@@ -75,6 +66,18 @@ class SimpleTelemetryImpl implements SimpleTelemetry {
       method,
       status: success ? 'success' : 'failure',
     }));
+  }
+
+  endSpanSuccess(_span: unknown, _attributes?: Record<string, string | number | boolean>): void {
+    // No-op in simple telemetry mode
+  }
+
+  endSpanError(
+    _span: unknown,
+    _error: Error | string,
+    _attributes?: Record<string, string | number | boolean>,
+  ): void {
+    // No-op in simple telemetry mode
   }
 }
 

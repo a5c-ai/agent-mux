@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Box, Text, useInput, useApp } from 'ink';
+import { logger } from '@a5c-ai/agent-mux-observability';
 import type { AgentMuxClient, AgentEvent, RunHandle } from '@a5c-ai/agent-mux';
 import { createRegistry, createContext, loadPlugins, type Registry } from './registry.js';
 import type { TuiPlugin, TuiViewProps, EventRenderer } from './plugin.js';
@@ -406,8 +407,10 @@ export function App({ client, plugins, defaultAgent = 'claude' }: AppProps) {
       currentHandleRef.current = null;
       if (resumedSessionId) unmarkActive(resumedAgent, resumedSessionId);
       setStatus('Run complete.');
-    } catch (e) {
+      } catch (e) {
+      logger.error({ error: e }, 'TUI run failed');
       // best-effort cleanup — we might not have started a session, but harmless
+
       // if the set doesn't contain the key.
       const msg = (e as Error).message;
       if (/ENOENT/.test(msg)) {

@@ -1,4 +1,3 @@
-// @ts-nocheck -- TODO(observability): fix Logger interface extension
 /**
  * Structured logging with Pino for agent-mux.
  *
@@ -8,49 +7,7 @@
 
 import pino from 'pino';
 import type { Logger as PinoLogger } from 'pino';
-
-/**
- * Log levels supported by the system.
- */
-export type LogLevel = 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'fatal';
-
-/**
- * Contextual information that can be attached to log entries.
- */
-export interface LogContext {
-  /** Run ID for correlating logs across a single run */
-  runId?: string;
-  /** Agent name being used */
-  agent?: string;
-  /** Session ID for multi-turn conversations */
-  sessionId?: string;
-  /** Model being used */
-  model?: string;
-  /** User ID or identifier */
-  userId?: string;
-  /** Request/operation ID for tracing */
-  operationId?: string;
-  /** Component or module name */
-  component?: string;
-  /** Duration in milliseconds for performance tracking */
-  duration?: number;
-  /** Cost information */
-  cost?: {
-    totalUsd?: number;
-    inputTokens?: number;
-    outputTokens?: number;
-    thinkingTokens?: number;
-  };
-  /** Error information */
-  error?: {
-    code?: string;
-    message?: string;
-    stack?: string;
-    recoverable?: boolean;
-  };
-  /** Additional arbitrary metadata */
-  [key: string]: unknown;
-}
+import { Logger, LogLevel, LogContext, CostInfo } from './types.js';
 
 /**
  * Logger configuration options.
@@ -58,6 +15,8 @@ export interface LogContext {
 export interface LoggerConfig {
   /** Log level threshold */
   level?: LogLevel;
+  /** Log to a file instead of stdout */
+  logFile?: string;
   /** Enable pretty printing for development */
   pretty?: boolean;
   /** Enable structured JSON output */
@@ -73,53 +32,135 @@ export interface LoggerConfig {
 }
 
 /**
- * Enhanced logger interface with agent-mux specific methods.
- * Combines Pino logger capabilities with domain-specific logging methods.
+ * Implementation of the Logger interface that wraps a Pino instance.
+ * Ensures that child loggers created via .child() also have the enhanced methods.
  */
-export interface Logger {
-  // Core Pino logger methods
-  trace(msg: string, ...args: unknown[]): void;
-  trace(obj: object, msg?: string, ...args: unknown[]): void;
-  debug(msg: string, ...args: unknown[]): void;
-  debug(obj: object, msg?: string, ...args: unknown[]): void;
-  info(msg: string, ...args: unknown[]): void;
-  info(obj: object, msg?: string, ...args: unknown[]): void;
-  warn(msg: string, ...args: unknown[]): void;
-  warn(obj: object, msg?: string, ...args: unknown[]): void;
-  error(msg: string, ...args: unknown[]): void;
-  error(obj: object, msg?: string, ...args: unknown[]): void;
-  fatal(msg: string, ...args: unknown[]): void;
-  fatal(obj: object, msg?: string, ...args: unknown[]): void;
+class PinoLoggerWrapper implements Logger {
+  constructor(private pino: PinoLogger) {}
 
-  /** Create a child logger with additional context */
-  child(context: LogContext): Logger;
+  // Core pino methods
+  get level(): string { return this.pino.level; }
+  set level(val: string) { this.pino.level = val; }
 
-  /** Log agent run start */
-  runStart(context: { runId: string; agent: string; prompt: string; model?: string }): void;
+  trace(msg: string): void;
+  trace(obj: object, msg?: string): void;
+  trace(objOrMsg: any, msg?: string): void {
+    this.pino.trace(objOrMsg, msg);
+  }
 
-  /** Log agent run completion */
-  runComplete(context: { runId: string; agent: string; duration: number; cost?: LogContext['cost'] }): void;
+  debug(msg: string): void;
+  debug(obj: object, msg?: string): void;
+  debug(objOrMsg: any, msg?: string): void {
+    this.pino.debug(objOrMsg, msg);
+  }
 
-  /** Log agent run error */
-  runError(context: { runId: string; agent: string; error: Error | LogContext['error'] }): void;
+  info(msg: string): void;
+  info(obj: object, msg?: string): void;
+  info(objOrMsg: any, msg?: string): void {
+    this.pino.info(objOrMsg, msg);
+  }
 
-  /** Log tool call start */
-  toolCallStart(context: { runId: string; toolName: string; toolCallId: string; args?: unknown }): void;
+  warn(msg: string): void;
+  warn(obj: object, msg?: string): void;
+  warn(objOrMsg: any, msg?: string): void {
+    this.pino.warn(objOrMsg, msg);
+  }
 
-  /** Log tool call completion */
-  toolCallComplete(context: { runId: string; toolName: string; toolCallId: string; duration: number; result?: unknown }): void;
+  error(msg: string): void;
+  error(obj: object, msg?: string): void;
+  error(objOrMsg: any, msg?: string): void {
+    this.pino.error(objOrMsg, msg);
+  }
 
-  /** Log performance metrics */
-  perf(message: string, context: LogContext & { duration: number }): void;
+  fatal(msg: string): void;
+  fatal(obj: object, msg?: string): void;
+  fatal(objOrMsg: any, msg?: string): void {
+    this.pino.fatal(objOrMsg, msg);
+  }
 
-  /** Log authentication events */
-  auth(message: string, context: LogContext & { method?: string; success?: boolean }): void;
+  child(bindings: LogContext): Logger {
+    return new PinoLoggerWrapper(this.pino.child(bindings));
+  }
 
-  /** Log configuration events */
-  config(message: string, context: LogContext): void;
+  // Enhanced methods
+  runStart(context: { runId: string; agent: string; prompt: string; model?: string }): void {
+    this.pino.info({
+      runId: context.runId,
+      agent: context.agent,
+      model: context.model,
+      prompt: context.prompt.slice(0, 100) + (context.prompt.length > 100 ? '...' : ''),
+    }, 'Agent run started');
+  }
 
-  /** Log session events */
-  session(message: string, context: LogContext & { action?: 'create' | 'resume' | 'fork' | 'end' }): void;
+  runComplete(context: { runId: string; agent: string; duration: number; cost?: CostInfo }): void {
+    this.pino.info({
+      runId: context.runId,
+      agent: context.agent,
+      duration: context.duration,
+      cost: context.cost,
+    }, 'Agent run completed');
+  }
+
+  runError(context: { runId: string; agent: string; error: Error | LogContext['error'] }): void {
+    const error = context.error instanceof Error ? {
+      message: context.error.message,
+      stack: context.error.stack,
+      name: context.error.name,
+    } : context.error;
+
+    this.pino.error({
+      runId: context.runId,
+      agent: context.agent,
+      error,
+    }, 'Agent run failed');
+  }
+
+  toolCallStart(context: { runId: string; toolName: string; toolCallId: string; args?: unknown }): void {
+    this.pino.debug({
+      runId: context.runId,
+      toolName: context.toolName,
+      toolCallId: context.toolCallId,
+      args: context.args,
+    }, 'Tool call started');
+  }
+
+  toolCallComplete(context: { runId: string; toolName: string; toolCallId: string; duration: number; result?: unknown }): void {
+    this.pino.debug({
+      runId: context.runId,
+      toolName: context.toolName,
+      toolCallId: context.toolCallId,
+      duration: context.duration,
+      result: typeof context.result === 'string' ? context.result.slice(0, 200) : context.result,
+    }, 'Tool call completed');
+  }
+
+  perf(message: string, context: LogContext & { duration: number }): void {
+    this.pino.info({
+      ...context,
+      type: 'performance',
+    }, message);
+  }
+
+  auth(message: string, context: LogContext & { method?: string; success?: boolean }): void {
+    this.pino.info({
+      ...context,
+      type: 'auth',
+    }, message);
+  }
+
+  config(message: string, context: LogContext): void {
+    this.pino.debug({
+      ...context,
+      type: 'config',
+    }, message);
+  }
+
+  session(message: string, context: LogContext & { action?: 'create' | 'resume' | 'fork' | 'end' }): void {
+    this.pino.info({
+      ...context,
+      type: 'session',
+    }, message);
+  }
 }
 
 /**
@@ -127,6 +168,7 @@ export interface Logger {
  */
 const DEFAULT_CONFIG: Required<Omit<LoggerConfig, 'pinoOptions' | 'baseContext'>> = {
   level: 'info',
+  logFile: '',
   pretty: process.env.NODE_ENV !== 'production',
   structured: process.env.NODE_ENV === 'production',
   timestamp: true,
@@ -140,7 +182,7 @@ export function createLogger(config: LoggerConfig = {}): Logger {
   const resolvedConfig = { ...DEFAULT_CONFIG, ...config };
 
   // Determine if we should use pretty printing
-  const shouldUsePretty = resolvedConfig.pretty && !resolvedConfig.structured;
+  const shouldUsePretty = resolvedConfig.pretty && !resolvedConfig.structured && !resolvedConfig.logFile;
 
   // Base pino options
   const pinoOptions: pino.LoggerOptions = {
@@ -155,107 +197,33 @@ export function createLogger(config: LoggerConfig = {}): Logger {
     ...config.pinoOptions,
   };
 
-  // Add pretty printing for development
-  const transport = shouldUsePretty ? {
-    target: 'pino-pretty',
-    options: {
-      colorize: true,
-      translateTime: 'yyyy-mm-dd HH:MM:ss',
-      ignore: 'pid,hostname,service',
-      messageFormat: '{msg}',
-      customPrettifiers: {
-        runId: (runId: string) => `run:${runId.slice(0, 8)}`,
-        agent: (agent: string) => `agent:${agent}`,
-        component: (component: string) => `[${component}]`,
+  let baseLogger: PinoLogger;
+
+  if (resolvedConfig.logFile) {
+    // Log to file (always structured JSON)
+    baseLogger = pino(pinoOptions, pino.destination(resolvedConfig.logFile));
+  } else if (shouldUsePretty) {
+    // Add pretty printing for development
+    const transport = {
+      target: 'pino-pretty',
+      options: {
+        colorize: true,
+        translateTime: 'yyyy-mm-dd HH:MM:ss',
+        ignore: 'pid,hostname,service',
+        messageFormat: '{msg}',
+        customPrettifiers: {
+          runId: (runId: string) => `run:${runId.slice(0, 8)}`,
+          agent: (agent: string) => `agent:${agent}`,
+          component: (component: string) => `[${component}]`,
+        },
       },
-    },
-  } : undefined;
+    };
+    baseLogger = pino(pinoOptions, pino.transport(transport));
+  } else {
+    baseLogger = pino(pinoOptions);
+  }
 
-  const baseLogger = transport ? pino(pinoOptions, pino.transport(transport)) : pino(pinoOptions);
-
-  // Enhance logger with agent-mux specific methods
-  const enhancedLogger = baseLogger as Logger;
-
-  enhancedLogger.runStart = function(context) {
-    this.info({
-      runId: context.runId,
-      agent: context.agent,
-      model: context.model,
-      prompt: context.prompt.slice(0, 100) + (context.prompt.length > 100 ? '...' : ''),
-    }, 'Agent run started');
-  };
-
-  enhancedLogger.runComplete = function(context) {
-    this.info({
-      runId: context.runId,
-      agent: context.agent,
-      duration: context.duration,
-      cost: context.cost,
-    }, 'Agent run completed');
-  };
-
-  enhancedLogger.runError = function(context) {
-    const error = context.error instanceof Error ? {
-      message: context.error.message,
-      stack: context.error.stack,
-      name: context.error.name,
-    } : context.error;
-
-    this.error({
-      runId: context.runId,
-      agent: context.agent,
-      error,
-    }, 'Agent run failed');
-  };
-
-  enhancedLogger.toolCallStart = function(context) {
-    this.debug({
-      runId: context.runId,
-      toolName: context.toolName,
-      toolCallId: context.toolCallId,
-      args: context.args,
-    }, 'Tool call started');
-  };
-
-  enhancedLogger.toolCallComplete = function(context) {
-    this.debug({
-      runId: context.runId,
-      toolName: context.toolName,
-      toolCallId: context.toolCallId,
-      duration: context.duration,
-      result: typeof context.result === 'string' ? context.result.slice(0, 200) : context.result,
-    }, 'Tool call completed');
-  };
-
-  enhancedLogger.perf = function(message, context) {
-    this.info({
-      ...context,
-      type: 'performance',
-    }, message);
-  };
-
-  enhancedLogger.auth = function(message, context) {
-    this.info({
-      ...context,
-      type: 'auth',
-    }, message);
-  };
-
-  enhancedLogger.config = function(message, context) {
-    this.debug({
-      ...context,
-      type: 'config',
-    }, message);
-  };
-
-  enhancedLogger.session = function(message, context) {
-    this.info({
-      ...context,
-      type: 'session',
-    }, message);
-  };
-
-  return enhancedLogger;
+  return new PinoLoggerWrapper(baseLogger);
 }
 
 /**
@@ -263,6 +231,7 @@ export function createLogger(config: LoggerConfig = {}): Logger {
  */
 export const logger = createLogger({
   level: (process.env.AMUX_LOG_LEVEL as LogLevel) || 'info',
+  logFile: process.env.AMUX_LOG_FILE,
   pretty: process.env.AMUX_LOG_PRETTY === 'true',
   baseContext: {
     version: process.env.npm_package_version || 'unknown',
@@ -281,4 +250,17 @@ export function createComponentLogger(component: string, context?: LogContext): 
  */
 export function createRunLogger(runId: string, agent: string, additionalContext?: LogContext): Logger {
   return logger.child({ runId, agent, ...additionalContext });
+}
+
+/**
+ * Reconfigure the default logger.
+ * Note: This replaces the pino instance in the singleton wrapper.
+ */
+export function reconfigureLogger(config: LoggerConfig): void {
+  const newLogger = createLogger(config);
+  // @ts-expect-error - accessing private property to reconfigure singleton
+  logger.pino = (newLogger as any).pino;
+  if (config.level) {
+    logger.level = config.level;
+  }
 }

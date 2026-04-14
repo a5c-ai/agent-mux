@@ -158,64 +158,67 @@ export class AgentMuxClient {
    * @see 01-core-types-and-client.md §5.2
    */
   run(options: RunOptions): RunHandle {
-    if (!options || typeof options !== 'object') {
-      throw new AgentMuxError('VALIDATION_ERROR', 'run() requires RunOptions');
+    try {
+      if (!options || typeof options !== 'object') {
+        throw new AgentMuxError('VALIDATION_ERROR', 'run() requires RunOptions');
+      }
+      if (!options.agent) {
+        throw new AgentMuxError('VALIDATION_ERROR', 'RunOptions.agent is required');
+      }
+      if (options.prompt === undefined || options.prompt === null
+          || (typeof options.prompt === 'string' && options.prompt.length === 0)
+          || (Array.isArray(options.prompt) && options.prompt.length === 0)) {
+        throw new AgentMuxError('VALIDATION_ERROR', 'RunOptions.prompt is required and non-empty');
+      }
+
+      // Merge client-level defaults onto options (options win).
+      const merged: RunOptions = {
+        ...options,
+        approvalMode: options.approvalMode ?? this.options.approvalMode,
+        timeout: options.timeout ?? this.options.timeout,
+        inactivityTimeout: options.inactivityTimeout ?? this.options.inactivityTimeout,
+        retryPolicy: options.retryPolicy ?? this.options.retryPolicy,
+        stream: options.stream ?? this.options.stream,
+        model: options.model ?? this.options.defaultModel,
+        cwd: options.cwd ?? process.cwd(),
+      };
+
+      const adapter = this.adapters.get(merged.agent);
+      if (!adapter) {
+        throw new AgentMuxError('UNKNOWN_AGENT', `No adapter registered for agent "${merged.agent}"`);
+      }
+
+      const runId = merged.runId ?? generateRunId();
+      const handle = new RunHandleImpl({
+        runId,
+        agent: merged.agent,
+        model: merged.model,
+        approvalMode: merged.approvalMode ?? 'prompt',
+        collectEvents: merged.collectEvents ?? false,
+        tags: merged.tags,
+      });
+
+      // Log and trace the agent run
+      this.logger.runStart({
+        runId,
+        agent: merged.agent,
+        prompt: Array.isArray(merged.prompt) ? merged.prompt.join('\n') : merged.prompt,
+        model: merged.model,
+      });
+
+      telemetry.recordRunStart(merged.agent, merged.model);
+
+      startSpawnLoop(handle, adapter, merged);
+
+      return handle;
+    } catch (err: any) {
+      this.logger.runError({
+        runId: (options as any)?.runId ?? 'unknown',
+        agent: options?.agent ?? 'unknown',
+        error: err,
+      });
+      throw err;
     }
-    if (!options.agent) {
-      throw new AgentMuxError('VALIDATION_ERROR', 'RunOptions.agent is required');
-    }
-    if (options.prompt === undefined || options.prompt === null
-        || (typeof options.prompt === 'string' && options.prompt.length === 0)
-        || (Array.isArray(options.prompt) && options.prompt.length === 0)) {
-      throw new AgentMuxError('VALIDATION_ERROR', 'RunOptions.prompt is required and non-empty');
-    }
-
-    // Merge client-level defaults onto options (options win).
-    const merged: RunOptions = {
-      ...options,
-      approvalMode: options.approvalMode ?? this.options.approvalMode,
-      timeout: options.timeout ?? this.options.timeout,
-      inactivityTimeout: options.inactivityTimeout ?? this.options.inactivityTimeout,
-      retryPolicy: options.retryPolicy ?? this.options.retryPolicy,
-      stream: options.stream ?? this.options.stream,
-      model: options.model ?? this.options.defaultModel,
-      cwd: options.cwd ?? process.cwd(),
-    };
-
-    // Profile merging — kicked off async but we need sync return; if a
-    // profile is referenced we apply it synchronously by reading fields we
-    // already have (profile manager is async, so we warn via debug event).
-    // For determinism in tests, callers that need profile merge should
-    // pre-apply via client.profiles.apply() before calling run().
-
-    const adapter = this.adapters.get(merged.agent);
-    if (!adapter) {
-      throw new AgentMuxError('UNKNOWN_AGENT', `No adapter registered for agent "${merged.agent}"`);
-    }
-
-    const runId = merged.runId ?? generateRunId();
-    const handle = new RunHandleImpl({
-      runId,
-      agent: merged.agent,
-      model: merged.model,
-      approvalMode: merged.approvalMode ?? 'prompt',
-      collectEvents: merged.collectEvents ?? false,
-      tags: merged.tags,
-    });
-
-    // Log and trace the agent run
-    this.logger.runStart({
-      runId,
-      agent: merged.agent,
-      prompt: Array.isArray(merged.prompt) ? merged.prompt.join('\n') : merged.prompt,
-      model: merged.model,
-    });
-
-    telemetry.recordRunStart(merged.agent, merged.model);
-
-    startSpawnLoop(handle, adapter, merged);
-
-    return handle;
   }
 
   /**

@@ -43,6 +43,7 @@ import configView from './plugins/config-view.js';
 import skillsView from './plugins/skills-view.js';
 import agentsView from './plugins/agents-view.js';
 import hooksView from './plugins/hooks-view.js';
+import observabilityView from './plugins/observability-view.js';
 import type { TuiPlugin } from './plugin.js';
 
 // Order matters: specific renderers first, fallback LAST so it only matches
@@ -79,5 +80,6 @@ export const builtinPlugins: TuiPlugin[] = [
   skillsView,
   agentsView,
   hooksView,
+  observabilityView,
   fallback,
 ];

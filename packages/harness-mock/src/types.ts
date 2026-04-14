@@ -321,6 +321,22 @@ export interface HarnessScenario {
   /** File operations the harness would perform. */
   fileOperations?: FileOperation[];
 
+  /** Simulated telemetry data. */
+  telemetry?: {
+    spans?: Array<{
+      name: string;
+      attributes?: Record<string, string | number | boolean>;
+      status?: 'ok' | 'error';
+      delayMs?: number;
+    }>;
+    metrics?: Array<{
+      name: string;
+      value: number;
+      attributes?: Record<string, string | number | boolean>;
+      delayMs?: number;
+    }>;
+  };
+
   // ── HTTP-specific configuration ─────────────────────────────────────
 
   /** HTTP server configuration (for HTTP adapters). */

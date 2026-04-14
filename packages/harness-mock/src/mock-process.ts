@@ -102,6 +102,7 @@ export class MockProcess extends EventEmitter implements MockHarnessHandle {
       this._validateExpectations();
       this._emitOutputChunks();
       this._applyFileOperations();
+      this._emitSimulatedTelemetry();
       this._scheduleExit();
     });
 
@@ -169,6 +170,32 @@ export class MockProcess extends EventEmitter implements MockHarnessHandle {
           if (!this._exited) {
             this.emit('auto-response', interaction.response);
           }
+        });
+      }
+    }
+  }
+
+  private _emitSimulatedTelemetry(): void {
+    if (!this.scenario.telemetry) return;
+
+    if (this.scenario.telemetry.spans) {
+      let cumulativeDelay = 0;
+      for (const span of this.scenario.telemetry.spans) {
+        cumulativeDelay += (span.delayMs ?? 0);
+        this._schedule(cumulativeDelay, () => {
+          if (this._exited) return;
+          this.emit('telemetry-span', span);
+        });
+      }
+    }
+
+    if (this.scenario.telemetry.metrics) {
+      let cumulativeDelay = 0;
+      for (const metric of this.scenario.telemetry.metrics) {
+        cumulativeDelay += (metric.delayMs ?? 0);
+        this._schedule(cumulativeDelay, () => {
+          if (this._exited) return;
+          this.emit('telemetry-metric', metric);
         });
       }
     }

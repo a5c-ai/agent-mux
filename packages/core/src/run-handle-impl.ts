@@ -26,6 +26,8 @@ import {
   type TokenAccumulator,
 } from './run-handle-cost.js';
 import { createComponentLogger, telemetry } from '@a5c-ai/agent-mux-observability';
+import type { Span } from '@opentelemetry/api';
+import { context, trace } from '@opentelemetry/api';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -124,6 +126,15 @@ export class RunHandleImpl implements RunHandle {
   /** Logger instance for this run. */
   private readonly logger: any;
 
+  /** OpenTelemetry span for this run. */
+  private readonly _runSpan: Span;
+
+  /** Map of active tool call spans by toolCallId. */
+  private readonly _toolSpans = new Map<string, Span>();
+
+  /** Map of active subagent spans by subagentId. */
+  private readonly _subagentSpans = new Map<string, Span>();
+
   // ── Constructor ───────────────────────────────────────────────────────────
 
   constructor(options: RunHandleImplOptions) {
@@ -138,6 +149,9 @@ export class RunHandleImpl implements RunHandle {
 
     // Initialize logger for this run
     this.logger = createComponentLogger(this.agent) as any;
+
+    // Start OpenTelemetry span for this run
+    this._runSpan = telemetry.startRunSpan(this.runId, this.agent, this.model);
 
     // Wire up the interaction channel's response dispatcher.
     this.interaction.setDispatch(async (id, response) => {
@@ -229,22 +243,93 @@ export class RunHandleImpl implements RunHandle {
       case 'tool_call_start':
         this.logger.toolCallStart({
           runId: this.runId,
-          toolName: event.toolName,
-          toolCallId: event.toolCallId,
-          args: event.inputAccumulated,
+          toolName: (event as any).toolName,
+          toolCallId: (event as any).toolCallId,
+          args: (event as any).inputAccumulated,
         });
+
+        // Start tool call span
+        const toolSpan = telemetry.startToolCallSpan((event as any).toolName, (event as any).toolCallId, this._runSpan);
+        this._toolSpans.set((event as any).toolCallId, toolSpan);
         break;
 
       case 'tool_call_ready':
-        // Track tool call completion time
-        const duration = Date.now() - event.timestamp;
-        this.logger.toolCallComplete({
-          runId: this.runId,
-          toolName: event.toolName,
-          toolCallId: event.toolCallId,
-          duration,
-        });
-        telemetry.recordToolCall(event.toolName, duration, true);
+        // Tool call is ready to be executed (or result is pending)
+        break;
+
+      case 'tool_result':
+        {
+          const span = this._toolSpans.get((event as any).toolCallId);
+          const duration = (event as any).durationMs || 0;
+          
+          this.logger.toolCallComplete({
+            runId: this.runId,
+            toolName: (event as any).toolName,
+            toolCallId: (event as any).toolCallId,
+            duration,
+            result: (event as any).result,
+          });
+
+          if (span) {
+            telemetry.endSpanSuccess(span, {
+              'tool.duration_ms': duration,
+            });
+            this._toolSpans.delete((event as any).toolCallId);
+          }
+          telemetry.recordToolCall((event as any).toolName, duration, true);
+        }
+        break;
+
+      case 'tool_error':
+        {
+          const span = this._toolSpans.get((event as any).toolCallId);
+          const duration = (event as any).durationMs || 0;
+
+          this.logger.toolCallComplete({
+            runId: this.runId,
+            toolName: (event as any).toolName,
+            toolCallId: (event as any).toolCallId,
+            duration,
+            result: (event as any).error,
+          });
+
+          if (span) {
+            telemetry.endSpanError(span, (event as any).error);
+            this._toolSpans.delete((event as any).toolCallId);
+          }
+          telemetry.recordToolCall((event as any).toolName, duration, false);
+        }
+        break;
+
+      case 'subagent_spawn':
+        {
+          const subagentSpan = telemetry.startSubagentSpan(
+            (event as any).subagentId,
+            (event as any).agentName,
+            this._runSpan,
+          );
+          this._subagentSpans.set((event as any).subagentId, subagentSpan);
+        }
+        break;
+
+      case 'subagent_result':
+        {
+          const span = this._subagentSpans.get((event as any).subagentId);
+          if (span) {
+            telemetry.endSpanSuccess(span);
+            this._subagentSpans.delete((event as any).subagentId);
+          }
+        }
+        break;
+
+      case 'subagent_error':
+        {
+          const span = this._subagentSpans.get((event as any).subagentId);
+          if (span) {
+            telemetry.endSpanError(span, (event as any).error);
+            this._subagentSpans.delete((event as any).subagentId);
+          }
+        }
         break;
 
       case 'error':
@@ -252,9 +337,9 @@ export class RunHandleImpl implements RunHandle {
           runId: this.runId,
           agent: this.agent,
           error: {
-            code: event.code,
-            message: event.message,
-            recoverable: event.recoverable,
+            code: (event as any).code,
+            message: (event as any).message,
+            recoverable: (event as any).recoverable,
           },
         }, 'Agent error occurred');
         break;
@@ -317,8 +402,12 @@ export class RunHandleImpl implements RunHandle {
         duration,
         cost,
       });
-      telemetry.recordRunComplete(this.agent, this.model, duration);
-      void cost;
+      telemetry.recordRunComplete(this.agent, this.model, duration, cost);
+      telemetry.endSpanSuccess(this._runSpan, {
+        exitReason,
+        durationMs: duration,
+        ...(cost || {}),
+      });
     } else {
       const error = this._runError || { message: `Run failed with reason: ${exitReason}` };
       this.logger.runError({
@@ -326,7 +415,12 @@ export class RunHandleImpl implements RunHandle {
         agent: this.agent,
         error,
       });
-      telemetry.recordRunError(this.agent, this.model, error.message);
+      telemetry.recordRunError(this.agent, this.model, error.message, cost);
+      telemetry.endSpanError(this._runSpan, error.message, {
+        exitReason,
+        durationMs: duration,
+        ...(cost || {}),
+      });
     }
 
     // Wake all waiting iterators with done = true.

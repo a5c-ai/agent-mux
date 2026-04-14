@@ -61,6 +61,7 @@
   },
   "dependencies": {
     "@a5c-ai/agent-mux": "0.3.0",
+    "@a5c-ai/agent-mux-observability": "*",
     "ink": "^5.0.1",
     "react": "^18.3.1"
   },

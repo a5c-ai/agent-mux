@@ -118,15 +118,19 @@ export class CopilotAdapter extends BaseAgentAdapter {
   };
 
   buildSpawnArgs(options: RunOptions): SpawnArgs {
-    const prompt = Array.isArray(options.prompt) ? options.prompt.join('\n') : options.prompt;
+    const { prompt, stdin } = this.buildPromptTransport(options);
+    const args = ['copilot', 'suggest'];
+    if (stdin === undefined) {
+      args.push(prompt);
+    }
 
     return {
       command: 'gh',
-      args: ['copilot', 'suggest', prompt],
+      args,
       env: this.buildEnvFromOptions(options),
       cwd: options.cwd ?? process.cwd(),
       usePty: false,
-      shell: true,
+      stdin,
       timeout: options.timeout,
       inactivityTimeout: options.inactivityTimeout,
     };

@@ -74,7 +74,7 @@ describe('CodexAdapter', () => {
     it('builds basic spawn args', () => {
       const result = adapter.buildSpawnArgs({
         agent: 'codex',
-        prompt: 'Fix the bug',
+        prompt: 'Fix the bug', nonInteractive: true,
       });
 
       expect(result.command).toBe('codex');
@@ -86,7 +86,7 @@ describe('CodexAdapter', () => {
     it('includes model flag', () => {
       const result = adapter.buildSpawnArgs({
         agent: 'codex',
-        prompt: 'Test',
+        prompt: 'Test', nonInteractive: true,
         model: 'o4-mini',
       });
 
@@ -97,7 +97,7 @@ describe('CodexAdapter', () => {
     it('sets full-auto for yolo mode', () => {
       const result = adapter.buildSpawnArgs({
         agent: 'codex',
-        prompt: 'Test',
+        prompt: 'Test', nonInteractive: true,
         approvalMode: 'yolo',
       });
 
@@ -107,7 +107,7 @@ describe('CodexAdapter', () => {
     it('joins array prompts', () => {
       const result = adapter.buildSpawnArgs({
         agent: 'codex',
-        prompt: ['First', 'Second'],
+        prompt: ['First', 'Second'], nonInteractive: true,
       });
 
       expect(result.args).toContain('First\nSecond');

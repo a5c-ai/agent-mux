@@ -84,4 +84,28 @@ describe('sessions-view selection + resume', () => {
     });
     expect(calls).toContainEqual({ type: 'view:switch', id: 'chat' });
   });
+
+  it('renders sessions from faster agents before slower listings finish', async () => {
+    const View = extractView();
+    const client = {
+      adapters: { list: () => [{ agent: 'claude-code' }, { agent: 'codex' }] },
+      sessions: {
+        list: vi.fn((agent: string) => {
+          if (agent === 'claude-code') {
+            return Promise.resolve([{ sessionId: 'sess-a' }]);
+          }
+          return new Promise((resolve) => setTimeout(() => resolve([{ sessionId: 'sess-b' }]), 100));
+        }),
+      },
+    } as unknown as Parameters<NonNullable<typeof SessionsViewPlugin>['register']>[0]['client'];
+    const stream = new EventStream();
+    const emit = vi.fn();
+    const { lastFrame, rerender } = render(
+      <View client={client} active={true} eventStream={stream} emit={emit} />,
+    );
+    await flush();
+    rerender(<View client={client} active={true} eventStream={stream} emit={emit} />);
+    expect(lastFrame()).toContain('sess-a');
+    expect(lastFrame()).not.toContain('No sessions found.');
+  });
 });

@@ -10,6 +10,8 @@
 import type { AgentName } from './types.js';
 import type { AdapterRegistry } from './adapter-registry.js';
 import { AgentMuxError } from './errors.js';
+import { telemetry } from '@a5c-ai/agent-mux-observability';
+import type { Span } from '@opentelemetry/api';
 
 // Re-export all auth types from the dedicated module
 export type {
@@ -71,19 +73,39 @@ export class AuthManagerImpl implements AuthManager {
   // -- check() -----------------------------------------------------------------
 
   async check(agent: AgentName): Promise<AuthState> {
+    const span = (telemetry as any).getTracer?.()?.startSpan(`auth.check.${agent}`);
     const adapter = this._getAdapter(agent);
-    const rawState = await adapter.detectAuth();
+    try {
+      const rawState = await adapter.detectAuth();
 
-    return {
-      agent,
-      status: rawState.status,
-      method: rawState.method as AuthMethod | undefined,
-      identity: rawState.identity,
-      expiresAt: rawState.expiresAt
-        ? (rawState.expiresAt instanceof Date ? rawState.expiresAt : new Date(rawState.expiresAt as string))
-        : undefined,
-      checkedAt: new Date(),
-    };
+      const state: AuthState = {
+        agent,
+        status: rawState.status,
+        method: rawState.method as AuthMethod | undefined,
+        identity: rawState.identity,
+        expiresAt: rawState.expiresAt
+          ? (rawState.expiresAt instanceof Date ? rawState.expiresAt : new Date(rawState.expiresAt as string))
+          : undefined,
+        checkedAt: new Date(),
+      };
+
+      if (span) {
+        span.setAttributes({
+          status: state.status,
+          method: state.method || 'unknown',
+        });
+        telemetry.endSpanSuccess(span);
+      }
+
+      telemetry.recordAuthEvent(agent, state.method || 'unknown', state.status === 'authenticated');
+
+      return state;
+    } catch (err: any) {
+      if (span) {
+        telemetry.endSpanError(span, err);
+      }
+      throw err;
+    }
   }
 
   // -- checkAll() --------------------------------------------------------------
