@@ -1,5 +1,14 @@
 # @a5c-ai/agent-mux
 
+## 0.4.0
+
+### Patch Changes
+
+- Updated dependencies [ee83281]
+  - @a5c-ai/agent-mux-adapters@0.4.0
+  - @a5c-ai/agent-mux-cli@0.4.0
+  - @a5c-ai/agent-mux-core@0.4.0
+
 ## 0.3.0
 
 ### Minor Changes
