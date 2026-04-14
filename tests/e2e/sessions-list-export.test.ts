@@ -34,10 +34,11 @@ describe('E2E: sessions list + export', () => {
       'sessions', 'list', 'nonexistent-agent', '--json',
     ]);
     expect(code).not.toBe(0);
-    // stdout or stderr in json mode contains the error envelope — we accept
-    // either channel since error printers may write to stderr.
-    const combined = (stdout + stderr).trim();
-    const parsed = JSON.parse(combined);
+    // Error envelopes may be emitted on either stream. Diagnostics can also
+    // appear on stderr, so prefer the stdout envelope and otherwise parse the
+    // final JSON object from stderr.
+    const stderrEnvelope = stderr.trim().match(/\{[\s\S]*\}\s*$/)?.[0];
+    const parsed = JSON.parse(stdout.trim() || stderrEnvelope || '');
     expect(parsed.ok).toBe(false);
     expect(typeof parsed.error.code).toBe('string');
   });
