@@ -7,7 +7,6 @@
  * @see 05-adapter-system.md §4
  */
 
-import { spawn } from 'node:child_process';
 import * as os from 'node:os';
 
 import type {
@@ -41,29 +40,9 @@ import type {
 } from '@a5c-ai/agent-mux-core';
 import { StreamAssembler } from '@a5c-ai/agent-mux-core';
 import { runInstall, runUpdate, type InstallContext } from './adapter-install.js';
+import { assembleCostRecord, defaultSpawner } from './base-adapter-helpers.js';
 
-/**
- * Default Spawner that runs the command via `child_process.spawn`, capturing
- * stdout/stderr. `shell: false`, `windowsHide: true`.
- */
-export const defaultSpawner: Spawner = (command, args, options) =>
-  new Promise((resolve, reject) => {
-    const child = spawn(command, args, {
-      stdio: ['ignore', 'pipe', 'pipe'],
-      shell: false,
-      windowsHide: true,
-      env: options?.env ? { ...process.env, ...options.env } : process.env,
-      cwd: options?.cwd,
-    });
-    let stdout = '';
-    let stderr = '';
-    child.stdout?.setEncoding('utf8');
-    child.stderr?.setEncoding('utf8');
-    child.stdout?.on('data', (c: string) => { stdout += c; });
-    child.stderr?.on('data', (c: string) => { stderr += c; });
-    child.on('error', (err) => reject(err));
-    child.on('exit', (code) => resolve({ code: code ?? 1, stdout, stderr }));
-  });
+export { defaultSpawner } from './base-adapter-helpers.js';
 
 /**
  * Abstract base class for subprocess-based agent adapters.
@@ -133,7 +112,6 @@ export abstract class BaseAgentAdapter implements SubprocessAdapter {
       stdin: prompt.endsWith('\n') ? prompt : `${prompt}\n`,
     };
   }
-
 
   // ── detectInstallation ────────────────────────────────────────────
 
@@ -310,39 +288,7 @@ export abstract class BaseAgentAdapter implements SubprocessAdapter {
    * standard CostRecord type.
    */
   protected assembleCostRecord(raw: unknown): CostRecord | null {
-    if (raw == null || typeof raw !== 'object') return null;
-
-    const obj = raw as Record<string, unknown>;
-
-    // Try common field names for total cost
-    const totalUsd = extractNumber(obj, ['totalUsd', 'total_usd', 'cost', 'total_cost', 'totalCost']) ?? 0;
-    const inputTokens = extractNumber(obj, ['inputTokens', 'input_tokens', 'prompt_tokens']) ?? 0;
-    const outputTokens = extractNumber(obj, ['outputTokens', 'output_tokens', 'completion_tokens']) ?? 0;
-    const thinkingTokens = extractNumber(obj, ['thinkingTokens', 'thinking_tokens', 'reasoning_tokens']);
-
-    // Granular cache token attribution (following ccusage/ai-usage pattern)
-    const cacheCreationTokens = extractNumber(obj, ['cacheCreationTokens', 'cache_creation_tokens', 'cache_write_tokens']);
-    const cacheReadTokens = extractNumber(obj, ['cacheReadTokens', 'cache_read_tokens', 'cache_read_input_tokens']);
-
-    // Legacy cached tokens (backward compatibility)
-    const cachedTokens = extractNumber(obj, ['cachedTokens', 'cached_tokens']) ??
-      ((cacheCreationTokens != null && cacheReadTokens != null) ? cacheCreationTokens + cacheReadTokens : undefined);
-
-    // Must have at least some recognizable data
-    if (totalUsd === 0 && inputTokens === 0 && outputTokens === 0) return null;
-
-    const record: CostRecord = {
-      totalUsd,
-      inputTokens,
-      outputTokens,
-    };
-
-    if (thinkingTokens != null) record.thinkingTokens = thinkingTokens;
-    if (cachedTokens != null) record.cachedTokens = cachedTokens;
-    if (cacheCreationTokens != null) record.cacheCreationTokens = cacheCreationTokens;
-    if (cacheReadTokens != null) record.cacheReadTokens = cacheReadTokens;
-
-    return record;
+    return assembleCostRecord(raw);
   }
 
   /**
@@ -571,27 +517,4 @@ export abstract class BaseAgentAdapter implements SubprocessAdapter {
     await fsp.writeFile(settingsPath, JSON.stringify(doc, null, 2) + '\n', 'utf8');
   }
 
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function extractNumber(
-  obj: Record<string, unknown>,
-  keys: string[],
-): number | undefined {
-  for (const key of keys) {
-    const val = obj[key];
-    if (typeof val === 'number' && Number.isFinite(val)) return val;
-    // Check nested objects
-    if (typeof val === 'object' && val !== null) {
-      const nested = val as Record<string, unknown>;
-      for (const nk of Object.keys(nested)) {
-        const nv = nested[nk];
-        if (typeof nv === 'number' && Number.isFinite(nv)) return nv;
-      }
-    }
-  }
-  return undefined;
 }

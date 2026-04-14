@@ -24,6 +24,7 @@ import { processTracker } from './process-tracker.js';
 import { DEFAULT_RETRY_POLICY } from './retry.js';
 import type { ErrorCode, RetryPolicy } from './types.js';
 import type { InvocationMode } from './invocation.js';
+import { ActiveSpawn, computeDelay, isWindows } from './spawn-runner-utils.js';
 import {
   buildInvocationCommand,
   runCleanupDetached,
@@ -35,20 +36,6 @@ export {
   type InvocationCommandWithCleanup,
   type K8sCleanup,
 } from './spawn-invocation.js';
-
-/** Internal: currently spawned child bound to a handle (for control methods). */
-interface ActiveSpawn {
-  child: ChildProcess;
-  killTimer: NodeJS.Timeout | null;
-}
-
-const isWindows = process.platform === 'win32';
-
-function computeDelay(policy: Required<RetryPolicy>, attempt: number): number {
-  const exp = Math.min(policy.maxDelayMs, policy.baseDelayMs * Math.pow(2, attempt - 1));
-  const jitter = exp * policy.jitterFactor * Math.random();
-  return Math.floor(exp + jitter);
-}
 
 /**
  * Start the spawn loop for the given handle. Returns immediately; all work
