@@ -4,6 +4,8 @@
  * @see docs/10-cli-reference.md Section 6
  */
 
+import * as path from 'node:path';
+
 import type { AgentMuxClient } from '@a5c-ai/agent-mux-core';
 import { AgentMuxError } from '@a5c-ai/agent-mux-core';
 import type { ParsedArgs } from '../parse-args.js';
@@ -262,12 +264,12 @@ export async function runCommand(client: AgentMuxClient, args: ParsedArgs): Prom
       }
     }
 
-    const result = await handle.result;
+    const result = await handle.result();
     if (jsonMode) {
       process.stdout.write(JSON.stringify({ type: 'run_result', ...result }) + '\n');
     }
 
-    return ExitCode.SUCCESS;
+    return runResultToExitCode(result);
   } catch (err: unknown) {
     if (err instanceof AgentMuxError) {
       if (jsonMode) {
@@ -285,6 +287,32 @@ export async function runCommand(client: AgentMuxClient, args: ParsedArgs): Prom
       printError(message);
     }
     return ExitCode.GENERAL_ERROR;
+  }
+}
+
+function runResultToExitCode(
+  result: { exitReason: string; error: { code: Parameters<typeof errorCodeToExitCode>[0] } | null },
+): number {
+  if (result.exitReason === 'completed') {
+    return ExitCode.SUCCESS;
+  }
+
+  if (result.error?.code) {
+    return errorCodeToExitCode(result.error.code);
+  }
+
+  switch (result.exitReason) {
+    case 'timeout':
+    case 'inactivity':
+      return ExitCode.TIMEOUT;
+    case 'aborted':
+    case 'interrupted':
+      return ExitCode.ABORTED;
+    case 'crashed':
+    case 'killed':
+      return ExitCode.AGENT_CRASHED;
+    default:
+      return ExitCode.GENERAL_ERROR;
   }
 }
 
@@ -306,14 +334,18 @@ function swapInMockAdapter(
 
   const mockBin = process.env['AMUX_MOCK_HARNESS_BIN'] ?? 'mock-harness';
   const scenarioName = scenario ?? `${agent}-basic`;
+  const mockExt = path.extname(mockBin).toLowerCase();
+  const launchWithNode = ['.js', '.mjs', '.cjs'].includes(mockExt);
 
   const wrapped = Object.create(original) as typeof original;
   wrapped.buildSpawnArgs = function mockBuildSpawnArgs(options: Parameters<typeof original.buildSpawnArgs>[0]) {
     const real = original.buildSpawnArgs(options);
     return {
       ...real,
-      command: mockBin,
-      args: ['--scenario', scenarioName, '--agent', agent],
+      command: launchWithNode ? process.execPath : mockBin,
+      args: launchWithNode
+        ? [mockBin, '--scenario', scenarioName, '--agent', agent]
+        : ['--scenario', scenarioName, '--agent', agent],
       usePty: false,
     };
   };

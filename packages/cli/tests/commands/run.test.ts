@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
+import { ExitCode } from '../../src/exit-codes.js';
 import { validateRunFlags, buildRunOptions, RUN_FLAGS, runCommand } from '../../src/commands/run.js';
 import { parseArgs } from '../../src/parse-args.js';
 
@@ -189,7 +190,7 @@ describe('runCommand', () => {
         calls.push(options);
         return {
           [Symbol.asyncIterator]: async function* () {},
-          result: Promise.resolve({ type: 'run_result', runId: 'r1', agent: 'claude', text: '', exitCode: 0, exitReason: 'completed', durationMs: 0, turnCount: 1 }),
+          result: () => Promise.resolve({ type: 'run_result', runId: 'r1', agent: 'claude', text: '', exitCode: 0, exitReason: 'completed', durationMs: 0, turnCount: 1 }),
         };
       }),
     } as unknown as Parameters<typeof runCommand>[0];
@@ -211,6 +212,101 @@ describe('runCommand', () => {
       (process.stdin as unknown as { isTTY: boolean | undefined }).isTTY = originalIsTTY;
       process.stdin.on = originalOn;
       process.stdin.setEncoding = originalSetEncoding;
+    }
+  });
+
+  it('returns a non-zero exit code when the run crashes', async () => {
+    const client = {
+      adapters: {
+        list: () => [{ agent: 'openclaw' }],
+      },
+      run: vi.fn(() => ({
+        [Symbol.asyncIterator]: async function* () {},
+        result: () => Promise.resolve({
+          type: 'run_result',
+          runId: 'r1',
+          agent: 'openclaw',
+          text: '',
+          exitCode: null,
+          exitReason: 'crashed',
+          durationMs: 0,
+          turnCount: 1,
+          error: {
+            code: 'SPAWN_ERROR',
+            message: 'spawn mock-harness EACCES',
+            stderr: '',
+            recoverable: false,
+          },
+        }),
+      })),
+    } as unknown as Parameters<typeof runCommand>[0];
+
+    const code = await runCommand(client, parseArgs(['run', 'openclaw', 'hello'], RUN_FLAGS));
+    expect(code).toBe(ExitCode.GENERAL_ERROR);
+  });
+
+  it('launches .js mock harness paths through node', async () => {
+    const originalMockBin = process.env['AMUX_MOCK_HARNESS_BIN'];
+    process.env['AMUX_MOCK_HARNESS_BIN'] = '/tmp/mock-harness.js';
+
+    const registry = new Map<string, any>([
+      ['openclaw', {
+        agent: 'openclaw',
+        buildSpawnArgs: () => ({
+          command: 'openclaw',
+          args: ['run'],
+          env: {},
+          cwd: process.cwd(),
+          usePty: false,
+        }),
+      }],
+    ]);
+
+    const client = {
+      adapters: {
+        list: () => [{ agent: 'openclaw' }],
+        get: (name: string) => registry.get(name),
+        unregister: (name: string) => void registry.delete(name),
+        register: (adapter: any) => void registry.set(adapter.agent, adapter),
+      },
+      run: vi.fn((options: Record<string, unknown>) => {
+        const adapter = registry.get(options['agent'] as string);
+        const spawnArgs = adapter.buildSpawnArgs(options);
+        expect(spawnArgs.command).toBe(process.execPath);
+        expect(spawnArgs.args).toEqual([
+          '/tmp/mock-harness.js',
+          '--scenario',
+          'openclaw-basic',
+          '--agent',
+          'openclaw',
+        ]);
+
+        return {
+          [Symbol.asyncIterator]: async function* () {},
+          result: () => Promise.resolve({
+            type: 'run_result',
+            runId: 'r2',
+            agent: 'openclaw',
+            text: '',
+            exitCode: 0,
+            exitReason: 'completed',
+            durationMs: 0,
+            turnCount: 1,
+            error: null,
+          }),
+        };
+      }),
+    } as unknown as Parameters<typeof runCommand>[0];
+
+    try {
+      const code = await runCommand(
+        client,
+        parseArgs(['run', 'openclaw', '--use-mock-harness', 'hello'], RUN_FLAGS),
+      );
+      expect(code).toBe(ExitCode.SUCCESS);
+    } finally {
+      if (originalMockBin === undefined) delete process.env['AMUX_MOCK_HARNESS_BIN'];
+      else process.env['AMUX_MOCK_HARNESS_BIN'] = originalMockBin;
     }
   });
 });
