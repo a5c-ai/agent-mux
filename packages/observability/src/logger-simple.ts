@@ -39,7 +39,7 @@ class SimpleLogger implements Logger {
       ...mergedContext,
     };
 
-    console.log(JSON.stringify(logEntry));
+    process.stderr.write(JSON.stringify(logEntry) + '\n');
   }
 
   trace(msgOrObj: string | object, msg?: string): void {

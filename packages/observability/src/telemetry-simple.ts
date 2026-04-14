@@ -4,6 +4,10 @@ import { Telemetry, CostInfo } from './types.js';
  * Simple telemetry implementation that logs metrics.
  */
 class SimpleTelemetryImpl implements Telemetry {
+  private emit(event: Record<string, unknown>): void {
+    process.stderr.write(JSON.stringify(event) + '\n');
+  }
+
   startRunSpan(_runId: string, _agent: string, _model?: string): null {
     return null;
   }
@@ -17,27 +21,27 @@ class SimpleTelemetryImpl implements Telemetry {
   }
 
   recordRunStart(agent: string, model?: string): void {
-    console.log(JSON.stringify({
+    this.emit({
       timestamp: new Date().toISOString(),
       event: 'run_start',
       agent,
       model: model || 'unknown',
-    }));
+    });
   }
 
   recordRunComplete(agent: string, model: string | undefined, duration: number, cost?: CostInfo): void {
-    console.log(JSON.stringify({
+    this.emit({
       timestamp: new Date().toISOString(),
       event: 'run_complete',
       agent,
       model: model || 'unknown',
       duration,
       cost,
-    }));
+    });
   }
 
   recordRunError(agent: string, model: string | undefined, error: Error | string, cost?: CostInfo): void {
-    console.log(JSON.stringify({
+    this.emit({
       timestamp: new Date().toISOString(),
       event: 'run_error',
       agent,
@@ -45,27 +49,27 @@ class SimpleTelemetryImpl implements Telemetry {
       error_type: error instanceof Error ? error.constructor.name : 'unknown',
       error_message: error instanceof Error ? error.message : error,
       cost,
-    }));
+    });
   }
 
   recordToolCall(toolName: string, duration: number, success: boolean): void {
-    console.log(JSON.stringify({
+    this.emit({
       timestamp: new Date().toISOString(),
       event: 'tool_call',
       tool: toolName,
       duration,
       status: success ? 'success' : 'error',
-    }));
+    });
   }
 
   recordAuthEvent(agent: string, method: string, success: boolean): void {
-    console.log(JSON.stringify({
+    this.emit({
       timestamp: new Date().toISOString(),
       event: 'auth_event',
       agent,
       method,
       status: success ? 'success' : 'failure',
-    }));
+    });
   }
 
   endSpanSuccess(_span: unknown, _attributes?: Record<string, string | number | boolean>): void {

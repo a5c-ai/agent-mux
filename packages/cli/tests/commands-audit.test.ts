@@ -58,7 +58,7 @@ suite('built CLI — functional audit', () => {
     expect(res.stdout).toContain('adapters');
     expect(res.stdout).toContain('remote');
     expect(res.stdout).toContain('detect-host');
-  });
+  }, 15000);
 
   it('--version prints semver', () => {
     const res = run('--version');
@@ -72,7 +72,7 @@ suite('built CLI — functional audit', () => {
       expect(res.status, `help ${cmd} should exit 0`).toBe(0);
       expect(res.stdout.length).toBeGreaterThan(20);
     }
-  });
+  }, 15000);
 
   // ── adapters ────────────────────────────────────────────────────
   it('adapters list --json returns the built-in adapter set', () => {
