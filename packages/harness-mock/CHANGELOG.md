@@ -1,5 +1,11 @@
 # @a5c-ai/agent-mux-harness-mock
 
+## 0.4.0
+
+### Patch Changes
+
+- @a5c-ai/agent-mux-core@0.4.0
+
 ## 0.3.0
 
 ### Minor Changes

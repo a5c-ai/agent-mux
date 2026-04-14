@@ -1,5 +1,7 @@
 # @a5c-ai/agent-mux-core
 
+## 0.4.0
+
 ## 0.3.0
 
 ### Minor Changes

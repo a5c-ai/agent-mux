@@ -1,5 +1,11 @@
 # @a5c-ai/agent-mux-tui
 
+## 0.4.1
+
+### Patch Changes
+
+- @a5c-ai/agent-mux@0.4.0
+
 ## 0.4.0
 
 ### Minor Changes

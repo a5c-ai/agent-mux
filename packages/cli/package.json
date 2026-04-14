@@ -1,6 +1,6 @@
 {
   "name": "@a5c-ai/agent-mux-cli",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "type": "module",
   "license": "MIT",
   "description": "CLI binary (amux) for agent-mux",
@@ -51,8 +51,8 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@a5c-ai/agent-mux-core": "0.3.0",
-    "@a5c-ai/agent-mux-adapters": "0.3.0",
+    "@a5c-ai/agent-mux-core": "0.4.0",
+    "@a5c-ai/agent-mux-adapters": "0.4.0",
     "@a5c-ai/agent-mux-observability": "*"
   }
 }
