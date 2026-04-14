@@ -83,12 +83,11 @@ then perform the same research and analysis as mentioned above for these new ref
 - when dragging files into the terminal while in the chat view, the full file path should be added to the prompt input where the cursor is, but the display should show only the file name with an emoji (based on file type) to prevent overwhelming the chat view with long file paths. 
 
 in the sdk and tui (end to end tasks):
-- message queueing / steering - append message to the conversation during a run, after the next tool call or next agent response is received, to steer the conversation in a certain direction. this can be used to provide additional context or information to the agent, or to correct its course if it's going off track. (investigate openai/codex queue/steering feature - its open sourced Or gemini - has it too):
+- message queueing / steering - append message to the conversation during a run, after the next tool call or next agent response is received (or when turn finishes if only queueing is supported), to steer the conversation in a certain direction. this can be used to provide additional context or information to the agent, or to correct its course if it's going off track. (investigate openai/codex queue/steering feature - its open sourced Or claude-code - has it too):
 
 sdk only:
-[ ] capabilities detections and matrixes - research, document and extend sdk:
+[x] capabilities detections and matrixes - research, document and extend sdk:
 - capability discovery for steering and/or queueing capabilities for interactive and non-interactive mode per adapter (matrix of 16 modes: interactive/non-interactive × jsonl supported x stream/non-stream x streering/queueing supported) per adapter
-- capability discovery for jsonl stream AND non-stream for interactive and non-interactive mode (matrix of 8 modes: interactive/non-interactive × jsonl supported x stream/non-stream) per adapter 
+- capability discovery for jsonl stream AND non-stream for interactive and non-interactive mode (matrix of 8 modes: interactive/non-interactive × jsonl supported x stream/non-stream) per adapter    
 - capability discovery for async loop tools per adapter (harness - claude-code likely to have this capability, but we should research for other harnesses as well)
-
 ---

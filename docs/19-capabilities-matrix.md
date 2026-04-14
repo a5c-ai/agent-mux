@@ -29,6 +29,44 @@ Legend: ✓ supported · · not supported · ~ partial / virtual-only.
 | Cost events            | ✓ | ✓ | ✓ | · | ~ | ~ | ~ | · | · | · | · | ~ | ~ |
 | Invocation modes       | local, docker, ssh, k8s — all adapters (chosen per-run via `RunOptions.invocation`). |
 
+## Advanced Orchestration & Streaming Modes
+
+This matrix covers the detailed discovery for how each adapter handles streaming, interactivity, and queueing across the 16 mode combinations (Interactive/Non-Interactive × JSONL/Text × Stream/Non-Stream).
+
+### Execution Modes
+
+| Mode | Format | Stream | claude | codex | gemini | copilot | cursor | opencode | opencode-http | openclaw | hermes | pi | omp | qwen | agent-mux-remote |
+|:---:|:---:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
+| **Interactive** | Text | **Stream** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| | Text | **Non-Str** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| | JSONL | **Stream** | ✓ | ✓ | · | · | · | · | · | · | · | · | · | · | ~ |
+| | JSONL | **Non-Str** | ✓ | · | · | · | · | · | · | · | · | · | · | · | ~ |
+| **Non-Interactive** | Text | **Stream** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| | Text | **Non-Str** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| | JSONL | **Stream** | ✓ | ✓ | · | · | · | · | · | · | · | · | · | · | ~ |
+| | JSONL | **Non-Str** | ✓ | · | · | · | · | · | · | · | · | · | · | · | ~ |
+
+### Steering & Queueing Support
+
+Steering (injecting messages mid-run) and Queueing (queuing async messages) capabilities depend on the execution mode selected above.
+
+| Feature / Mode | Format | Stream | claude | codex | gemini | copilot | cursor | opencode | opencode-http | openclaw | hermes | pi | omp | qwen | agent-mux-remote |
+|:---:|:---:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
+| **Steering** (Interactive) | Text | **Stream** | ✓ | ✓ | ✓ | · | · | · | · | · | · | · | · | · | ~ |
+| | Text | **Non-Str** | ✓ | ✓ | ✓ | · | · | · | · | · | · | · | · | · | ~ |
+| | JSONL | **Stream** | ✓ | ✓ | · | · | · | · | · | · | · | · | · | · | ~ |
+| | JSONL | **Non-Str** | ✓ | · | · | · | · | · | · | · | · | · | · | · | ~ |
+| **Queueing** (Interactive) | Text | **Stream** | · | ✓ | ✓ | · | · | · | · | · | · | · | · | · | ~ |
+| | Text | **Non-Str** | · | ✓ | ✓ | · | · | · | · | · | · | · | · | · | ~ |
+| | JSONL | **Stream** | · | ✓ | · | · | · | · | · | · | · | · | · | · | ~ |
+| | JSONL | **Non-Str** | · | · | · | · | · | · | · | · | · | · | · | · | ~ |
+
+*(Non-Interactive support matches the Interactive table above identically for Steering and Queueing)*
+
+| Feature / Agent               | claude | codex | gemini | copilot | cursor | opencode | opencode-http | openclaw | hermes | pi | omp | qwen | agent-mux-remote |
+|-------------------------------|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
+| **Async Loop Tools**          | ✓ | · | · | · | · | · | · | · | · | · | · | · | ~ |
+
 ## How this is derived
 
 Each adapter declares `AgentCapabilities` (see

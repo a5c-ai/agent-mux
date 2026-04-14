@@ -50,6 +50,9 @@ export interface PluginInstallOptions {
 
   /** Registry to install from. */
   registry?: string;
+
+  /** Install globally (true) vs. project-local (false). */
+  global?: boolean;
 }
 
 /** Plugin search options (placeholder for Phase 9). */
