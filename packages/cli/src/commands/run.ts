@@ -316,6 +316,24 @@ function runResultToExitCode(
   }
 }
 
+const MOCK_SCENARIO_ALIASES: Record<string, string> = {
+  'claude-basic': 'claude:basic-text',
+  'codex-basic': 'codex:basic-text',
+  'gemini-basic': 'gemini:basic-text',
+  'copilot-basic': 'copilot:basic-text',
+  'cursor-basic': 'cursor:basic-text',
+  'opencode-basic': 'opencode:basic-text',
+  'pi-basic': 'pi:basic-text',
+  'omp-basic': 'omp:basic-text',
+  'openclaw-basic': 'openclaw:basic-text',
+  'hermes-basic': 'hermes:basic-text',
+};
+
+function resolveMockScenarioName(agent: string, scenario: string | undefined): string {
+  const requested = scenario ?? `${agent}-basic`;
+  return MOCK_SCENARIO_ALIASES[requested] ?? requested;
+}
+
 /**
  * Replace the target agent's registered adapter with a wrapper whose
  * `buildSpawnArgs` redirects the spawn to the `mock-harness` binary.
@@ -333,7 +351,7 @@ function swapInMockAdapter(
   if (!original) return;
 
   const mockBin = process.env['AMUX_MOCK_HARNESS_BIN'] ?? 'mock-harness';
-  const scenarioName = scenario ?? `${agent}-basic`;
+  const scenarioName = resolveMockScenarioName(agent, scenario);
   const mockExt = path.extname(mockBin).toLowerCase();
   const launchWithNode = ['.js', '.mjs', '.cjs'].includes(mockExt);
 

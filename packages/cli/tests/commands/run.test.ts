@@ -276,7 +276,7 @@ describe('runCommand', () => {
         expect(spawnArgs.args).toEqual([
           '/tmp/mock-harness.js',
           '--scenario',
-          'openclaw-basic',
+          'openclaw:basic-text',
           '--agent',
           'openclaw',
         ]);
