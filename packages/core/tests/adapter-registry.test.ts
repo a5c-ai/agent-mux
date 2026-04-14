@@ -3,6 +3,7 @@ import { AdapterRegistryImpl } from '../src/index.js';
 import type {
   AgentAdapter,
   AgentCapabilities,
+  DetectInstallationResult,
   ModelCapabilities,
 } from '../src/index.js';
 
@@ -85,12 +86,18 @@ function createMockModel(agent: string, modelId: string, alias?: string): ModelC
 function createMockAdapter(
   agent: string,
   displayName: string,
-  opts?: { models?: ModelCapabilities[]; defaultModelId?: string },
+  opts?: {
+    models?: ModelCapabilities[];
+    defaultModelId?: string;
+    detectInstallation?: () => Promise<DetectInstallationResult>;
+    minVersion?: string;
+  },
 ): AgentAdapter {
   return {
     agent,
     displayName,
     cliCommand: agent,
+    minVersion: opts?.minVersion,
     capabilities: createMockCapabilities(agent),
     models: opts?.models ?? [createMockModel(agent, `${agent}-default`)],
     defaultModelId: opts?.defaultModelId,
@@ -116,6 +123,7 @@ function createMockAdapter(
     listSessionFiles: async () => [],
     readConfig: async () => ({}),
     writeConfig: async () => {},
+    detectInstallation: opts?.detectInstallation,
   };
 }
 
@@ -289,6 +297,26 @@ describe('AdapterRegistryImpl', () => {
       expect(result).not.toBeNull();
       expect(result!.agent).toBe('test');
       expect(result!.authState).toBe('unknown');
+    });
+
+    it('includes installation metadata from detectInstallation()', async () => {
+      registry.register(createMockAdapter('test', 'Test', {
+        minVersion: '1.2.0',
+        detectInstallation: async () => ({
+          installed: true,
+          path: '/resolved/test',
+          version: '1.3.0',
+        }),
+      }));
+
+      const result = await registry.detect('test');
+
+      expect(result).not.toBeNull();
+      expect(result!.installed).toBe(true);
+      expect(result!.cliPath).toBe('/resolved/test');
+      expect(result!.version).toBe('1.3.0');
+      expect(result!.meetsMinVersion).toBe(true);
+      expect(result!.minVersion).toBe('1.2.0');
     });
 
     it('caches results for 30 seconds', async () => {

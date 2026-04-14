@@ -94,4 +94,43 @@ describe('startSpawnLoop stdin transport', () => {
 
     child.emit('exit', 0, null);
   });
+
+  it('prefers detected executable path when spawning a bare cli command', async () => {
+    const child = new FakeChild();
+    spawnMock.mockReturnValue(child);
+
+    const handle = new RunHandleImpl({ runId: 'run-3', agent: 'codex' });
+    const adapter = {
+      agent: 'codex',
+      cliCommand: 'codex',
+      capabilities: { supportsStdinInjection: false },
+      detectInstallation: async () => ({
+        installed: true,
+        path: '/resolved/bin/codex',
+      }),
+      buildSpawnArgs: () => ({
+        command: 'codex',
+        args: ['exec'],
+        env: {},
+        cwd: process.cwd(),
+        usePty: false,
+      }),
+      parseEvent: () => null,
+    } as any;
+
+    startSpawnLoop(handle, adapter, { agent: 'codex', prompt: 'go' } as any);
+    await Promise.resolve();
+    await Promise.resolve();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(spawnMock).toHaveBeenCalledWith(
+      '/resolved/bin/codex',
+      ['exec'],
+      expect.objectContaining({
+        cwd: process.cwd(),
+      }),
+    );
+
+    child.emit('exit', 0, null);
+  });
 });

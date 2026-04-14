@@ -13,7 +13,7 @@
 
 import { spawn, type ChildProcess } from 'node:child_process';
 
-import type { AgentAdapter, ParseContext, SpawnArgs } from './adapter.js';
+import type { AgentAdapter, ParseContext } from './adapter.js';
 import type { AgentEvent } from './events.js';
 import type { RunOptions } from './run-options.js';
 import { AgentMuxError } from './errors.js';
@@ -24,18 +24,9 @@ import { processTracker } from './process-tracker.js';
 import { DEFAULT_RETRY_POLICY } from './retry.js';
 import type { ErrorCode, RetryPolicy } from './types.js';
 import type { InvocationMode } from './invocation.js';
-import { ActiveSpawn, computeDelay, isWindows } from './spawn-runner-utils.js';
-import {
-  buildInvocationCommand,
-  runCleanupDetached,
-  type InvocationCommandWithCleanup,
-} from './spawn-invocation.js';
-export {
-  buildInvocationCommand,
-  type InvocationCommand,
-  type InvocationCommandWithCleanup,
-  type K8sCleanup,
-} from './spawn-invocation.js';
+import { ActiveSpawn, computeDelay, isWindows, resolveSpawnArgs } from './spawn-runner-utils.js';
+import { buildInvocationCommand, runCleanupDetached, type InvocationCommandWithCleanup } from './spawn-invocation.js';
+export { buildInvocationCommand, type InvocationCommand, type InvocationCommandWithCleanup, type K8sCleanup } from './spawn-invocation.js';
 
 /**
  * Start the spawn loop for the given handle. Returns immediately; all work
@@ -57,31 +48,29 @@ export function startSpawnLoop(
 
   const attemptSpawn = (): void => {
     attempt += 1;
-    try {
-      runOnce(handle, adapter, options, (terminalCode, exitReason, exitCode, signal) => {
-        if (
-          enableRetry &&
-          attempt < policy.maxAttempts &&
-          terminalCode !== null &&
-          retryOn.has(terminalCode)
-        ) {
-          const delay = computeDelay(policy, attempt);
-          handle.emit({
-            type: 'retry',
-            runId: handle.runId,
-            agent: handle.agent,
-            timestamp: Date.now(),
-            attempt: attempt + 1,
-            maxAttempts: policy.maxAttempts,
-            reason: terminalCode,
-            delayMs: delay,
-          });
-          setTimeout(attemptSpawn, delay);
-          return;
-        }
-        handle.complete(exitReason, exitCode, signal);
-      });
-    } catch (err) {
+    void runOnce(handle, adapter, options, (terminalCode, exitReason, exitCode, signal) => {
+      if (
+        enableRetry &&
+        attempt < policy.maxAttempts &&
+        terminalCode !== null &&
+        retryOn.has(terminalCode)
+      ) {
+        const delay = computeDelay(policy, attempt);
+        handle.emit({
+          type: 'retry',
+          runId: handle.runId,
+          agent: handle.agent,
+          timestamp: Date.now(),
+          attempt: attempt + 1,
+          maxAttempts: policy.maxAttempts,
+          reason: terminalCode,
+          delayMs: delay,
+        });
+        setTimeout(attemptSpawn, delay);
+        return;
+      }
+      handle.complete(exitReason, exitCode, signal);
+    }).catch((err) => {
       handle.emit({
         type: 'error',
         runId: handle.runId,
@@ -92,7 +81,7 @@ export function startSpawnLoop(
         recoverable: false,
       });
       handle.complete('crashed', null, null);
-    }
+    });
   };
 
   // Defer to microtask so the synchronous RunHandle return happens first.
@@ -106,13 +95,13 @@ type FinalizeFn = (
   signal: string | null,
 ) => void;
 
-function runOnce(
+async function runOnce(
   handle: RunHandleImpl,
   adapter: AgentAdapter,
   options: RunOptions,
   finalize: FinalizeFn,
-): void {
-  const spawnArgs = adapter.buildSpawnArgs(options);
+): Promise<void> {
+  const spawnArgs = await resolveSpawnArgs(adapter, adapter.buildSpawnArgs(options));
   const now = Date.now();
 
   // Transform the spawnArgs according to the configured invocation mode.

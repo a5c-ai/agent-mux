@@ -61,6 +61,32 @@ interface DetectCacheEntry {
   expiresAt: number;
 }
 
+function parseVersionParts(version: string): number[] | null {
+  const match = version.match(/\d+(?:\.\d+)*/);
+  if (!match) return null;
+
+  return match[0].split('.').map((part) => Number.parseInt(part, 10));
+}
+
+function meetsMinVersion(version: string | null, minVersion: string | undefined): boolean {
+  if (!minVersion) return true;
+  if (!version) return false;
+
+  const actual = parseVersionParts(version);
+  const required = parseVersionParts(minVersion);
+  if (!actual || !required) return false;
+
+  const len = Math.max(actual.length, required.length);
+  for (let i = 0; i < len; i += 1) {
+    const actualPart = actual[i] ?? 0;
+    const requiredPart = required[i] ?? 0;
+    if (actualPart > requiredPart) return true;
+    if (actualPart < requiredPart) return false;
+  }
+
+  return true;
+}
+
 // ---------------------------------------------------------------------------
 // AdapterRegistryImpl
 // ---------------------------------------------------------------------------
@@ -130,13 +156,20 @@ export class AdapterRegistryImpl implements AdapterRegistry {
       // Detection failure is not fatal
     }
 
+    const installation = typeof adapter.detectInstallation === 'function'
+      ? await adapter.detectInstallation().catch(() => null)
+      : null;
+
+    const version = installation?.version ?? null;
+    const minVersion = adapter.minVersion ?? '';
+
     const info: InstalledAgentInfo = {
       agent: adapter.agent,
-      installed: false,
-      cliPath: null,
-      version: null,
-      meetsMinVersion: !adapter.minVersion,
-      minVersion: adapter.minVersion ?? '',
+      installed: installation?.installed ?? false,
+      cliPath: installation?.path ?? null,
+      version,
+      meetsMinVersion: meetsMinVersion(version, adapter.minVersion),
+      minVersion,
       authState,
       activeModel: adapter.defaultModelId ?? null,
     };
