@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { validateRunFlags, buildRunOptions, RUN_FLAGS } from '../../src/commands/run.js';
+import { describe, it, expect, vi } from 'vitest';
+import { validateRunFlags, buildRunOptions, RUN_FLAGS, runCommand } from '../../src/commands/run.js';
 import { parseArgs } from '../../src/parse-args.js';
 
 describe('validateRunFlags', () => {
@@ -63,6 +63,34 @@ describe('buildRunOptions', () => {
     const result = buildRunOptions(args, agents);
     expect(result.agent).toBe('claude');
     expect(result.prompt).toBe('hello');
+  });
+
+  it('uses --prompt flag for prompt text', () => {
+    const args = parseArgs(['run', '--agent', 'claude', '--prompt', 'hello flag'], RUN_FLAGS);
+    const result = buildRunOptions(args, agents);
+    expect(result.agent).toBe('claude');
+    expect(result.prompt).toBe('hello flag');
+  });
+
+  it('still resolves a positional agent when --prompt is used', () => {
+    const args = parseArgs(['run', 'claude', '--prompt', 'hello flag'], RUN_FLAGS);
+    const result = buildRunOptions(args, agents);
+    expect(result.agent).toBe('claude');
+    expect(result.prompt).toBe('hello flag');
+  });
+
+  it('marks runs non-interactive only when --prompt and --non-interactive are both set', () => {
+    const args = parseArgs(['run', '--agent', 'claude', '--prompt', 'hello flag', '--non-interactive'], RUN_FLAGS);
+    const result = buildRunOptions(args, agents);
+    expect(result.prompt).toBe('hello flag');
+    expect(result.options['nonInteractive']).toBe(true);
+  });
+
+  it('does not mark positional prompts as non-interactive', () => {
+    const args = parseArgs(['run', '--agent', 'claude', '--non-interactive', 'hello positional'], RUN_FLAGS);
+    const result = buildRunOptions(args, agents);
+    expect(result.prompt).toBe('hello positional');
+    expect(Object.prototype.hasOwnProperty.call(result.options, 'nonInteractive')).toBe(false);
   });
 
   it('maps --yolo to approvalMode', () => {
@@ -142,5 +170,47 @@ describe('buildRunOptions', () => {
     const result = buildRunOptions(args, agents);
     expect(Object.prototype.hasOwnProperty.call(result.options, 'temperature')).toBe(false);
     expect(Object.prototype.hasOwnProperty.call(result.options, 'topP')).toBe(false);
+  });
+});
+
+
+describe('runCommand', () => {
+  it('reads a piped prompt from stdin when no explicit prompt is provided', async () => {
+    const originalIsTTY = process.stdin.isTTY;
+    const originalOn = process.stdin.on.bind(process.stdin);
+    const originalSetEncoding = process.stdin.setEncoding.bind(process.stdin);
+
+    const calls: Array<Record<string, unknown>> = [];
+    const client = {
+      adapters: {
+        list: () => [{ agent: 'claude' }],
+      },
+      run: vi.fn((options: Record<string, unknown>) => {
+        calls.push(options);
+        return {
+          [Symbol.asyncIterator]: async function* () {},
+          result: Promise.resolve({ type: 'run_result', runId: 'r1', agent: 'claude', text: '', exitCode: 0, exitReason: 'completed', durationMs: 0, turnCount: 1 }),
+        };
+      }),
+    } as unknown as Parameters<typeof runCommand>[0];
+
+    (process.stdin as unknown as { isTTY: boolean }).isTTY = false;
+    process.stdin.setEncoding = (() => process.stdin) as typeof process.stdin.setEncoding;
+    process.stdin.on = ((event: string, handler: (...args: unknown[]) => void) => {
+      if (event === 'data') handler('prompt from pipe');
+      if (event === 'end') handler();
+      return process.stdin;
+    }) as typeof process.stdin.on;
+
+    try {
+      const code = await runCommand(client, parseArgs(['run', 'claude'], RUN_FLAGS));
+      expect(code).toBe(0);
+      expect(calls).toHaveLength(1);
+      expect(calls[0]?.['prompt']).toBe('prompt from pipe');
+    } finally {
+      (process.stdin as unknown as { isTTY: boolean | undefined }).isTTY = originalIsTTY;
+      process.stdin.on = originalOn;
+      process.stdin.setEncoding = originalSetEncoding;
+    }
   });
 });

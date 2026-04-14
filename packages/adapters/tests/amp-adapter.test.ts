@@ -101,7 +101,7 @@ describe.skip('AmpAdapter', () => {
   });
 
   describe('buildSpawnArgs', () => {
-    it('builds basic chat command', () => {
+    it('builds an interactive chat command by default', () => {
       const options: RunOptions = {
         agent: 'amp',
         prompt: 'Hello, world!',
@@ -113,9 +113,22 @@ describe.skip('AmpAdapter', () => {
       expect(spawnArgs.args).toContain('--output');
       expect(spawnArgs.args).toContain('jsonl');
       expect(spawnArgs.args).toContain('--stream');
+      expect(spawnArgs.args).not.toContain('--headless');
+      expect(spawnArgs.args).not.toContain('--prompt');
+      expect(spawnArgs.stdin).toBe('Hello, world!\n');
+    });
+
+    it('uses headless --prompt mode only when explicitly non-interactive', () => {
+      const spawnArgs = adapter.buildSpawnArgs({
+        agent: 'amp',
+        prompt: 'Hello, world!',
+        nonInteractive: true,
+      });
+
       expect(spawnArgs.args).toContain('--headless');
       expect(spawnArgs.args).toContain('--prompt');
       expect(spawnArgs.args).toContain('Hello, world!');
+      expect(spawnArgs.stdin).toBeUndefined();
     });
 
     it('builds resume command with session ID', () => {

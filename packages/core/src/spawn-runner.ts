@@ -16,6 +16,8 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import type { AgentAdapter, ParseContext, SpawnArgs } from './adapter.js';
 import type { AgentEvent } from './events.js';
 import type { RunOptions } from './run-options.js';
+import { AgentMuxError } from './errors.js';
+
 import { RunHandleImpl } from './run-handle-impl.js';
 import { StreamAssembler } from './stream-assembler.js';
 import { processTracker } from './process-tracker.js';
@@ -288,7 +290,7 @@ function runOnce(
   pipeStream(child.stdout, 'stdout');
   pipeStream(child.stderr, 'stderr');
 
-  // ── Interaction channel -> stdin ────────────────────────────────────────
+  // ── Interaction channel + send() -> stdin ───────────────────────────────
   handle.interaction.setDispatch(async (_id, response) => {
     if (!child.stdin || child.stdin.destroyed) return;
     let text = '';
@@ -302,10 +304,28 @@ function runOnce(
     }
   });
 
+  const originalSend = handle.send.bind(handle);
+  handle.send = async (text: string) => {
+    await originalSend(text);
+    if (!adapter.capabilities.supportsStdinInjection) {
+      throw new AgentMuxError('STDIN_NOT_AVAILABLE', `${adapter.agent} does not support stdin injection`, false);
+    }
+    if (!child.stdin || child.stdin.destroyed) {
+      throw new AgentMuxError('STDIN_NOT_AVAILABLE', 'Agent stdin is not available', false);
+    }
+    try {
+      child.stdin.write(text.endsWith('\n') ? text : `${text}\n`);
+    } catch {
+      throw new AgentMuxError('STDIN_NOT_AVAILABLE', 'Failed to write to agent stdin', false);
+    }
+  };
+
   // Optional initial stdin from SpawnArgs.
   if (spawnArgs.stdin && child.stdin) {
     child.stdin.write(spawnArgs.stdin);
-    child.stdin.end();
+    if (options.nonInteractive === true) {
+      child.stdin.end();
+    }
   }
 
   // ── Timeouts ─────────────────────────────────────────────────────────────

@@ -223,12 +223,9 @@ export class DroidAdapter extends BaseAgentAdapter {
       args.push('--cwd', options.cwd);
     }
 
-    // Headless mode for non-interactive usage
-    args.push('--headless');
-
-    // Add the prompt
-    if (options.prompt) {
-      const prompt = Array.isArray(options.prompt) ? options.prompt.join('\n') : options.prompt;
+    const { prompt, stdin } = this.buildPromptTransport(options);
+    if (stdin === undefined) {
+      args.push('--headless');
       args.push('--prompt', prompt);
     }
 
@@ -240,6 +237,7 @@ export class DroidAdapter extends BaseAgentAdapter {
         ...options.env,
       },
       cwd: options.cwd,
+      stdin,
     };
   }
 

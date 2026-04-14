@@ -134,8 +134,13 @@ export class HermesAdapter extends BaseAgentAdapter {
       args.push('--auto-approve');
     }
 
-    const prompt = Array.isArray(options.prompt) ? options.prompt.join('\n') : options.prompt;
-    args.push('--prompt', prompt);
+    args.push('--output-format', 'jsonl');
+
+
+    const { prompt, stdin } = this.buildPromptTransport(options);
+    if (stdin === undefined) {
+      args.push('--prompt', prompt);
+    }
 
     return {
       command: this.cliCommand,
@@ -143,6 +148,7 @@ export class HermesAdapter extends BaseAgentAdapter {
       env: this.buildEnvFromOptions(options),
       cwd: options.cwd ?? process.cwd(),
       usePty: false,
+      stdin,
       timeout: options.timeout,
       inactivityTimeout: options.inactivityTimeout,
     };

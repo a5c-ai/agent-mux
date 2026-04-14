@@ -207,8 +207,9 @@ amux run [<agent>] [<prompt>] [flags...]
 Both `<agent>` and `<prompt>` are optional positional arguments:
 
 - If `<agent>` is omitted, the default agent from config is used (`GlobalConfig.defaultAgent` or `--agent` global flag).
-- If `<prompt>` is omitted and stdin is not a TTY, the prompt is read from stdin (see Section 14).
-- If `<prompt>` is omitted and stdin is a TTY and `--interactive` is not set, the CLI prints an error and exits with code 2.
+- If `--prompt` / `-p` is provided, it supplies the initial prompt and takes precedence over positional prompt text.
+- If no explicit prompt is provided and stdin is not a TTY, the prompt is read from stdin (see Section 14).
+- If no explicit prompt is provided and stdin is a TTY and `--interactive` is not set, the CLI prints an error and exits with code 2.
 - If both are provided as positionals, the first argument is parsed as an agent name if it matches a registered adapter; otherwise, the entire positional is treated as the prompt and the default agent is used.
 
 ### 6.2 Flags
@@ -234,6 +235,8 @@ Both `<agent>` and `<prompt>` are optional positional arguments:
 | `--system-mode` | -- | `string` | `prepend` | `systemPromptMode` | System prompt mode: `prepend`, `append`, `replace`. |
 | `--cwd` | -- | `string` | `process.cwd()` | `cwd` | Working directory for the agent subprocess. Must be an absolute path to an existing directory. |
 | `--env` | -- | `string` | -- | `env` | Environment variable in `KEY=VALUE` format. Repeatable. |
+| `--prompt` | `-p` | `string` | -- | -- | Initial prompt text. Equivalent to the positional `<prompt>`, but unambiguous in scripts. |
+| `--non-interactive` | -- | `boolean` | `false` | `nonInteractive: true` | Force headless one-shot harness mode. Harness prompt flags are only used when this is paired with `--prompt`. |
 | `--yolo` | -- | `boolean` | -- | `approvalMode: 'yolo'` | Auto-approve all tool calls and file operations. |
 | `--deny` | -- | `boolean` | -- | `approvalMode: 'deny'` | Auto-deny all actions requiring approval. |
 | `--timeout` | -- | `number` | `0` | `timeout` | Run timeout in milliseconds. 0 disables. |
@@ -286,21 +289,22 @@ This matches the resolution order defined in `02-run-options-and-profiles.md`, S
 ### 6.5 Behavior
 
 1. The CLI calls `createClient()` with global flag overrides.
-2. Resolves the prompt from positional args or stdin.
+2. Resolves the initial prompt from `--prompt`, positional args, or stdin.
 3. Constructs `RunOptions` from flags, profile, and config.
 4. Calls `mux.run(options)` to obtain a `RunHandle`.
-5. Consumes events from the `RunHandle`:
+5. By default, the initial prompt is delivered to stdin-capable harnesses over stdin so the harness stays interactive. When `--prompt` and `--non-interactive` are both set, agent-mux instead uses the harness's one-shot prompt flag/path.
+6. Consumes events from the `RunHandle`:
    - **Human mode**: prints text deltas to stdout, tool calls and thinking to stderr.
    - **JSONL mode** (`--json`): writes each `AgentEvent` as one JSON line to stdout.
    - **Quiet mode** (`-q`): suppresses everything except the final `message_stop` text.
-6. On `approval_request` events (when `approvalMode` is `'prompt'` and not `--yolo`/`--deny`):
+7. On `approval_request` events (when `approvalMode` is `'prompt'` and not `--yolo`/`--deny`):
    - **Interactive terminal**: prompts the user on stderr, reads response from stdin.
    - **Non-interactive** (pipe, no TTY): auto-denies with a warning to stderr.
-7. On `input_required` events:
+8. On `input_required` events:
    - **Interactive terminal**: prompts on stderr, reads from stdin.
    - **Non-interactive**: emits the event in JSONL mode; otherwise errors.
-8. Awaits `RunResult`. Prints cost summary to stderr (unless `--quiet`).
-9. Exits with the appropriate exit code (see Section 4).
+9. Awaits `RunResult`. Prints cost summary to stderr (unless `--quiet`).
+10. Exits with the appropriate exit code (see Section 4).
 
 ### 6.6 API Mapping
 

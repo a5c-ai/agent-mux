@@ -118,6 +118,23 @@ export abstract class BaseAgentAdapter implements SubprocessAdapter {
     this._spawner = spawner;
   }
 
+  protected normalizePrompt(prompt: string | string[]): string {
+    return Array.isArray(prompt) ? prompt.join('\n') : prompt;
+  }
+
+  protected buildPromptTransport(options: RunOptions): { prompt: string; stdin?: string } {
+    const prompt = this.normalizePrompt(options.prompt);
+    if (options.nonInteractive === true || !this.capabilities.supportsStdinInjection) {
+      return { prompt };
+    }
+
+    return {
+      prompt,
+      stdin: prompt.endsWith('\n') ? prompt : `${prompt}\n`,
+    };
+  }
+
+
   // ── detectInstallation ────────────────────────────────────────────
 
   /**

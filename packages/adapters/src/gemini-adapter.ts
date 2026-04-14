@@ -157,8 +157,10 @@ export class GeminiAdapter extends BaseAgentAdapter {
       args.push('--sandbox', 'false');
     }
 
-    const prompt = Array.isArray(options.prompt) ? options.prompt.join('\n') : options.prompt;
-    args.push('--prompt', prompt);
+    const { prompt, stdin } = this.buildPromptTransport(options);
+    if (stdin === undefined) {
+      args.push('--prompt', prompt);
+    }
 
     return {
       command: this.cliCommand,
@@ -166,6 +168,7 @@ export class GeminiAdapter extends BaseAgentAdapter {
       env: this.buildEnvFromOptions(options),
       cwd: options.cwd ?? process.cwd(),
       usePty: false,
+      stdin,
       timeout: options.timeout,
       inactivityTimeout: options.inactivityTimeout,
     };

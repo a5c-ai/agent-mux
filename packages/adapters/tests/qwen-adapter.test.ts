@@ -62,24 +62,34 @@ describe('QwenAdapter', () => {
   });
 
   describe('buildSpawnArgs', () => {
-    it('builds basic spawn args with --prompt', () => {
+    it('sends the initial prompt over stdin by default', () => {
       const r = adapter.buildSpawnArgs({ agent: 'qwen', prompt: 'hi' });
       expect(r.command).toBe('qwen');
+      expect(r.args).not.toContain('--prompt');
+      expect(r.stdin).toBe('hi\n');
+    });
+
+    it('uses --prompt only for explicit non-interactive runs', () => {
+      const r = adapter.buildSpawnArgs({ agent: 'qwen', prompt: 'hi', nonInteractive: true });
       expect(r.args).toContain('--prompt');
       expect(r.args).toContain('hi');
+      expect(r.stdin).toBeUndefined();
     });
+
     it('includes --model flag when provided', () => {
       const r = adapter.buildSpawnArgs({ agent: 'qwen', prompt: 'hi', model: 'qwen3-coder-flash' });
       expect(r.args).toContain('--model');
       expect(r.args).toContain('qwen3-coder-flash');
     });
+
     it('adds --yolo in yolo mode', () => {
       const r = adapter.buildSpawnArgs({ agent: 'qwen', prompt: 'hi', approvalMode: 'yolo' });
       expect(r.args).toContain('--yolo');
     });
-    it('joins array prompts with newlines', () => {
+
+    it('joins array prompts with newlines before writing stdin', () => {
       const r = adapter.buildSpawnArgs({ agent: 'qwen', prompt: ['a', 'b'] });
-      expect(r.args).toContain('a\nb');
+      expect(r.stdin).toBe('a\nb\n');
     });
   });
 

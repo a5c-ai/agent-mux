@@ -182,11 +182,11 @@ export class AmpAdapter extends BaseAgentAdapter {
       args.push('--cwd', options.cwd);
     }
 
-    // Headless mode
-    args.push('--headless');
-
-    // User prompt (last)
-    args.push('--prompt', options.prompt);
+    const { prompt, stdin } = this.buildPromptTransport(options);
+    if (stdin === undefined) {
+      args.push('--headless');
+      args.push('--prompt', prompt);
+    }
 
     return {
       command: this.cliCommand,
@@ -196,6 +196,7 @@ export class AmpAdapter extends BaseAgentAdapter {
         ...process.env,
         ...options.env,
       },
+      stdin,
     };
   }
 

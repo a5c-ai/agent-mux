@@ -12,6 +12,9 @@ import { flagStr, flagNum, flagBool, flagArr } from '../parse-args.js';
 import { ExitCode, errorCodeToExitCode } from '../exit-codes.js';
 import { printError, printJsonError } from '../output.js';
 
+import { readStdin } from '../read-stdin.js';
+
+
 /** Run-specific flag definitions. */
 export const RUN_FLAGS: Record<string, FlagDef> = {
   'stream': { type: 'boolean' },
@@ -44,6 +47,8 @@ export const RUN_FLAGS: Record<string, FlagDef> = {
   'mcp-server': { type: 'string', repeatable: true },
   'project-id': { type: 'string' },
   'profile': { type: 'string' },
+  'prompt': { short: 'p', type: 'string' },
+  'non-interactive': { type: 'boolean' },
   'interactive': { short: 'i', type: 'boolean' },
   'quiet': { short: 'q', type: 'boolean' },
   'no-stream': { type: 'boolean' },
@@ -82,17 +87,19 @@ export function buildRunOptions(
 ): { agent?: string; prompt?: string; options: Record<string, unknown> } {
   const { flags, positionals } = args;
 
-  // Resolve agent and prompt from positionals
-  // If first positional matches a registered agent, it's the agent; else it's part of the prompt
+  // Resolve agent and prompt from flags/positionals.
+
   let agent = flagStr(flags, 'agent');
-  let prompt: string | undefined;
+  const promptFlag = flagStr(flags, 'prompt');
+  let prompt: string | undefined = promptFlag;
 
   if (positionals.length >= 1) {
-    if (!agent && registeredAgents.has(positionals[0]!)) {
+    const positionalAgent = !agent && registeredAgents.has(positionals[0]!);
+    if (positionalAgent) {
       agent = positionals[0];
-      prompt = positionals.slice(1).join(' ') || undefined;
-    } else {
-      prompt = positionals.join(' ');
+    }
+    if (prompt === undefined) {
+      prompt = positionalAgent ? positionals.slice(1).join(' ') || undefined : positionals.join(' ');
     }
   }
 
@@ -159,6 +166,7 @@ export function buildRunOptions(
     agentsDoc: flagStr(flags, 'agents-doc'),
     projectId: flagStr(flags, 'project-id'),
     profile: flagStr(flags, 'profile'),
+    nonInteractive: flagBool(flags, 'non-interactive') === true && promptFlag !== undefined ? true : undefined,
   };
 
   // Remove undefined entries
@@ -193,6 +201,11 @@ export async function runCommand(client: AgentMuxClient, args: ParsedArgs): Prom
   const agentNames = new Set(adapters.map((a) => a.agent));
 
   const { agent, prompt, options } = buildRunOptions(args, agentNames);
+  const explicitPrompt = prompt ?? (options['prompt'] as string | undefined);
+  const stdinPrompt = explicitPrompt === undefined && process.stdin.isTTY === false
+    ? await readStdin()
+    : undefined;
+  const resolvedPrompt = explicitPrompt ?? (stdinPrompt && stdinPrompt.trim() ? stdinPrompt : undefined);
 
   if (!agent && !options['agent']) {
     if (jsonMode) {
@@ -203,16 +216,13 @@ export async function runCommand(client: AgentMuxClient, args: ParsedArgs): Prom
     return ExitCode.USAGE_ERROR;
   }
 
-  if (!prompt && !options['prompt']) {
-    // Check stdin
-    if (process.stdin.isTTY !== false) {
-      if (jsonMode) {
-        printJsonError('VALIDATION_ERROR', 'No prompt specified. Provide a prompt argument or pipe via stdin.');
-      } else {
-        printError('No prompt specified. Provide a prompt argument or pipe via stdin.');
-      }
-      return ExitCode.USAGE_ERROR;
+  if (!resolvedPrompt) {
+    if (jsonMode) {
+      printJsonError('VALIDATION_ERROR', 'No prompt specified. Provide a prompt argument or pipe via stdin.');
+    } else {
+      printError('No prompt specified. Provide a prompt argument or pipe via stdin.');
     }
+    return ExitCode.USAGE_ERROR;
   }
 
   const useMock =
@@ -231,7 +241,7 @@ export async function runCommand(client: AgentMuxClient, args: ParsedArgs): Prom
   try {
     const runOpts = {
       agent: agent ?? (options['agent'] as string),
-      prompt: prompt ?? '',
+      prompt: resolvedPrompt,
       ...options,
     };
 

@@ -87,6 +87,8 @@ Flags:
   --system-mode <mode>         prepend, append, replace
   --cwd <path>                 Working directory
   --env KEY=VALUE              Environment variable (repeatable)
+  --prompt, -p <text>          Initial prompt text
+  --non-interactive            Force headless one-shot harness mode (with --prompt)
   --yolo                       Auto-approve all tool calls
   --deny                       Auto-deny all approval requests
   --timeout <ms>               Run timeout in milliseconds

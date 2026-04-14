@@ -116,6 +116,9 @@ export interface RunOptions {
   /** Output format. */
   outputFormat?: 'text' | 'json' | 'jsonl';
 
+  /** Force headless one-shot prompt delivery instead of stdin-driven interactive transport. */
+  nonInteractive?: boolean;
+
   // --- Environment ---
 
   /** Working directory for the agent process. Must be an absolute path. */

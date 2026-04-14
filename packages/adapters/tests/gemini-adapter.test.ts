@@ -78,15 +78,27 @@ describe('GeminiAdapter', () => {
   });
 
   describe('buildSpawnArgs', () => {
-    it('builds basic spawn args', () => {
+    it('sends the initial prompt over stdin by default', () => {
       const result = adapter.buildSpawnArgs({
         agent: 'gemini',
         prompt: 'Explain this code',
       });
 
       expect(result.command).toBe('gemini');
+      expect(result.args).not.toContain('--prompt');
+      expect(result.stdin).toBe('Explain this code\n');
+    });
+
+    it('uses --prompt only for explicit non-interactive runs', () => {
+      const result = adapter.buildSpawnArgs({
+        agent: 'gemini',
+        prompt: 'Explain this code',
+        nonInteractive: true,
+      });
+
       expect(result.args).toContain('--prompt');
       expect(result.args).toContain('Explain this code');
+      expect(result.stdin).toBeUndefined();
     });
 
     it('includes model flag', () => {

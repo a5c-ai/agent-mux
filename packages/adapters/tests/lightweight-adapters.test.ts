@@ -40,6 +40,50 @@ describe('lightweight adapter parity', () => {
         expect(typeof args.env).toBe('object');
       });
 
+      it('uses the correct initial prompt transport', () => {
+        const args = adapter.buildSpawnArgs({ agent: name as never, prompt: 'hi', cwd: process.cwd() });
+
+        if (name === 'copilot') {
+          expect(args.stdin).toBeUndefined();
+          expect(args.args).toEqual(['copilot', 'suggest', 'hi']);
+          return;
+        }
+
+        if (name === 'cursor') {
+          expect(args.stdin).toBeUndefined();
+          expect(args.args).toContain('--prompt');
+          expect(args.args).toContain('hi');
+          return;
+        }
+
+        if (name === 'pi' || name === 'omp' || name === 'openclaw' || name === 'hermes') {
+          expect(args.args).not.toContain('--prompt');
+          expect(args.stdin).toBe('hi\n');
+        }
+      });
+
+      it('preserves explicit non-interactive prompt args where supported', () => {
+        const args = adapter.buildSpawnArgs({
+          agent: name as never,
+          prompt: 'hi',
+          cwd: process.cwd(),
+          nonInteractive: true,
+        });
+
+        if (name === 'pi' || name === 'omp' || name === 'openclaw' || name === 'hermes') {
+          expect(args.args).toContain('--prompt');
+          expect(args.args).toContain('hi');
+          expect(args.stdin).toBeUndefined();
+        }
+      });
+
+      it('keeps Hermes in JSONL mode for parseEvent', () => {
+        if (name !== 'hermes') return;
+        const args = adapter.buildSpawnArgs({ agent: name as never, prompt: 'hi', cwd: process.cwd() });
+        expect(args.args).toContain('--output-format');
+        expect(args.args).toContain('jsonl');
+      });
+
       it('sessionDir returns a non-empty path', () => {
         const d = adapter.sessionDir();
         expect(typeof d).toBe('string');

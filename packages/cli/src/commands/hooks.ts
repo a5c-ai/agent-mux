@@ -31,6 +31,9 @@ import {
   printTable,
 } from '../output.js';
 
+import { readStdin } from '../read-stdin.js';
+
+
 export const HOOKS_FLAGS: Record<string, FlagDef> = {
   handler: { type: 'string' },
   target: { type: 'string' },
@@ -235,16 +238,3 @@ async function handle(
   return exitCode;
 }
 
-function readStdin(): Promise<string> {
-  return new Promise((resolve) => {
-    if (process.stdin.isTTY) {
-      resolve('');
-      return;
-    }
-    let buf = '';
-    process.stdin.setEncoding('utf8');
-    process.stdin.on('data', (d) => (buf += d));
-    process.stdin.on('end', () => resolve(buf));
-    process.stdin.on('error', () => resolve(buf));
-  });
-}
