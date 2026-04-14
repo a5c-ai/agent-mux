@@ -13,9 +13,30 @@ interface Row {
   fullPath: string;
 }
 
+
+function findProjectRoot(startDir = process.cwd()) {
+  const path = require('node:path');
+  const fs = require('node:fs');
+  let current = path.resolve(startDir);
+  while (true) {
+    if (
+      fs.existsSync(path.join(current, '.git')) ||
+      fs.existsSync(path.join(current, '.a5c')) ||
+      fs.existsSync(path.join(current, '.claude.json')) ||
+      fs.existsSync(path.join(current, '.claude'))
+    ) {
+      return current;
+    }
+    const parent = path.dirname(current);
+    if (parent === current) return startDir;
+    current = parent;
+  }
+}
+
 function buildRegistry(): Record<string, { global: string; project: string }> {
   const HOME = os.homedir() || '.';
   return {
+    'claude-code': { global: path.join(HOME, '.claude', 'skills'), project: path.join('.claude', 'skills') },
     claude: { global: path.join(HOME, '.claude', 'skills'), project: path.join('.claude', 'skills') },
     codex: { global: path.join(HOME, '.codex', 'skills'), project: path.join('.codex', 'skills') },
     cursor: { global: path.join(HOME, '.cursor', 'skills'), project: path.join('.cursor', 'skills') },
@@ -40,7 +61,7 @@ function scan(): Row[] {
     for (const name of readDir(paths.global)) {
       all.push({ agent, scope: 'global', name, dir: paths.global, fullPath: path.join(paths.global, name) });
     }
-    const proj = path.isAbsolute(paths.project) ? paths.project : path.join(process.cwd(), paths.project);
+    const proj = path.isAbsolute(paths.project) ? paths.project : path.join(findProjectRoot(), paths.project);
     for (const name of readDir(proj)) {
       all.push({ agent, scope: 'project', name, dir: proj, fullPath: path.join(proj, name) });
     }

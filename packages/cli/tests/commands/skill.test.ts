@@ -25,6 +25,7 @@ beforeEach(() => {
   tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'amux-skill-'));
   prevCwd = process.cwd();
   process.chdir(tmp);
+  fs.mkdirSync(path.join(tmp, '.a5c'));
 });
 
 afterEach(() => {
