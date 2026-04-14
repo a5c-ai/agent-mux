@@ -430,7 +430,7 @@ export class DroidAdapter extends BaseAgentAdapter {
     return mcpInstallPlugin(this.settingsPath(), pluginId, options);
   }
 
-  async uninstallPlugin(pluginId: string): Promise<void> {
+  async uninstallPlugin(pluginId: string, options?: { global?: boolean }): Promise<void> {
     return mcpUninstallPlugin(this.settingsPath(), pluginId);
   }
 }

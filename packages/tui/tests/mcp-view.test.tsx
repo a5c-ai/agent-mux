@@ -31,10 +31,10 @@ describe('mcp-view', () => {
     const stream = new EventStream();
     const client = {
       adapters: { list: () => [{ agent: 'claude-code' }, { agent: 'codex' }] },
-      config: {
-        getMcpServers: vi.fn((agent: string) =>
+      plugins: {
+        list: vi.fn(async (agent: string) =>
           agent === 'claude-code'
-            ? [{ name: 'filesystem' }, { name: 'github' }]
+            ? [{ pluginId: 'filesystem', enabled: true }, { pluginId: 'github', enabled: true }]
             : [],
         ),
       },
@@ -57,7 +57,7 @@ describe('mcp-view', () => {
     const stream = new EventStream();
     const client = {
       adapters: { list: () => [{ agent: 'claude-code' }] },
-      config: { getMcpServers: vi.fn(() => []) },
+      plugins: { list: vi.fn(async () => []) },
     } as never;
     const { lastFrame, rerender } = render(
       <View client={client} active={true} eventStream={stream} emit={() => {}} />,

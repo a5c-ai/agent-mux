@@ -69,9 +69,9 @@ then perform the same research and analysis as mentioned above for these new ref
 [ ] - improve user experience and find and resolve all ux bugs and issues in tui.
 [ ] - find and resolve all bugs in sdk. 
 [x] - system bug: sessions not showing in sessions view for discovered installed agents (claude, codex, etc.) 
-[ ] - skills are not showing the correct skills for claude code. also only shows global skills and not repo specific skills (where the amux is currently running)
-[ ] - plugins not showing (although i have installed plugins for many harnesses) 
-[ ] - MCP servers not showing (although i have installed mcp servers) -also include global/repo local distinction here as well.
+[x] - skills are not showing the correct skills for claude code. also only shows global skills and not repo specific skills (where the amux is currently running)
+[x] - plugins not showing (although i have installed plugins for many harnesses) 
+[x] - MCP servers not showing (although i have installed mcp servers) -also include global/repo local distinction here as well.
 [x] - fix harnesses use of -p / --prompts (which makes the run non-interactive, we want it to be interactive by default, communicating the first (or next) prompts using stdin/stdout.) use -p / --prompts ONLY for non-interactive invocations (through OUR cli when called with --prompt flag AND --non-interactive) - partially done.
 [ ] - tui usability:
 - escape in chat should go back to menu (an keep prompt for later if the user continues typeing in the chat view)

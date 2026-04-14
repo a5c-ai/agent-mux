@@ -27,6 +27,7 @@ import {
   parseJsonlSessionFile,
   readJsonFile,
   writeJsonFileAtomic,
+  findProjectRootSync,
 } from './session-fs.js';
 
 export class ClaudeAdapter extends BaseAgentAdapter {
@@ -416,22 +417,26 @@ export class ClaudeAdapter extends BaseAgentAdapter {
    * `{ command, args?, env? }` body. We treat the server id as the pluginId
    * and surface an InstalledPlugin for each one.
    */
-  private settingsPath(): string {
-    return path.join(os.homedir(), '.claude', 'settings.json');
+  private settingsPaths(): Record<string, string> {
+    const HOME = os.homedir() || '.';
+    return {
+      global: path.join(HOME, '.claude', 'settings.json'),
+      project: path.join(findProjectRootSync(), '.claude', 'settings.json'),
+    };
   }
 
   override async listPlugins(): Promise<InstalledPlugin[]> {
-    return mcpListPlugins(this.settingsPath());
+    return mcpListPlugins(this.settingsPaths());
   }
 
   override async installPlugin(
     pluginId: string,
     options?: PluginInstallOptions,
   ): Promise<InstalledPlugin> {
-    return mcpInstallPlugin(this.settingsPath(), pluginId, options);
+    return mcpInstallPlugin(this.settingsPaths(), pluginId, options);
   }
 
-  override async uninstallPlugin(pluginId: string): Promise<void> {
-    return mcpUninstallPlugin(this.settingsPath(), pluginId);
+  override async uninstallPlugin(pluginId: string, options?: { global?: boolean }): Promise<void> {
+    return mcpUninstallPlugin(this.settingsPaths(), pluginId, options);
   }
 }

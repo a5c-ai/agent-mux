@@ -15,6 +15,26 @@ import { writeFileAtomic, writeJsonAtomic } from '@a5c-ai/agent-mux-core';
  * Returns absolute paths with forward slashes.
  * If `dir` does not exist, returns an empty array.
  */
+
+import * as syncFs from 'node:fs';
+
+export function findProjectRootSync(startDir = process.cwd()): string {
+  let current = path.resolve(startDir);
+  while (true) {
+    if (
+      syncFs.existsSync(path.join(current, '.git')) ||
+      syncFs.existsSync(path.join(current, '.a5c')) ||
+      syncFs.existsSync(path.join(current, '.claude.json')) ||
+      syncFs.existsSync(path.join(current, '.claude'))
+    ) {
+      return current;
+    }
+    const parent = path.dirname(current);
+    if (parent === current) return startDir;
+    current = parent;
+  }
+}
+
 export async function listFilesRecursive(
   dir: string,
   predicate: (entryName: string, fullPath: string) => boolean,

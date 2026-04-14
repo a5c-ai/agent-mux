@@ -84,7 +84,7 @@ export class PluginManagerImpl implements PluginManager {
     return result as unknown as InstalledPlugin;
   }
 
-  async uninstall(agent: AgentName, pluginId: string): Promise<void> {
+  async uninstall(agent: AgentName, pluginId: string, options?: { global?: boolean }): Promise<void> {
     const adapter = this.assertPluginCapable(agent);
     if (!adapter.uninstallPlugin) {
       throw new AgentMuxError(
@@ -92,7 +92,7 @@ export class PluginManagerImpl implements PluginManager {
         `Agent '${agent}' does not implement uninstallPlugin`,
       );
     }
-    await adapter.uninstallPlugin(pluginId);
+    await adapter.uninstallPlugin(pluginId, options);
   }
 
   async update(agent: AgentName, pluginId: string): Promise<InstalledPlugin> {

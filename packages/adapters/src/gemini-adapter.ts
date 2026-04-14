@@ -29,6 +29,7 @@ import {
   parseJsonlSessionFile,
   readJsonFile,
   writeJsonFileAtomic,
+  findProjectRootSync,
 } from './session-fs.js';
 
 export class GeminiAdapter extends BaseAgentAdapter {
@@ -335,7 +336,7 @@ export class GeminiAdapter extends BaseAgentAdapter {
     return mcpInstallPlugin(this.pluginsPath(), pluginId, options);
   }
 
-  override async uninstallPlugin(pluginId: string): Promise<void> {
+  override async uninstallPlugin(pluginId: string, options?: { global?: boolean }): Promise<void> {
     return mcpUninstallPlugin(this.pluginsPath(), pluginId);
   }
 }

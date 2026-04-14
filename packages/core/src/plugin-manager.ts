@@ -50,7 +50,7 @@ export interface PluginManager {
    * @throws {AgentMuxError} With code `'AGENT_NOT_FOUND'` if agent is not registered.
    * @throws {AgentMuxError} With code `'PLUGIN_ERROR'` if uninstallation fails.
    */
-  uninstall(agent: AgentName, pluginId: string): Promise<void>;
+  uninstall(agent: AgentName, pluginId: string, options?: { global?: boolean }): Promise<void>;
 
   /**
    * Update a single installed plugin to its latest version.

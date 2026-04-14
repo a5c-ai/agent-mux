@@ -48,14 +48,27 @@ export async function mcpCommand(
   try {
     switch (subcommand) {
       case 'list': {
-        const servers = client.config.getMcpServers(agentName as never);
+        const plugins = await client.plugins.list(agentName as never);
+        const servers = plugins.filter(p => p.format === 'mcp-server' || !p.format);
         if (servers.length === 0) {
           process.stdout.write('(no MCP servers installed)\n');
           return ExitCode.SUCCESS;
         }
         for (const server of servers) {
           const status = 'enabled'; // MCP servers are enabled by default
-          process.stdout.write(`${server.name}\t${status}\t${server.command}\n`);
+          const s = server as { pluginId: string; scope?: string; command?: string; args?: string[]; env?: Record<string, string> };
+          
+          let cmdStr = s.command ?? '';
+          if (s.args && s.args.length > 0) cmdStr += ' ' + s.args.join(' ');
+          
+          let envStr = '';
+          if (s.env && Object.keys(s.env).length > 0) {
+            envStr = Object.entries(s.env).map(([k, v]) => `${k}=${v}`).join(' ');
+          }
+          
+          const scopeStr = s.scope ? `[${s.scope}]` : '';
+          const displayStr = [s.pluginId, status, scopeStr, cmdStr, envStr].filter(Boolean).join('\t');
+          process.stdout.write(`${displayStr}\n`);
         }
         return ExitCode.SUCCESS;
       }
@@ -65,14 +78,7 @@ export async function mcpCommand(
           printError('Missing required argument: <server>');
           return ExitCode.GENERAL_ERROR;
         }
-        // Create a basic MCP server config - in a real implementation this would
-        // likely look up the server in a registry to get the proper command
-        const serverConfig = {
-          name: serverName,
-          transport: 'stdio' as const,
-          command: serverName, // Basic implementation - assumes command matches name
-        };
-        await client.config.addMcpServer(agentName as never, serverConfig);
+        await client.plugins.install(agentName as never, serverName, { global: isGlobal });
         process.stdout.write(`installed: ${serverName} (${isGlobal ? 'global' : 'project'})\n`);
         return ExitCode.SUCCESS;
       }
@@ -82,7 +88,7 @@ export async function mcpCommand(
           printError('Missing required argument: <server>');
           return ExitCode.GENERAL_ERROR;
         }
-        await client.config.removeMcpServer(agentName as never, serverToRemove);
+        await client.plugins.uninstall(agentName as never, serverToRemove, { global: args.flags.global as boolean | undefined });
         process.stdout.write(`uninstalled: ${serverToRemove}\n`);
         return ExitCode.SUCCESS;
       }

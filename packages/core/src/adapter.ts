@@ -358,7 +358,7 @@ export interface AgentAdapter {
 
   listPlugins?(): Promise<InstalledPlugin[]>;
   installPlugin?(pluginId: string, options?: PluginInstallOptions): Promise<InstalledPlugin>;
-  uninstallPlugin?(pluginId: string): Promise<void>;
+  uninstallPlugin?(pluginId: string, options?: { global?: boolean }): Promise<void>;
   searchPlugins?(query: string, options?: PluginSearchOptions): Promise<PluginListing[]>;
 }
 

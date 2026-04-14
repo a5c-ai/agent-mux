@@ -7,6 +7,8 @@ interface Row {
   pluginId: string;
   enabled: boolean;
   error?: string;
+  scope?: string;
+  command?: string;
 }
 
 function McpView({ client, active }: TuiViewProps) {
@@ -31,12 +33,16 @@ function McpView({ client, active }: TuiViewProps) {
         const all: Row[] = [];
         for (const a of client.adapters.list()) {
           try {
-            const cfg = client.config as unknown as { getMcpServers?: (agent: string) => Array<{ name: string; command?: string }> };
-            const servers = cfg.getMcpServers?.(a.agent) ?? [];
-            for (const s of servers) all.push({ agent: a.agent, pluginId: s.name, enabled: true });
+            const list = await client.plugins.list(a.agent);
+            for (const p of list) {
+              const rec = p as { pluginId: string; enabled: boolean; format?: string; scope?: string; command?: string; args?: string[] };
+              if (rec.format === 'mcp-server' || !rec.format) {
+                const cmdStr = [rec.command, ...(rec.args || [])].filter(Boolean).join(' ');
+                all.push({ agent: a.agent, pluginId: rec.pluginId, enabled: rec.enabled, scope: rec.scope, command: cmdStr });
+              }
+            }
           } catch (e) {
-            const msg = (e as Error).message ?? String(e);
-            all.push({ agent: a.agent, pluginId: '(error)', enabled: false, error: msg });
+            // adapter might not support plugin list
           }
         }
         setRows(all);
@@ -65,6 +71,8 @@ function McpView({ client, active }: TuiViewProps) {
           <Text color="cyan">{r.agent.padEnd(14)}</Text>{' '}
           <Text>{r.pluginId}</Text>
           {r.enabled ? <Text color="green"> ✓</Text> : <Text dimColor> (disabled)</Text>}
+          {r.scope ? <Text dimColor> [{r.scope}]</Text> : null}
+          {r.command ? <Text dimColor> {r.command}</Text> : null}
           {r.error ? <Text color="red"> {r.error}</Text> : null}
         </Text>
       ))}

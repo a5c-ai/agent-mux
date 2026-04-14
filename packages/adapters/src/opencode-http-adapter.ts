@@ -391,7 +391,7 @@ export class OpenCodeHttpAdapter extends BaseRemoteAdapter {
     return mcpInstallPlugin(this.pluginsPath(), pluginId, options);
   }
 
-  async uninstallPlugin(pluginId: string): Promise<void> {
+  async uninstallPlugin(pluginId: string, options?: { global?: boolean }): Promise<void> {
     return mcpUninstallPlugin(this.pluginsPath(), pluginId);
   }
 

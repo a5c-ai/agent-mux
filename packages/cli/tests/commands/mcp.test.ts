@@ -15,6 +15,11 @@ describe('mcp command', () => {
         addMcpServer: vi.fn(),
         removeMcpServer: vi.fn(),
       },
+      plugins: {
+        list: vi.fn().mockResolvedValue([]),
+        install: vi.fn(),
+        uninstall: vi.fn(),
+      },
     } as unknown as AgentMuxClient;
     mockArgs = {
       command: 'mcp',

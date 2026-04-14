@@ -28,29 +28,46 @@ async function writeConfig(configPath: string, doc: Record<string, unknown>): Pr
   await fsp.writeFile(configPath, JSON.stringify(doc, null, 2) + '\n', 'utf8');
 }
 
-export async function mcpListPlugins(configPath: string): Promise<InstalledPlugin[]> {
-  const doc = await readConfig(configPath);
-  const servers = (doc['mcpServers'] && typeof doc['mcpServers'] === 'object'
-    ? (doc['mcpServers'] as Record<string, unknown>)
-    : {});
-  return Object.keys(servers).map((id) => ({
-    pluginId: id,
-    name: id,
-    version: '0.0.0',
-    enabled: true,
-  }));
+export async function mcpListPlugins(configPaths: string | Record<string, string>): Promise<InstalledPlugin[]> {
+  const paths = typeof configPaths === 'string' ? { global: configPaths } : configPaths;
+  const plugins: Record<string, InstalledPlugin & { scope?: string }> = {};
+  
+  // Read in order so project can override global (or vice versa, but usually project wins)
+  for (const [scope, configPath] of Object.entries(paths)) {
+    const doc = await readConfig(configPath);
+    const servers = doc['mcpServers'] && typeof doc['mcpServers'] === 'object'
+      ? doc['mcpServers']
+      : {};
+    for (const [id, def] of Object.entries(servers)) {
+      plugins[id] = {
+        ...(typeof def === 'object' && def !== null ? def : {}),
+        pluginId: id,
+        name: id,
+        version: '0.0.0',
+        enabled: true,
+        scope, // Adding non-standard scope property to help TUI/CLI differentiate
+      } as any;
+    }
+  }
+  return Object.values(plugins);
 }
 
 export async function mcpInstallPlugin(
-  configPath: string,
+  configPaths: string | Record<string, string>,
   pluginId: string,
   options?: PluginInstallOptions,
 ): Promise<InstalledPlugin> {
   if (!pluginId) throw new Error('pluginId is required');
+  
+  const paths = typeof configPaths === 'string' ? { global: configPaths } : configPaths;
+  const scope = options?.global === false ? 'project' : 'global';
+  const configPath = paths[scope] || paths['global'];
+  if (!configPath) throw new Error('No config path available for scope: ' + scope);
+
   const doc = await readConfig(configPath);
-  const servers = (doc['mcpServers'] && typeof doc['mcpServers'] === 'object'
-    ? { ...(doc['mcpServers'] as Record<string, unknown>) }
-    : {}) as Record<string, unknown>;
+  const servers = doc['mcpServers'] && typeof doc['mcpServers'] === 'object'
+    ? { ...(doc['mcpServers']) }
+    : {};
   servers[pluginId] = { command: pluginId };
   doc['mcpServers'] = servers;
   await writeConfig(configPath, doc);
@@ -59,16 +76,36 @@ export async function mcpInstallPlugin(
     name: pluginId,
     version: options?.version ?? '0.0.0',
     enabled: true,
-  };
+    scope,
+  } as any;
 }
 
-export async function mcpUninstallPlugin(configPath: string, pluginId: string): Promise<void> {
-  const doc = await readConfig(configPath);
-  const servers = (doc['mcpServers'] && typeof doc['mcpServers'] === 'object'
-    ? { ...(doc['mcpServers'] as Record<string, unknown>) }
-    : {}) as Record<string, unknown>;
-  if (!(pluginId in servers)) return;
-  delete servers[pluginId];
-  doc['mcpServers'] = servers;
-  await writeConfig(configPath, doc);
+export async function mcpUninstallPlugin(
+  configPaths: string | Record<string, string>,
+  pluginId: string,
+  options?: { global?: boolean },
+): Promise<void> {
+  const paths = typeof configPaths === 'string' ? { global: configPaths } : configPaths;
+  
+  // If no scope specified, check both, starting with project
+  const scopes = options && options.global !== undefined 
+    ? [options.global ? 'global' : 'project'] 
+    : ['project', 'global'];
+
+  for (const scope of scopes) {
+    const configPath = paths[scope];
+    if (!configPath) continue;
+    
+    const doc = await readConfig(configPath);
+    const servers = doc['mcpServers'] && typeof doc['mcpServers'] === 'object'
+      ? { ...(doc['mcpServers']) }
+      : {};
+    if (pluginId in servers) {
+      delete servers[pluginId];
+      doc['mcpServers'] = servers;
+      await writeConfig(configPath, doc);
+      // Remove from first matching scope only unless we want to clean all
+      return;
+    }
+  }
 }

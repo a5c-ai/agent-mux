@@ -288,7 +288,7 @@ describe('PluginManagerImpl', () => {
 
       await manager.uninstall('opencode', 'my-plugin');
 
-      expect(uninstallPlugin).toHaveBeenCalledWith('my-plugin');
+      expect(uninstallPlugin).toHaveBeenCalledWith('my-plugin', undefined);
     });
 
     it('throws PLUGIN_ERROR when adapter has no uninstallPlugin', async () => {

@@ -7,6 +7,7 @@ interface Row {
   pluginName: string;
   enabled?: boolean;
   version?: string;
+  scope?: string;
 }
 
 function PluginsView({ client, active }: TuiViewProps) {
@@ -21,28 +22,17 @@ function PluginsView({ client, active }: TuiViewProps) {
           try {
             const list = await client.plugins.list(a.agent);
             for (const p of list) {
-              const rec = p as { name?: string; pluginName?: string; pluginId?: string; enabled?: boolean; version?: string };
+              const rec = p as { name?: string; pluginName?: string; pluginId?: string; enabled?: boolean; version?: string; scope?: string };
               all.push({
                 agent: a.agent,
                 pluginName: rec.name ?? rec.pluginName ?? rec.pluginId ?? '(unknown)',
                 enabled: rec.enabled,
                 version: rec.version,
+                scope: rec.scope,
               });
             }
           } catch {
             // adapter may not support plugin listing — skip
-          }
-          // Also surface MCP servers from the native config (most adapters
-          // don't implement listPlugins(), so this is where users' actual
-          // plugin state lives: ~/.claude.json, ~/.codex/config.toml, …).
-          try {
-            const cfg = client.config as unknown as { getMcpServers?: (a: string) => Array<{ name: string; command?: string }> };
-            const mcp = cfg.getMcpServers?.(a.agent) ?? [];
-            for (const s of mcp) {
-              all.push({ agent: a.agent, pluginName: `mcp:${s.name}` });
-            }
-          } catch {
-            // ignore
           }
         }
         setRows(all);
@@ -63,6 +53,7 @@ function PluginsView({ client, active }: TuiViewProps) {
           <Text>{r.pluginName}</Text>
           {r.version ? <Text dimColor> v{r.version}</Text> : null}
           {r.enabled === false ? <Text color="gray"> (disabled)</Text> : null}
+          {r.scope ? <Text dimColor> [{r.scope}]</Text> : null}
         </Text>
       ))}
       {rows.length > 40 ? <Text dimColor>… {rows.length - 40} more</Text> : null}
