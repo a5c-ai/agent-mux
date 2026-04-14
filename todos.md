@@ -68,7 +68,10 @@ then perform the same research and analysis as mentioned above for these new ref
 [x] - Logging and opentelemetry integration: implement logging and telemetry in the agent-mux, to track the usage, performance, and errors of the system. this can be done using a tool like Winston or Pino for logging, and OpenTelemetry for telemetry. make sure to log important events and errors, and to collect relevant metrics for monitoring and debugging purposes.
 [ ] - improve user experience and find and resolve all ux bugs and issues in tui.
 [ ] - find and resolve all bugs in sdk. 
-[ ] - system bug: sessions not showing in sessions view for discovered installed agents (claude, codex, etc.) 
+[x] - system bug: sessions not showing in sessions view for discovered installed agents (claude, codex, etc.) 
+[ ] - skills are not showing the correct skills for claude code. also only shows global skills and not repo specific skills (where the amux is currently running)
+[ ] - plugins not showing (although i have installed plugins for many harnesses) 
+[ ] - MCP servers not showing (although i have installed mcp servers) -also include global/repo local distinction here as well.
 [x] - fix harnesses use of -p / --prompts (which makes the run non-interactive, we want it to be interactive by default, communicating the first (or next) prompts using stdin/stdout.) use -p / --prompts ONLY for non-interactive invocations (through OUR cli when called with --prompt flag AND --non-interactive) - partially done.
 [ ] - tui usability:
 - escape in chat should go back to menu (an keep prompt for later if the user continues typeing in the chat view)
