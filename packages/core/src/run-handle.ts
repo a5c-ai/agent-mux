@@ -40,6 +40,15 @@ export interface RunError {
   readonly recoverable: boolean;
 }
 
+/** When a deferred prompt should be injected into an active run. */
+export type DeferredPromptTarget = 'next-turn' | 'after-tool' | 'after-response';
+
+/** Options shared by deferred prompt queueing / steering methods. */
+export interface DeferredPromptOptions {
+  /** Delivery boundary for the deferred prompt. */
+  when?: DeferredPromptTarget;
+}
+
 // ---------------------------------------------------------------------------
 // RunResult
 // ---------------------------------------------------------------------------
@@ -216,6 +225,16 @@ export interface RunHandle extends AsyncIterable<AgentEvent> {
   send(text: string): Promise<void>;
 
   /**
+   * Queue a follow-up prompt for delivery at a later run boundary.
+   *
+   * Defaults to the next turn boundary.
+   *
+   * @throws {AgentMuxError} code `RUN_NOT_ACTIVE` if the run has terminated.
+   * @throws {AgentMuxError} code `STDIN_NOT_AVAILABLE` if the agent does not support stdin injection.
+   */
+  queue(prompt: string, options?: DeferredPromptOptions): Promise<void>;
+
+  /**
    * Approve a pending tool-use or action request.
    *
    * @throws {AgentMuxError} code `RUN_NOT_ACTIVE` if the run has terminated.
@@ -237,6 +256,16 @@ export interface RunHandle extends AsyncIterable<AgentEvent> {
    * @throws {AgentMuxError} code `RUN_NOT_ACTIVE` if the run has terminated.
    */
   continue(prompt: string): Promise<void>;
+
+  /**
+   * Steer the current run by injecting a deferred follow-up prompt.
+   *
+   * Defaults to delivery after the next completed agent response.
+   *
+   * @throws {AgentMuxError} code `RUN_NOT_ACTIVE` if the run has terminated.
+   * @throws {AgentMuxError} code `STDIN_NOT_AVAILABLE` if the agent does not support stdin injection.
+   */
+  steer(prompt: string, options?: DeferredPromptOptions): Promise<void>;
 
   // ── Control methods ───────────────────────────────────────────────────
 

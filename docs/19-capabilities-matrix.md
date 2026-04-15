@@ -63,6 +63,13 @@ Steering (injecting messages mid-run) and Queueing (queuing async messages) capa
 
 *(Non-Interactive support matches the Interactive table above identically for Steering and Queueing)*
 
+Current runtime note: the concrete `RunHandle.queue()` / `RunHandle.steer()`
+implementation is wired through the stdin-backed live-run path. Deferred
+delivery currently flushes on observed `tool_result` / `tool_error`,
+`message_stop`, and `turn_end` events. Adapters that are modeled as remote or
+programmatic transports still need dedicated transport-native wiring before
+this matrix can be treated as fully enforced runtime behavior for those paths.
+
 | Feature / Agent               | claude | codex | gemini | copilot | cursor | opencode | opencode-http | openclaw | hermes | pi | omp | qwen | agent-mux-remote |
 |-------------------------------|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
 | **Async Loop Tools**          | ✓ | · | · | · | · | · | · | · | · | · | · | · | ~ |

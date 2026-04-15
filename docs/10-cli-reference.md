@@ -936,6 +936,11 @@ The following slash commands are recognized within the REPL:
 | `/session` | Print the current session ID. |
 | `/help` | Print REPL command reference. |
 
+SDK frontends built on the same live-run surface can also defer follow-up
+prompts with `RunHandle.queue()` and `RunHandle.steer()`. The bundled TUI maps
+`/queue ...`, `/steer ...`, and `/steer-tool ...` onto those APIs when a run
+is already active.
+
 ### 13.4 REPL + JSONL
 
 When `-i` and `--json` are combined, the REPL reads prompts from stdin (one per line) and emits JSONL events to stdout. This enables programmatic multi-turn conversation. The REPL terminates on stdin EOF.
@@ -1748,4 +1753,3 @@ Default `--mode` is `ssh` when `<host>` is given, else `local`. Default `--harne
 ### Global flags actually accepted
 
 From `packages/cli/src/parse-args.ts` the recognized globals are: `--agent/-a`, `--model/-m`, `--json`, `--debug`, `--config-dir`, `--project-dir`, `--no-color`, `--version/-V`, `--help/-h`, `--completions <shell>`. The top-level commands: `run`, `install`, `uninstall`, `update`, `detect`, `detect-host`, `remote`, `adapters`, `capabilities`, `models`, `plugin`, `mcp`, `sessions`, `cost`, `config`, `profiles`, `auth`, `init`, `version`, `help`.
-

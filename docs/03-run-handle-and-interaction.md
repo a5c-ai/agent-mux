@@ -195,10 +195,26 @@ interface RunHandle extends AsyncIterable<AgentEvent> {
    *
    * @param text - The text to send. Must be non-empty.
    * @throws {AgentMuxError} code `RUN_NOT_ACTIVE` if the run has terminated.
-   * @throws {AgentMuxError} code `STDIN_NOT_AVAILABLE` if the agent does
-   *         not support stdin injection (capability: `supportsStdinInjection`).
-   */
+  * @throws {AgentMuxError} code `STDIN_NOT_AVAILABLE` if the agent does
+  *         not support stdin injection (capability: `supportsStdinInjection`).
+  */
   send(text: string): Promise<void>;
+
+  /**
+   * Queue a deferred follow-up prompt.
+   *
+   * The prompt is held until the requested boundary is observed on the
+   * active run. If omitted, delivery defaults to the next turn boundary.
+   *
+   * Supported boundaries:
+   * - `next-turn`
+   * - `after-tool`
+   * - `after-response`
+   */
+  queue(
+    prompt: string,
+    options?: { when?: 'next-turn' | 'after-tool' | 'after-response' }
+  ): Promise<void>;
 
   /**
    * Approve a pending tool-use or action request.
@@ -237,10 +253,22 @@ interface RunHandle extends AsyncIterable<AgentEvent> {
    * input (e.g., wrapping in a turn delimiter, resetting inactivity
    * timers).
    *
-   * @param prompt - The follow-up prompt. Must be non-empty.
-   * @throws {AgentMuxError} code `RUN_NOT_ACTIVE` if the run has terminated.
-   */
+  * @param prompt - The follow-up prompt. Must be non-empty.
+  * @throws {AgentMuxError} code `RUN_NOT_ACTIVE` if the run has terminated.
+  */
   continue(prompt: string): Promise<void>;
+
+  /**
+   * Steer the current run with a deferred prompt injection.
+   *
+   * This is the same transport mechanism as `queue()`, but defaults to
+   * `after-response` so the next completed assistant message becomes the
+   * steering boundary.
+   */
+  steer(
+    prompt: string,
+    options?: { when?: 'next-turn' | 'after-tool' | 'after-response' }
+  ): Promise<void>;
 
   // ── Control methods ───────────────────────────────────────────────────
 
@@ -1248,6 +1276,15 @@ Calling `abort()` multiple times is safe:
 
 Calling `send()`, `approve()`, `deny()`, `continue()`, `interrupt()`, `pause()`, or `resume()` after the run has reached a terminal state throws `AgentMuxError` with code `RUN_NOT_ACTIVE`. The `abort()` method is the exception: it is a no-op after termination.
 
+`queue()` and `steer()` follow the same active-run guard and also require an
+input transport. On the current implementation path, deferred prompt delivery
+is available for stdin-backed live runs. The runtime flushes deferred prompts
+when it observes the requested boundary event:
+
+- `after-tool` on `tool_result` / `tool_error`
+- `after-response` on `message_stop`
+- `next-turn` on `turn_end` or `message_stop`
+
 ### 12.7 Empty Runs
 
 If an agent produces no output and exits with code 0:
@@ -1696,9 +1733,17 @@ interface RunHandle extends AsyncIterable<AgentEvent> {
   finally: Promise<RunResult>['finally'];
 
   send(text: string): Promise<void>;
+  queue(
+    prompt: string,
+    options?: { when?: 'next-turn' | 'after-tool' | 'after-response' }
+  ): Promise<void>;
   approve(detail?: string): Promise<void>;
   deny(reason?: string): Promise<void>;
   continue(prompt: string): Promise<void>;
+  steer(
+    prompt: string,
+    options?: { when?: 'next-turn' | 'after-tool' | 'after-response' }
+  ): Promise<void>;
 
   interrupt(): Promise<void>;
   abort(): Promise<void>;
@@ -1857,4 +1902,3 @@ type JobObjectHandle = { readonly handle: unknown };
 ## Implementation Status (2026-04-12)
 
 `RunHandle` is now backed by a live `node:child_process.spawn` pipeline. `startSpawnLoop()` in `packages/core/src/spawn-runner.ts` owns the process lifetime, wires stdout/stderr into the adapter's `parseEvent()`, and honours `RunOptions.retryPolicy`, `timeout`, and `inactivityTimeout`. Abort performs a two-phase shutdown (SIGTERM, then SIGKILL after `gracePeriodMs`). On Unix, processes are spawned with `detached: true` and killed as a group via `process.kill(-pid, sig)`; Windows relies on the native job object / process tree and falls back to `taskkill /T`. See `docs/11-process-lifecycle-and-platform.md` for the full spawn/kill contract.
-

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Box, Text, useInput, useApp } from 'ink';
 import { logger } from '@a5c-ai/agent-mux-observability';
-import type { AgentMuxClient, AgentEvent, RunHandle } from '@a5c-ai/agent-mux';
+import type { AgentMuxClient, AgentEvent, DeferredPromptTarget, RunHandle } from '@a5c-ai/agent-mux';
 import { createRegistry, createContext, loadPlugins, type Registry } from './registry.js';
 import type { TuiPlugin, TuiViewProps, EventRenderer } from './plugin.js';
 import { EventStream } from './event-stream.js';
@@ -14,6 +14,55 @@ export interface AppProps {
   client: AgentMuxClient;
   plugins: TuiPlugin[];
   defaultAgent?: string;
+}
+
+type ActiveRunCommand =
+  | { kind: 'send'; prompt: string }
+  | { kind: 'queue'; prompt: string; when: DeferredPromptTarget }
+  | { kind: 'steer'; prompt: string; when: DeferredPromptTarget };
+
+export function parseActiveRunCommand(prompt: string): ActiveRunCommand | null {
+  if (prompt.startsWith('/queue ')) {
+    const body = prompt.slice('/queue '.length).trim();
+    return body ? { kind: 'queue', prompt: body, when: 'next-turn' } : null;
+  }
+  if (prompt.startsWith('/steer-tool ')) {
+    const body = prompt.slice('/steer-tool '.length).trim();
+    return body ? { kind: 'steer', prompt: body, when: 'after-tool' } : null;
+  }
+  if (prompt.startsWith('/steer ')) {
+    const body = prompt.slice('/steer '.length).trim();
+    return body ? { kind: 'steer', prompt: body, when: 'after-response' } : null;
+  }
+  return { kind: 'send', prompt };
+}
+
+function describeDeferredTarget(target: DeferredPromptTarget): string {
+  switch (target) {
+    case 'after-tool':
+      return 'the next tool result';
+    case 'after-response':
+      return 'the next agent response';
+    case 'next-turn':
+      return 'the next turn';
+  }
+}
+
+export async function dispatchPromptToActiveRun(handle: RunHandle, prompt: string): Promise<string> {
+  const command = parseActiveRunCommand(prompt);
+  if (!command) {
+    return 'Active-run command requires a message.';
+  }
+  if (command.kind === 'queue') {
+    await handle.queue(command.prompt, { when: command.when });
+    return `Queued for ${describeDeferredTarget(command.when)}…`;
+  }
+  if (command.kind === 'steer') {
+    await handle.steer(command.prompt, { when: command.when });
+    return `Steering after ${describeDeferredTarget(command.when)}…`;
+  }
+  await handle.send(command.prompt);
+  return 'Sending to active run…';
 }
 
 function pickRenderers(renderers: EventRenderer[], ev: AgentEvent): EventRenderer | undefined {
@@ -328,8 +377,7 @@ export function App({ client, plugins, defaultAgent = 'claude' }: AppProps) {
     // fresh process — keeps follow-ups inside the same session & context.
     if (currentHandleRef.current) {
       try {
-        setStatus('Sending to active run…');
-        await currentHandleRef.current.send(prompt);
+        setStatus(await dispatchPromptToActiveRun(currentHandleRef.current, prompt));
       } catch (e) {
         setStatus(`send failed: ${(e as Error).message}`);
       }
@@ -546,6 +594,7 @@ export function App({ client, plugins, defaultAgent = 'claude' }: AppProps) {
             <Text color="blue"> · profile={currentProfile}</Text>
           ) : null}
           {currentHandleRef.current ? <Text color="yellow"> · i: interrupt</Text> : null}
+          {currentHandleRef.current ? <Text color="yellow"> · /queue · /steer · /steer-tool</Text> : null}
           {pendingApproval ? <Text color="yellow"> · y/n: approve/deny</Text> : null}
           <Text dimColor> · q: quit</Text>
           {registry.views.length > 1 ? (

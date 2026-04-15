@@ -280,9 +280,7 @@ async function runOnce(
     }
   });
 
-  const originalSend = handle.send.bind(handle);
-  handle.send = async (text: string) => {
-    await originalSend(text);
+  handle.bindInputTransport(async (text: string) => {
     if (!adapter.capabilities.supportsStdinInjection) {
       throw new AgentMuxError('STDIN_NOT_AVAILABLE', `${adapter.agent} does not support stdin injection`, false);
     }
@@ -294,7 +292,7 @@ async function runOnce(
     } catch {
       throw new AgentMuxError('STDIN_NOT_AVAILABLE', 'Failed to write to agent stdin', false);
     }
-  };
+  });
 
   // Optional initial stdin from SpawnArgs.
   if (spawnArgs.stdin && child.stdin) {

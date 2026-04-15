@@ -12,7 +12,14 @@
 
 import type { AgentName, CostRecord } from './types.js';
 import type { AgentEvent, AgentEventType, EventOfType, DebugEvent } from './events.js';
-import type { RunHandle, RunResult, TokenUsageSummary, RunError } from './run-handle.js';
+import type {
+  DeferredPromptOptions,
+  DeferredPromptTarget,
+  RunHandle,
+  RunResult,
+  TokenUsageSummary,
+  RunError,
+} from './run-handle.js';
 import type { InteractionChannel, InteractionResponse } from './interaction.js';
 import type { ApprovalRequestEvent, InputRequiredEvent, TokenUsageEvent, CostEvent, TextDeltaEvent, TurnStartEvent } from './events.js';
 import { AgentMuxError } from './errors.js';
@@ -61,6 +68,13 @@ interface IteratorState {
 
   /** Resolve function for the current `next()` call that is awaiting an event. */
   waiting: ((value: IteratorResult<AgentEvent>) => void) | null;
+}
+
+interface DeferredPrompt {
+  id: string;
+  mode: 'queue' | 'steer';
+  prompt: string;
+  when: DeferredPromptTarget;
 }
 
 // ---------------------------------------------------------------------------
@@ -134,6 +148,18 @@ export class RunHandleImpl implements RunHandle {
 
   /** Map of active subagent spans by subagentId. */
   private readonly _subagentSpans = new Map<string, Span>();
+
+  /** Bound runtime input transport used by send()/queue()/steer(). */
+  private _inputTransport: ((text: string) => Promise<void>) | null = null;
+
+  /** Deferred prompts waiting for a matching run boundary. */
+  private readonly _deferredPrompts: DeferredPrompt[] = [];
+
+  /** Serializes deferred prompt delivery. */
+  private _deferredDeliveryChain: Promise<void> = Promise.resolve();
+
+  /** Monotonic counter for deferred prompt bookkeeping. */
+  private _deferredPromptSeq = 0;
 
   // ── Constructor ───────────────────────────────────────────────────────────
 
@@ -233,6 +259,10 @@ export class RunHandleImpl implements RunHandle {
 
     // Dispatch to EventEmitter handlers.
     this._dispatchHandlers(event);
+
+    // Deferred prompt delivery runs after consumers have observed the
+    // boundary event that triggered it.
+    this._triggerDeferredPromptDelivery(event);
   }
 
   /**
@@ -540,6 +570,11 @@ export class RunHandleImpl implements RunHandle {
     return this._ensureResultPromise();
   }
 
+  /** @internal Bind the active runtime input transport. */
+  bindInputTransport(writer: (text: string) => Promise<void>): void {
+    this._inputTransport = writer;
+  }
+
   // ── Interaction methods ───────────────────────────────────────────────────
 
   async send(text: string): Promise<void> {
@@ -547,8 +582,11 @@ export class RunHandleImpl implements RunHandle {
     if (!text) {
       throw new AgentMuxError('VALIDATION_ERROR', 'send() requires non-empty text', false);
     }
-    // Stub: real implementation writes to subprocess stdin with trailing newline.
-    // Adapter integration (subprocess I/O) is implemented in Phase 11.
+    await this._sendNow(text);
+  }
+
+  async queue(prompt: string, options?: DeferredPromptOptions): Promise<void> {
+    await this._enqueueDeferredPrompt('queue', prompt, options?.when ?? 'next-turn');
   }
 
   async approve(detail?: string): Promise<void> {
@@ -576,6 +614,10 @@ export class RunHandleImpl implements RunHandle {
     }
     // Semantically equivalent to send() — adapters may differentiate later.
     await this.send(prompt);
+  }
+
+  async steer(prompt: string, options?: DeferredPromptOptions): Promise<void> {
+    await this._enqueueDeferredPrompt('steer', prompt, options?.when ?? 'after-response');
   }
 
   // ── Control methods ───────────────────────────────────────────────────────
@@ -734,5 +776,82 @@ export class RunHandleImpl implements RunHandle {
   private async _handleInteractionResponse(_id: string, _response: InteractionResponse): Promise<void> {
     // In this phase: stub. Real adapters will write to the agent's stdin/PTY.
     // The interaction channel already removed the interaction from pending.
+  }
+
+  private async _sendNow(text: string): Promise<void> {
+    const writer = this._inputTransport;
+    if (!writer) {
+      throw new AgentMuxError('STDIN_NOT_AVAILABLE', 'Agent stdin is not available', false);
+    }
+    await writer(text);
+  }
+
+  private async _enqueueDeferredPrompt(
+    mode: 'queue' | 'steer',
+    prompt: string,
+    when: DeferredPromptTarget,
+  ): Promise<void> {
+    this._assertActive();
+    if (!prompt) {
+      const method = mode === 'queue' ? 'queue()' : 'steer()';
+      throw new AgentMuxError('VALIDATION_ERROR', `${method} requires non-empty prompt`, false);
+    }
+    if (!this._inputTransport) {
+      throw new AgentMuxError('STDIN_NOT_AVAILABLE', 'Agent stdin is not available', false);
+    }
+    this._deferredPrompts.push({
+      id: `deferred-${++this._deferredPromptSeq}`,
+      mode,
+      prompt,
+      when,
+    });
+  }
+
+  private _triggerDeferredPromptDelivery(event: AgentEvent): void {
+    if (this._deferredPrompts.length === 0 || !this._inputTransport) {
+      return;
+    }
+
+    const boundaries = this._boundariesForEvent(event);
+    if (boundaries.length === 0) {
+      return;
+    }
+
+    const deliverNow = this._deferredPrompts.filter((entry) => boundaries.includes(entry.when));
+    if (deliverNow.length === 0) {
+      return;
+    }
+
+    const pending = this._deferredPrompts.filter((entry) => !boundaries.includes(entry.when));
+    this._deferredPrompts.splice(0, this._deferredPrompts.length, ...pending);
+
+    this._deferredDeliveryChain = this._deferredDeliveryChain
+      .then(async () => {
+        for (const entry of deliverNow) {
+          try {
+            await this._sendNow(entry.prompt);
+          } catch (err) {
+            this._emitDebugEvent(
+              'warn',
+              `Deferred ${entry.mode} delivery failed: ${err instanceof Error ? err.message : String(err)}`,
+            );
+          }
+        }
+      })
+      .catch(() => {});
+  }
+
+  private _boundariesForEvent(event: AgentEvent): DeferredPromptTarget[] {
+    switch (event.type) {
+      case 'tool_result':
+      case 'tool_error':
+        return ['after-tool'];
+      case 'message_stop':
+        return ['after-response', 'next-turn'];
+      case 'turn_end':
+        return ['next-turn'];
+      default:
+        return [];
+    }
   }
 }

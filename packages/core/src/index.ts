@@ -151,6 +151,8 @@ export { InteractionChannelImpl } from './interaction-channel-impl.js';
 
 // RunHandle types
 export type {
+  DeferredPromptTarget,
+  DeferredPromptOptions,
   RunHandle,
   RunResult,
   TokenUsageSummary,

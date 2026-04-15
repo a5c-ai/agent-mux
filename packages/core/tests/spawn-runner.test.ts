@@ -66,6 +66,81 @@ describe('startSpawnLoop stdin transport', () => {
     child.emit('exit', 0, null);
   });
 
+  it('delivers queued prompts after the next turn boundary', async () => {
+    const child = new FakeChild();
+    spawnMock.mockReturnValue(child);
+
+    const handle = new RunHandleImpl({ runId: 'run-queue', agent: 'gemini' });
+    const adapter = {
+      agent: 'gemini',
+      capabilities: { supportsStdinInjection: true },
+      buildSpawnArgs: () => ({
+        command: 'fake-agent',
+        args: [],
+        env: {},
+        cwd: process.cwd(),
+        usePty: false,
+      }),
+      parseEvent: () => null,
+    } as any;
+
+    startSpawnLoop(handle, adapter, { agent: 'gemini', prompt: 'first prompt' } as any);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    await handle.queue('queued follow up');
+    handle.emit({
+      type: 'turn_end',
+      runId: 'run-queue',
+      agent: 'gemini',
+      timestamp: Date.now(),
+      turnIndex: 0,
+    } as any);
+    await Promise.resolve();
+
+    expect(child.stdin.write).toHaveBeenCalledWith('queued follow up\n');
+    child.emit('exit', 0, null);
+  });
+
+  it('delivers steering prompts after the next tool boundary', async () => {
+    const child = new FakeChild();
+    spawnMock.mockReturnValue(child);
+
+    const handle = new RunHandleImpl({ runId: 'run-steer', agent: 'gemini' });
+    const adapter = {
+      agent: 'gemini',
+      capabilities: { supportsStdinInjection: true },
+      buildSpawnArgs: () => ({
+        command: 'fake-agent',
+        args: [],
+        env: {},
+        cwd: process.cwd(),
+        usePty: false,
+      }),
+      parseEvent: () => null,
+    } as any;
+
+    startSpawnLoop(handle, adapter, { agent: 'gemini', prompt: 'first prompt' } as any);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    await handle.steer('steer now', { when: 'after-tool' });
+    handle.emit({
+      type: 'tool_result',
+      runId: 'run-steer',
+      agent: 'gemini',
+      timestamp: Date.now(),
+      toolCallId: 'tool-1',
+      toolName: 'search',
+      output: {},
+      durationMs: 5,
+    } as any);
+    await Promise.resolve();
+
+    expect(child.stdin.write).toHaveBeenCalledWith('steer now\n');
+    child.emit('exit', 0, null);
+  });
+
   it('closes seeded stdin for explicit non-interactive runs', async () => {
     const child = new FakeChild();
     spawnMock.mockReturnValue(child);

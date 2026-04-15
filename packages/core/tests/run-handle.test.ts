@@ -22,6 +22,12 @@ function makeBaseEvent(type: string, extra: Record<string, unknown> = {}): Agent
   } as AgentEvent;
 }
 
+function bindTransport(handle: RunHandleImpl) {
+  const write = vi.fn(async (_text: string) => {});
+  handle.bindInputTransport(write);
+  return write;
+}
+
 describe('RunHandleImpl', () => {
   describe('identity', () => {
     it('exposes runId, agent, model', () => {
@@ -399,7 +405,38 @@ describe('RunHandleImpl', () => {
     it('send() accepts whitespace-only text (spec says non-empty, not non-whitespace)', async () => {
       const h = makeHandle();
       h.transitionTo('running');
+      bindTransport(h);
       await expect(h.send('  ')).resolves.not.toThrow();
+    });
+
+    it('queue() throws on empty prompt', async () => {
+      const h = makeHandle();
+      h.transitionTo('running');
+      bindTransport(h);
+      await expect(h.queue('')).rejects.toThrow(AgentMuxError);
+    });
+
+    it('steer() throws on empty prompt', async () => {
+      const h = makeHandle();
+      h.transitionTo('running');
+      bindTransport(h);
+      await expect(h.steer('')).rejects.toThrow(AgentMuxError);
+    });
+
+    it('deferred prompts flush on matching boundaries', async () => {
+      const h = makeHandle();
+      h.transitionTo('running');
+      const write = bindTransport(h);
+
+      await h.queue('turn follow-up');
+      await h.steer('tool follow-up', { when: 'after-tool' });
+      h.emit(makeBaseEvent('tool_result', { toolCallId: 't1', toolName: 'ls', output: {}, durationMs: 1 }));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(write).toHaveBeenNthCalledWith(1, 'tool follow-up');
+
+      h.emit(makeBaseEvent('turn_end', { turnIndex: 0 }));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(write).toHaveBeenNthCalledWith(2, 'turn follow-up');
     });
   });
 
