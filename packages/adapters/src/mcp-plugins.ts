@@ -15,6 +15,9 @@ import type {
   PluginInstallOptions,
 } from '@a5c-ai/agent-mux-core';
 
+type McpConfigPaths = Partial<Record<'global' | 'project', string>>;
+type McpServerMap = Record<string, unknown>;
+
 async function readConfig(configPath: string): Promise<Record<string, unknown>> {
   try {
     return JSON.parse(await fsp.readFile(configPath, 'utf8')) as Record<string, unknown>;
@@ -29,14 +32,16 @@ async function writeConfig(configPath: string, doc: Record<string, unknown>): Pr
 }
 
 export async function mcpListPlugins(configPaths: string | Record<string, string>): Promise<InstalledPlugin[]> {
-  const paths = typeof configPaths === 'string' ? { global: configPaths } : configPaths;
+  const paths: McpConfigPaths = typeof configPaths === 'string'
+    ? { global: configPaths }
+    : configPaths;
   const plugins: Record<string, InstalledPlugin & { scope?: string }> = {};
   
   // Read in order so project can override global (or vice versa, but usually project wins)
   for (const [scope, configPath] of Object.entries(paths)) {
     const doc = await readConfig(configPath);
-    const servers = doc['mcpServers'] && typeof doc['mcpServers'] === 'object'
-      ? doc['mcpServers']
+    const servers: McpServerMap = doc['mcpServers'] && typeof doc['mcpServers'] === 'object'
+      ? doc['mcpServers'] as McpServerMap
       : {};
     for (const [id, def] of Object.entries(servers)) {
       plugins[id] = {
@@ -59,14 +64,16 @@ export async function mcpInstallPlugin(
 ): Promise<InstalledPlugin> {
   if (!pluginId) throw new Error('pluginId is required');
   
-  const paths = typeof configPaths === 'string' ? { global: configPaths } : configPaths;
+  const paths: McpConfigPaths = typeof configPaths === 'string'
+    ? { global: configPaths }
+    : configPaths;
   const scope = options?.global === false ? 'project' : 'global';
   const configPath = paths[scope] || paths['global'];
   if (!configPath) throw new Error('No config path available for scope: ' + scope);
 
   const doc = await readConfig(configPath);
-  const servers = doc['mcpServers'] && typeof doc['mcpServers'] === 'object'
-    ? { ...(doc['mcpServers']) }
+  const servers: McpServerMap = doc['mcpServers'] && typeof doc['mcpServers'] === 'object'
+    ? { ...(doc['mcpServers'] as McpServerMap) }
     : {};
   servers[pluginId] = { command: pluginId };
   doc['mcpServers'] = servers;
@@ -85,10 +92,12 @@ export async function mcpUninstallPlugin(
   pluginId: string,
   options?: { global?: boolean },
 ): Promise<void> {
-  const paths = typeof configPaths === 'string' ? { global: configPaths } : configPaths;
+  const paths: McpConfigPaths = typeof configPaths === 'string'
+    ? { global: configPaths }
+    : configPaths;
   
   // If no scope specified, check both, starting with project
-  const scopes = options && options.global !== undefined 
+  const scopes: Array<'global' | 'project'> = options && options.global !== undefined 
     ? [options.global ? 'global' : 'project'] 
     : ['project', 'global'];
 
@@ -97,8 +106,8 @@ export async function mcpUninstallPlugin(
     if (!configPath) continue;
     
     const doc = await readConfig(configPath);
-    const servers = doc['mcpServers'] && typeof doc['mcpServers'] === 'object'
-      ? { ...(doc['mcpServers']) }
+    const servers: McpServerMap = doc['mcpServers'] && typeof doc['mcpServers'] === 'object'
+      ? { ...(doc['mcpServers'] as McpServerMap) }
       : {};
     if (pluginId in servers) {
       delete servers[pluginId];

@@ -22,3 +22,4 @@ tasks/
 .a5c/logs/babysitter-session-start-hook.log
 amux-debug.log
 amux-debug-auto.log
+coverage/.tmp/

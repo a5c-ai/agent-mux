@@ -84,6 +84,8 @@ export default [
     ignores: [
       '**/dist/**',
       '**/node_modules/**',
+      '**/.a5c/**',
+      '**/.codex/**',
       '**/*.d.ts',
       '**/*.test.ts',
       '**/*.spec.ts',

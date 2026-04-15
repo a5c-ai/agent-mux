@@ -18,6 +18,7 @@ import type {
   RetryPolicy,
   ValidationFieldError,
 } from './types.js';
+import type { RuntimeHooks } from './runtime-hooks.js';
 import { ValidationError } from './errors.js';
 import type { InvocationMode } from './invocation.js';
 import {
@@ -150,6 +151,9 @@ export interface RunOptions {
   onApprovalRequest?: (event: ApprovalRequestEvent) => Promise<'approve' | 'deny'>;
 
   // --- Extensions ---
+
+  /** In-process runtime hooks for this run only. */
+  hooks?: RuntimeHooks;
 
   /** Skills to load for this run. */
   skills?: string[];

@@ -5,6 +5,7 @@
  */
 
 import type { AgentName, PluginFormat } from './types.js';
+import type { RuntimeHookCapabilities } from './runtime-hooks.js';
 
 // ---------------------------------------------------------------------------
 // ThinkingEffortLevel
@@ -122,6 +123,9 @@ export interface AgentCapabilities {
 
   /** The approval modes this agent supports. */
   approvalModes: ('yolo' | 'prompt' | 'deny')[];
+
+  /** How each runtime hook kind is supported by the adapter. */
+  runtimeHooks: RuntimeHookCapabilities;
 
   // ── Thinking ────────────────────────────────────────────────────────
 

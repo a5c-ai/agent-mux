@@ -187,6 +187,19 @@ export {
   validateProfileData,
 } from './run-options.js';
 
+// Runtime hooks
+export type {
+  RuntimeHookKind,
+  RuntimeHookMode,
+  RuntimeHookCapabilities,
+  HookContext,
+  HookDecision,
+  PreToolUseHook,
+  UserPromptSubmitHook,
+  NotificationHook,
+  RuntimeHooks,
+} from './runtime-hooks.js';
+
 // Merge
 export { deepMerge, stripUndefined, resolveRunOptions } from './merge.js';
 

@@ -12,6 +12,7 @@
     "packages/adapters",
     "packages/cli",
     "packages/agent-mux",
+    "packages/gateway",
     "packages/harness-mock",
     "packages/tui",
     "packages/observability"

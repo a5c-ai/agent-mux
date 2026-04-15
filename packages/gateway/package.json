@@ -1,0 +1,50 @@
+{
+  "name": "@a5c-ai/agent-mux-gateway",
+  "version": "0.0.0",
+  "type": "module",
+  "license": "MIT",
+  "description": "Gateway package for remote and browser-facing agent-mux surfaces",
+  "author": "a5c-ai",
+  "homepage": "https://github.com/a5c-ai/agent-mux#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/a5c-ai/agent-mux.git",
+    "directory": "packages/gateway"
+  },
+  "bugs": {
+    "url": "https://github.com/a5c-ai/agent-mux/issues"
+  },
+  "keywords": [
+    "agent-mux",
+    "gateway",
+    "websocket",
+    "remote",
+    "sdk"
+  ],
+  "engines": {
+    "node": ">=20.9.0"
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc --build",
+    "prepublishOnly": "npm run build"
+  }
+}
