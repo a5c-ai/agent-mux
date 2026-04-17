@@ -37,7 +37,7 @@ check for:
  - parity and inconsistencies in our implementation compared to the popular working references.
 → Initial pass written: docs/16-reference-comparison.md.
 
-[ ] - make sure interactive mode is supported. even if it means parsing ansi based interactions in this mode.
+[ ] - make sure interactive mode is supported too. even if it means parsing ansi based interactions in this mode.
 [ ] - research and design a unified protocol for all the harnesses and agents we support, to enable seamless integration and interoperability between them. this protocol should define the standard way of communicating with the harnesses and agents, including the format of the messages, the supported commands and actions, the error handling mechanisms, etc. this protocol should also be extensible and flexible enough to accommodate new harnesses and agents in the future without breaking existing integrations. it should also support both interactive and non-interactive modes of communication, to allow for different use cases and workflows. this protocol will serve as the foundation for our sdk and cli implementations, as well as for any third-party integrations that want to interface with our system. - this is the process - C:\work\agent-mux\protocol.pseudocode.task.md  - 3 levels of protocol: 1. model , 2. agent/reactor/lower-harness 3. upper-harness (with plugins, skills, hooks, config, etc.) - including capability specifications for each level.
 [ ] - find more battle tested references in existing project for functionalities and features we don't have reference and evidence for.
  - in monitoring and orchestration tools that support various harnesses and agents - for example cctop
