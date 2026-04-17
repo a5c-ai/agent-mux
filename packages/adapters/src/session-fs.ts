@@ -9,6 +9,7 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import { writeFileAtomic, writeJsonAtomic } from '@a5c-ai/agent-mux-core';
+import type { CostRecord, SessionMessage, SessionToolCall } from '@a5c-ai/agent-mux-core';
 
 /**
  * Recursively list all files matching `predicate` under `dir`.
@@ -263,6 +264,240 @@ export async function parseJsonlSessionFile(
   return { sessionId, agent, turnCount, createdAt, updatedAt, messages, raw: rows };
 }
 
+export async function parseCodexSessionFile(
+  filePath: string,
+  agent: string,
+): Promise<{
+  sessionId: string;
+  agent: string;
+  turnCount: number;
+  createdAt: string;
+  updatedAt: string;
+  title?: string;
+  model?: string;
+  cost?: CostRecord;
+  cwd?: string;
+  messages: SessionMessage[];
+  raw: unknown;
+}> {
+  const rows = await parseJsonlFile(filePath);
+  const stat = await statSafe(filePath);
+  const now = new Date().toISOString();
+  const createdAt = stat ? new Date(stat.birthtimeMs || stat.mtimeMs).toISOString() : now;
+  const updatedAt = stat ? new Date(stat.mtimeMs).toISOString() : now;
+
+  let sessionId = path.basename(filePath, path.extname(filePath));
+  let cwd: string | undefined;
+  let model: string | undefined;
+  let title: string | undefined;
+  let sessionCost: CostRecord | undefined;
+  const messages: SessionMessage[] = [];
+  const toolCalls = new Map<string, SessionToolCall>();
+
+  for (const row of rows) {
+    const rowType = typeof row['type'] === 'string' ? row['type'] : '';
+
+    if (rowType === 'session_meta') {
+      const payload = row['payload'];
+      if (payload && typeof payload === 'object') {
+        const meta = payload as Record<string, unknown>;
+        if (typeof meta['cwd'] === 'string' && meta['cwd'].length > 0) {
+          cwd = String(meta['cwd']);
+        }
+      }
+      continue;
+    }
+
+    if (rowType === 'turn_context') {
+      const payload = row['payload'];
+      if (payload && typeof payload === 'object') {
+        const turnContext = payload as Record<string, unknown>;
+        if (typeof turnContext['model'] === 'string' && turnContext['model'].length > 0) {
+          model = String(turnContext['model']);
+        }
+      }
+      continue;
+    }
+
+    if (rowType === 'event_msg') {
+      const payload = row['payload'];
+      if (!payload || typeof payload !== 'object') {
+        continue;
+      }
+      const event = payload as Record<string, unknown>;
+      if (event['type'] !== 'token_count') {
+        continue;
+      }
+      const estimatedCost = estimateCodexSessionCost(event, model);
+      if (estimatedCost) {
+        sessionCost = estimatedCost;
+      }
+      continue;
+    }
+
+    if (rowType !== 'response_item') {
+      continue;
+    }
+
+    const payload = row['payload'];
+    if (!payload || typeof payload !== 'object') {
+      continue;
+    }
+    const item = payload as Record<string, unknown>;
+    const itemType = typeof item['type'] === 'string' ? item['type'] : '';
+
+    if (itemType === 'message') {
+      const roleRaw = typeof item['role'] === 'string' ? item['role'] : '';
+      if (roleRaw !== 'user' && roleRaw !== 'assistant') {
+        continue;
+      }
+      const text = flattenCodexMessageText(item['content']);
+      if (shouldSkipCodexBootstrapMessage(roleRaw, text)) {
+        continue;
+      }
+      if (roleRaw === 'user' && !title && text.length > 0) {
+        title = text.length > 80 ? `${text.slice(0, 77)}...` : text;
+      }
+      messages.push({
+        role: roleRaw,
+        content: text,
+      });
+      continue;
+    }
+
+    if (itemType === 'function_call') {
+      const toolCallId = String(item['call_id'] ?? item['id'] ?? '');
+      const toolName = String(item['name'] ?? 'tool');
+      const input = parseMaybeJson(item['arguments']);
+      const toolCall: SessionToolCall = {
+        toolCallId,
+        toolName,
+        input,
+      };
+      toolCalls.set(toolCallId, toolCall);
+      messages.push({
+        role: 'assistant',
+        content: '',
+        toolCalls: [toolCall],
+      });
+      continue;
+    }
+
+    if (itemType === 'function_call_output') {
+      const toolCallId = String(item['call_id'] ?? item['id'] ?? '');
+      const knownToolCall = toolCalls.get(toolCallId);
+      const toolName = knownToolCall?.toolName ?? String(item['name'] ?? 'tool');
+      const output = item['output'] ?? '';
+      messages.push({
+        role: 'tool',
+        content: typeof output === 'string' ? output : renderStructuredValue(output),
+        toolResult: {
+          toolCallId,
+          toolName,
+          output,
+        },
+      });
+    }
+  }
+
+  const userTurns = messages.filter((message) => message.role === 'user').length;
+  const assistantTurns = messages.filter((message) => message.role === 'assistant').length;
+  const turnCount = userTurns || assistantTurns;
+
+  return {
+    sessionId,
+    agent,
+    turnCount,
+    createdAt,
+    updatedAt,
+    title,
+    model,
+    cost: sessionCost,
+    cwd,
+    messages,
+    raw: rows,
+  };
+}
+
+type CodexSessionPricing = {
+  inputPricePerMillion: number;
+  cachedInputPricePerMillion: number;
+  outputPricePerMillion: number;
+};
+
+const CODEX_SESSION_PRICING: Record<string, CodexSessionPricing> = {
+  'gpt-5.4': {
+    inputPricePerMillion: 2.5,
+    cachedInputPricePerMillion: 0.25,
+    outputPricePerMillion: 15,
+  },
+  'gpt-5.3-codex': {
+    inputPricePerMillion: 1.75,
+    cachedInputPricePerMillion: 0.175,
+    outputPricePerMillion: 14,
+  },
+  'gpt-5-codex': {
+    inputPricePerMillion: 1.25,
+    cachedInputPricePerMillion: 0.125,
+    outputPricePerMillion: 10,
+  },
+  'gpt-5.1-codex-mini': {
+    inputPricePerMillion: 0.25,
+    cachedInputPricePerMillion: 0.025,
+    outputPricePerMillion: 2,
+  },
+};
+
+function estimateCodexSessionCost(
+  event: Record<string, unknown>,
+  model: string | undefined,
+): CostRecord | undefined {
+  if (!model) {
+    return undefined;
+  }
+  const pricing = CODEX_SESSION_PRICING[model];
+  if (!pricing) {
+    return undefined;
+  }
+
+  const info = event['info'];
+  if (!info || typeof info !== 'object') {
+    return undefined;
+  }
+  const totalTokenUsage = (info as Record<string, unknown>)['total_token_usage'];
+  if (!totalTokenUsage || typeof totalTokenUsage !== 'object') {
+    return undefined;
+  }
+
+  const usage = totalTokenUsage as Record<string, unknown>;
+  const inputTokens = numberField(usage['input_tokens']);
+  const cachedTokens = numberField(usage['cached_input_tokens']) ?? 0;
+  const outputTokens = numberField(usage['output_tokens']);
+  const thinkingTokens = numberField(usage['reasoning_output_tokens']) ?? 0;
+
+  if (inputTokens == null || outputTokens == null) {
+    return undefined;
+  }
+
+  const uncachedInputTokens = Math.max(inputTokens - cachedTokens, 0);
+  const totalUsd =
+    ((uncachedInputTokens / 1_000_000) * pricing.inputPricePerMillion) +
+    ((cachedTokens / 1_000_000) * pricing.cachedInputPricePerMillion) +
+    (((outputTokens + thinkingTokens) / 1_000_000) * pricing.outputPricePerMillion);
+
+  return {
+    totalUsd,
+    inputTokens,
+    outputTokens,
+    thinkingTokens,
+    cachedTokens,
+  };
+}
+
+function numberField(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
 /**
  * Derive a SessionMessage-like representation from an arbitrary JSONL row.
  * Used by adapters that don't have a more precise schema.
@@ -284,4 +519,51 @@ export function rowToMessage(row: Record<string, unknown>): {
     (row['message'] as string | undefined) ??
     '';
   return { role, content: typeof content === 'string' ? content : JSON.stringify(content) };
+}
+
+function flattenCodexMessageText(content: unknown): string {
+  if (!Array.isArray(content)) {
+    return '';
+  }
+  const parts = content.flatMap((entry) => {
+    if (!entry || typeof entry !== 'object') {
+      return [];
+    }
+    const block = entry as Record<string, unknown>;
+    const blockType = typeof block['type'] === 'string' ? block['type'] : '';
+    if ((blockType === 'input_text' || blockType === 'output_text') && typeof block['text'] === 'string') {
+      return [block['text']];
+    }
+    return [];
+  });
+  return parts.join('\n').trim();
+}
+
+function parseMaybeJson(value: unknown): unknown {
+  if (typeof value !== 'string') {
+    return value;
+  }
+  try {
+    return JSON.parse(value);
+  } catch {
+    return value;
+  }
+}
+
+function renderStructuredValue(value: unknown): string {
+  if (typeof value === 'string') {
+    return value;
+  }
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
+}
+
+function shouldSkipCodexBootstrapMessage(role: string, text: string): boolean {
+  if (role !== 'user') {
+    return false;
+  }
+  return text.startsWith('# AGENTS.md instructions for ') && text.includes('<environment_context>');
 }

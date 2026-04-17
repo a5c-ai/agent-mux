@@ -1,3 +1,7 @@
+import * as fs from 'node:fs/promises';
+import * as os from 'node:os';
+import * as path from 'node:path';
+
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { StreamAssembler } from '@a5c-ai/agent-mux-core';
 import type { ParseContext } from '@a5c-ai/agent-mux-core';
@@ -112,6 +116,23 @@ describe('CodexAdapter', () => {
 
       expect(result.args).toContain('First\nSecond');
     });
+
+    it('resumes a specific session instead of using --last', () => {
+      const result = adapter.buildSpawnArgs({
+        agent: 'codex',
+        prompt: 'continue this session',
+        sessionId: '019d96a9-8685-7503-92c5-8523d6843d6b',
+        nonInteractive: true,
+      });
+
+      expect(result.args).toEqual([
+        'exec',
+        'resume',
+        '--json',
+        '019d96a9-8685-7503-92c5-8523d6843d6b',
+        'continue this session',
+      ]);
+    });
   });
 
   describe('parseEvent', () => {
@@ -127,6 +148,26 @@ describe('CodexAdapter', () => {
       const event = result as { type: string; delta: string };
       expect(event.type).toBe('text_delta');
       expect(event.delta).toBe('Response text');
+    });
+
+    it('parses thread.started into session_start using thread_id', () => {
+      const result = adapter.parseEvent(
+        JSON.stringify({ type: 'thread.started', thread_id: 'thread-123' }),
+        makeContext(),
+      );
+      const event = result as { type: string; sessionId: string };
+      expect(event.type).toBe('session_start');
+      expect(event.sessionId).toBe('thread-123');
+    });
+
+    it('parses item.completed agent messages from codex exec --json', () => {
+      const result = adapter.parseEvent(
+        JSON.stringify({ type: 'item.completed', item: { id: 'item_0', type: 'agent_message', text: 'hello from codex' } }),
+        makeContext(),
+      );
+      const event = result as { type: string; delta: string };
+      expect(event.type).toBe('text_delta');
+      expect(event.delta).toBe('hello from codex');
     });
 
     it('parses function_call events', () => {
@@ -147,6 +188,45 @@ describe('CodexAdapter', () => {
       const event = result as { type: string; toolCallId: string };
       expect(event.type).toBe('tool_result');
       expect(event.toolCallId).toBe('fc-1');
+    });
+
+    it('parses nested command_execution starts from codex exec --json', () => {
+      const result = adapter.parseEvent(
+        JSON.stringify({
+          type: 'item.started',
+          item: {
+            id: 'cmd-1',
+            type: 'command_execution',
+            command: 'pwd',
+          },
+        }),
+        makeContext(),
+      );
+      const event = result as { type: string; toolCallId: string; toolName: string; inputAccumulated: string };
+      expect(event.type).toBe('tool_call_start');
+      expect(event.toolCallId).toBe('cmd-1');
+      expect(event.toolName).toBe('pwd');
+      expect(event.inputAccumulated).toContain('pwd');
+    });
+
+    it('parses nested command_execution completions from codex exec --json', () => {
+      const result = adapter.parseEvent(
+        JSON.stringify({
+          type: 'item.completed',
+          item: {
+            id: 'cmd-1',
+            type: 'command_execution',
+            command: 'pwd',
+            aggregated_output: 'C:/work/agent-mux',
+          },
+        }),
+        makeContext(),
+      );
+      const event = result as { type: string; toolCallId: string; toolName: string; output: string };
+      expect(event.type).toBe('tool_result');
+      expect(event.toolCallId).toBe('cmd-1');
+      expect(event.toolName).toBe('pwd');
+      expect(event.output).toContain('agent-mux');
     });
 
     it('parses error events', () => {
@@ -214,6 +294,148 @@ describe('CodexAdapter', () => {
     it('readConfig returns default', async () => {
       const config = await adapter.readConfig();
       expect(config.agent).toBe('codex');
+    });
+  });
+
+  describe('parseSessionFile', () => {
+    it('parses codex native response_item transcripts, including tool calls', async () => {
+      const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'codex-session-'));
+      const sessionPath = path.join(tempDir, 'example.jsonl');
+
+      try {
+        await fs.writeFile(
+          sessionPath,
+          [
+            JSON.stringify({
+              type: 'session_meta',
+              payload: {
+                id: 'native-session-1',
+                cwd: 'C:\\work\\agent-mux',
+              },
+            }),
+            JSON.stringify({
+              type: 'turn_context',
+              payload: {
+                model: 'gpt-5.4',
+              },
+            }),
+            JSON.stringify({
+              type: 'response_item',
+              payload: {
+                type: 'message',
+                role: 'user',
+                content: [{ type: 'input_text', text: 'Run pwd' }],
+              },
+            }),
+            JSON.stringify({
+              type: 'response_item',
+              payload: {
+                type: 'function_call',
+                call_id: 'call-1',
+                name: 'shell_command',
+                arguments: '{\"command\":\"pwd\"}',
+              },
+            }),
+            JSON.stringify({
+              type: 'response_item',
+              payload: {
+                type: 'function_call_output',
+                call_id: 'call-1',
+                output: 'C:\\\\work\\\\agent-mux',
+              },
+            }),
+            JSON.stringify({
+              type: 'response_item',
+              payload: {
+                type: 'message',
+                role: 'assistant',
+                content: [{ type: 'output_text', text: 'DONE' }],
+              },
+            }),
+          ].join('\n'),
+          'utf8',
+        );
+
+        const session = await adapter.parseSessionFile(sessionPath);
+        expect(session.sessionId).toBe('example');
+        expect(session.cwd).toBe('C:\\work\\agent-mux');
+        expect(session.model).toBe('gpt-5.4');
+        expect(session.messages).toHaveLength(4);
+        expect(session.messages[0]).toMatchObject({
+          role: 'user',
+          content: 'Run pwd',
+        });
+        expect(session.messages[1]).toMatchObject({
+          role: 'assistant',
+          toolCalls: [
+            {
+              toolCallId: 'call-1',
+              toolName: 'shell_command',
+              input: { command: 'pwd' },
+            },
+          ],
+        });
+        expect(session.messages[2]).toMatchObject({
+          role: 'tool',
+          toolResult: {
+            toolCallId: 'call-1',
+            toolName: 'shell_command',
+            output: 'C:\\\\work\\\\agent-mux',
+          },
+        });
+        expect(session.messages[3]).toMatchObject({
+          role: 'assistant',
+          content: 'DONE',
+        });
+      } finally {
+        await fs.rm(tempDir, { recursive: true, force: true });
+      }
+    });
+
+    it('estimates session cost from persisted token_count events', async () => {
+      const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'codex-session-cost-'));
+      const sessionPath = path.join(tempDir, 'costed.jsonl');
+
+      try {
+        await fs.writeFile(
+          sessionPath,
+          [
+            JSON.stringify({
+              type: 'turn_context',
+              payload: {
+                model: 'gpt-5.4',
+              },
+            }),
+            JSON.stringify({
+              type: 'event_msg',
+              payload: {
+                type: 'token_count',
+                info: {
+                  total_token_usage: {
+                    input_tokens: 1000,
+                    cached_input_tokens: 400,
+                    output_tokens: 100,
+                    reasoning_output_tokens: 50,
+                    total_tokens: 1100,
+                  },
+                },
+              },
+            }),
+          ].join('\n'),
+          'utf8',
+        );
+
+        const session = await adapter.parseSessionFile(sessionPath);
+        expect(session.cost).toMatchObject({
+          inputTokens: 1000,
+          cachedTokens: 400,
+          outputTokens: 100,
+          thinkingTokens: 50,
+        });
+        expect(session.cost?.totalUsd).toBeCloseTo(0.00385, 8);
+      } finally {
+        await fs.rm(tempDir, { recursive: true, force: true });
+      }
     });
   });
 });
