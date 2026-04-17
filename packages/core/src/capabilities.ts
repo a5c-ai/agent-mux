@@ -14,6 +14,22 @@ import type { RuntimeHookCapabilities } from './runtime-hooks.js';
 /** Discrete thinking effort levels supported by agents. */
 export type ThinkingEffortLevel = 'low' | 'medium' | 'high' | 'max';
 
+/** Normalized request/transport protocol used to talk to a model. */
+export type ModelProtocol = 'chat' | 'responses' | 'messages' | 'custom';
+
+/** How a model is typically reached for a given adapter. */
+export type ModelDeployment = 'hosted' | 'local' | 'gateway' | 'hybrid';
+
+/**
+ * How agent-mux can execute additional turns for a structured session.
+ *
+ * `restart-per-turn` means each user turn requires a fresh invocation or
+ * reconnect that resumes the same native session.
+ * `persistent` means the same live process/connection stays open and can
+ * accept later turns while continuing to emit structured events.
+ */
+export type StructuredSessionTransport = 'none' | 'restart-per-turn' | 'persistent';
+
 // ---------------------------------------------------------------------------
 // PluginRegistry
 // ---------------------------------------------------------------------------
@@ -145,6 +161,13 @@ export interface AgentCapabilities {
 
   /** Whether the agent supports structured output with a schema. */
   supportsStructuredOutput: boolean;
+
+  /**
+   * How agent-mux can drive structured multi-turn sessions for this adapter.
+   * Distinguishes resumable one-turn CLI flows from truly persistent live
+   * structured sessions.
+   */
+  structuredSessionTransport: StructuredSessionTransport;
 
   // ── Skills / Agent Docs ─────────────────────────────────────────────
 
@@ -324,6 +347,21 @@ export interface ModelCapabilities {
 
   /** Whether this model accepts file inputs beyond images. */
   supportsFileInput: boolean;
+
+  /** The underlying provider family backing this model entry. */
+  provider?: string;
+
+  /** Provider-native model identifier when it differs from modelId. */
+  providerModelId?: string;
+
+  /** The request/transport protocol typically used for this model. */
+  protocol?: ModelProtocol;
+
+  /** Whether this model is typically reached as hosted, local, or via gateway. */
+  deployment?: ModelDeployment;
+
+  /** Whether the adapter can route this catalog entry to local model backends. */
+  supportsLocalModels?: boolean;
 
   /** The CLI argument key used to select this model. */
   cliArgKey: string;

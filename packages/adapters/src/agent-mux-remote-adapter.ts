@@ -32,6 +32,7 @@ import type {
 } from '@a5c-ai/agent-mux-core';
 
 import { BaseAgentAdapter } from './base-adapter.js';
+import { createVirtualRuntimeHookCapabilities } from './shared/runtime-hooks-virtual.js';
 
 export class AgentMuxRemoteAdapter extends BaseAgentAdapter {
   readonly agent = 'agent-mux-remote' as const;
@@ -54,19 +55,13 @@ export class AgentMuxRemoteAdapter extends BaseAgentAdapter {
     supportsParallelToolCalls: true,
     requiresToolApproval: false,
     approvalModes: ['yolo', 'prompt', 'deny'],
-    runtimeHooks: {
-      preToolUse: 'unsupported',
-      postToolUse: 'unsupported',
-      sessionStart: 'unsupported',
-      sessionEnd: 'unsupported',
-      stop: 'unsupported',
-      userPromptSubmit: 'unsupported',
-    },
+    runtimeHooks: createVirtualRuntimeHookCapabilities(),
     supportsThinking: true,
     thinkingEffortLevels: ['low', 'medium', 'high'],
     supportsThinkingBudgetTokens: true,
     supportsJsonMode: true,
     supportsStructuredOutput: true,
+    structuredSessionTransport: 'restart-per-turn',
     supportsSkills: false,
     supportsAgentsMd: false,
     skillsFormat: null,

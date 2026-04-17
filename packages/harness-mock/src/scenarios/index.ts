@@ -15,6 +15,9 @@ export * from './hooks.js';
 import { AGENT_SCENARIOS } from './per-agent.js';
 import { ERROR_SCENARIOS } from './errors.js';
 import { INTERACTION_SCENARIOS } from './interactive.js';
+import {
+  RUNTIME_HOOK_SCENARIOS,
+} from './hooks.js';
 import type { HarnessScenario } from '../types.js';
 
 /**
@@ -33,6 +36,7 @@ export function resolveScenario(name: string): HarnessScenario | undefined {
     const m = name.slice('interactive:'.length) as 'yolo' | 'prompt' | 'deny';
     if (INTERACTION_SCENARIOS[m]) return INTERACTION_SCENARIOS[m];
   }
+  if (RUNTIME_HOOK_SCENARIOS[name]) return RUNTIME_HOOK_SCENARIOS[name];
   return undefined;
 }
 
@@ -42,5 +46,6 @@ export function listScenarioNames(): string[] {
   names.push(...Object.keys(AGENT_SCENARIOS));
   for (const k of Object.keys(ERROR_SCENARIOS)) names.push(`error:${k}`);
   for (const k of Object.keys(INTERACTION_SCENARIOS)) names.push(`interactive:${k}`);
+  names.push(...Object.keys(RUNTIME_HOOK_SCENARIOS));
   return names.sort();
 }

@@ -16,6 +16,7 @@ import * as path from 'node:path';
 function mockAdapter(
   agent: string,
   config: Record<string, unknown> = {},
+  defaultModelId?: string,
 ): AgentAdapter {
   let storedConfig = { ...config };
 
@@ -57,6 +58,7 @@ function mockAdapter(
       installMethods: [],
     },
     models: [],
+    defaultModelId,
     configSchema: {
       version: 1,
       fields: [
@@ -236,6 +238,39 @@ describe('ConfigManagerImpl', () => {
 
     it('throws AGENT_NOT_FOUND for unknown agent', () => {
       expect(() => manager.getMcpServers('nonexistent')).toThrow(AgentMuxError);
+    });
+  });
+
+  // ── getModelSelection() ─────────────────────────────────────────────
+
+  describe('getModelSelection()', () => {
+    it('returns configured and effective model information', async () => {
+      registry.register(mockAdapter('claude', {}, 'sonnet'));
+      await manager.setModelSelection('claude', { model: 'opus', provider: 'anthropic' });
+      const selection = manager.getModelSelection('claude');
+      expect(selection.configuredModel).toBe('opus');
+      expect(selection.configuredProvider).toBe('anthropic');
+      expect(selection.defaultModel).toBe('sonnet');
+      expect(selection.effectiveModel).toBe('opus');
+    });
+
+    it('falls back to adapter default when config is unset', () => {
+      registry.register(mockAdapter('claude', {}, 'sonnet'));
+      const selection = manager.getModelSelection('claude');
+      expect(selection.configuredModel).toBeNull();
+      expect(selection.defaultModel).toBe('sonnet');
+      expect(selection.effectiveModel).toBe('sonnet');
+    });
+  });
+
+  // ── setModelSelection() ─────────────────────────────────────────────
+
+  describe('setModelSelection()', () => {
+    it('updates model and provider fields together', async () => {
+      registry.register(mockAdapter('claude', {}, 'sonnet'));
+      await manager.setModelSelection('claude', { model: 'opus', provider: 'anthropic' });
+      expect(manager.getField('claude', 'model')).toBe('opus');
+      expect(manager.getField('claude', 'provider')).toBe('anthropic');
     });
   });
 

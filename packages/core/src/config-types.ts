@@ -25,10 +25,10 @@ export interface AgentConfig {
   readonly filePaths?: string[];
 
   /** Default model ID. */
-  model?: string;
+  model?: string | null;
 
   /** Provider name. */
-  provider?: string;
+  provider?: string | null;
 
   /** Sampling temperature. */
   temperature?: number;
@@ -62,6 +62,21 @@ export interface AgentConfig {
 
   /** Index signature for dynamic access. */
   [key: string]: unknown;
+}
+
+/** Effective model selection state for an agent. */
+export interface ModelSelection {
+  /** Explicitly configured model, if any. */
+  readonly configuredModel: string | null;
+
+  /** Explicitly configured provider, if any. */
+  readonly configuredProvider: string | null;
+
+  /** Adapter-declared default model. */
+  readonly defaultModel: string | null;
+
+  /** Effective model after config fallback to adapter default. */
+  readonly effectiveModel: string | null;
 }
 
 // ---------------------------------------------------------------------------

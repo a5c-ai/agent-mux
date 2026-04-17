@@ -1,0 +1,17 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "rootDir": ".",
+    "outDir": "dist-types",
+    "emitDeclarationOnly": true,
+    "jsx": "react-jsx",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "allowSyntheticDefaultImports": true
+  },
+  "include": ["src", "vite.config.ts"],
+  "references": [
+    { "path": "../ui" }
+  ]
+}

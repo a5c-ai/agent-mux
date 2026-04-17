@@ -179,6 +179,44 @@ describe('MockProcess', () => {
     });
   });
 
+  describe('runtime hooks', () => {
+    it('waits for allow decisions before emitting the intercepted chunk', async () => {
+      const proc = new MockProcess(simpleScenario({
+        output: [
+          { stream: 'stdout', data: 'tool\n', delayMs: 0 },
+          { stream: 'stdout', data: 'after\n', delayMs: 0 },
+        ],
+        runtimeHooks: {
+          steps: [
+            { chunkIndex: 0, kind: 'preToolUse', decision: 'allow', delayMs: 10 },
+          ],
+        },
+      }));
+      const events: string[] = [];
+      proc.on('runtime-hook', () => events.push('hook'));
+      proc.on('stdout', (data: string) => events.push(data.trim()));
+      proc.start();
+      await proc.waitForExit();
+      expect(events).toEqual(['hook', 'tool', 'after']);
+    });
+
+    it('exits with code 2 when a runtime hook denies', async () => {
+      const proc = new MockProcess(simpleScenario({
+        output: [{ stream: 'stdout', data: 'tool\n', delayMs: 0 }],
+        runtimeHooks: {
+          steps: [
+            { chunkIndex: 0, kind: 'preToolUse', decision: 'deny', errorMessage: 'denied by hook' },
+          ],
+        },
+      }));
+      proc.start();
+      const result = await proc.waitForExit();
+      expect(result.exitCode).toBe(2);
+      expect(result.stdout).toBe('');
+      expect(result.stderr).toContain('denied by hook');
+    });
+  });
+
   describe('waitForExit resolves immediately if already exited', () => {
     it('resolves immediately', async () => {
       const proc = new MockProcess(simpleScenario({ output: [] }));

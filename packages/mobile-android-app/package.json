@@ -1,0 +1,26 @@
+{
+  "name": "@a5c-ai/agent-mux-mobile-android-app",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "description": "Expo-based Android companion app for agent-mux",
+  "main": "src/index.tsx",
+  "scripts": {
+    "build": "tsc --build",
+    "android": "expo run:android",
+    "start": "expo start"
+  },
+  "dependencies": {
+    "@a5c-ai/agent-mux-ui": "file:../ui",
+    "expo": "~51.0.39",
+    "expo-camera": "~15.0.16",
+    "expo-haptics": "~13.0.1",
+    "expo-notifications": "~0.28.19",
+    "react": "18.2.0",
+    "react-native": "0.74.5"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.79"
+  }
+}

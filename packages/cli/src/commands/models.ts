@@ -10,7 +10,7 @@ import type { ParsedArgs } from '../parse-args.js';
 import { flagBool, flagStr } from '../parse-args.js';
 import { ExitCode, errorCodeToExitCode } from '../exit-codes.js';
 import {
-  printTable, printJsonOk, printJsonError, printError, printJson, toPlain,
+  printTable, printJsonOk, printJsonError, printError, printJson, printKeyValue, toPlain,
 } from '../output.js';
 
 export async function modelsCommand(client: AgentMuxClient, args: ParsedArgs): Promise<number> {
@@ -57,11 +57,39 @@ export async function modelsCommand(client: AgentMuxClient, args: ParsedArgs): P
     return modelsRefresh(client, agent, jsonMode);
   }
 
+  if (sub === 'current') {
+    const agent = args.positionals[0] ?? flagStr(args.flags, 'agent');
+    if (!agent) {
+      if (jsonMode) {
+        printJsonError('VALIDATION_ERROR', 'Missing required argument: <agent>');
+      } else {
+        printError('Missing required argument: <agent>');
+      }
+      return ExitCode.USAGE_ERROR;
+    }
+    return modelsCurrent(client, agent, jsonMode);
+  }
+
+  if (sub === 'set') {
+    const agent = args.positionals[0] ?? flagStr(args.flags, 'agent');
+    const modelId = args.positionals[1];
+    const provider = flagStr(args.flags, 'provider');
+    if (!agent || !modelId) {
+      if (jsonMode) {
+        printJsonError('VALIDATION_ERROR', 'Usage: amux models set <agent> <model> [--provider <provider>]');
+      } else {
+        printError('Usage: amux models set <agent> <model> [--provider <provider>]');
+      }
+      return ExitCode.USAGE_ERROR;
+    }
+    return modelsSet(client, agent, modelId, provider, jsonMode);
+  }
+
   if (!sub) {
     if (jsonMode) {
-      printJsonError('VALIDATION_ERROR', 'Missing subcommand. Available: list, info, refresh');
+      printJsonError('VALIDATION_ERROR', 'Missing subcommand. Available: list, info, refresh, current, set');
     } else {
-      printError('Missing subcommand. Available: list, info, refresh');
+      printError('Missing subcommand. Available: list, info, refresh, current, set');
     }
     return ExitCode.USAGE_ERROR;
   }
@@ -76,7 +104,7 @@ export async function modelsCommand(client: AgentMuxClient, args: ParsedArgs): P
 
 async function modelsList(client: AgentMuxClient, agent: string, jsonMode: boolean): Promise<number> {
   try {
-    const models = client.models.models(agent);
+    const models = client.models.catalog(agent);
 
     if (jsonMode) {
       printJsonOk(models);
@@ -88,15 +116,17 @@ async function modelsList(client: AgentMuxClient, agent: string, jsonMode: boole
       return [
       String(m['id'] ?? m['modelId'] ?? '--'),
       String(m['displayName'] ?? m['name'] ?? '--'),
+      String(m['provider'] ?? '--'),
+      String(m['protocol'] ?? '--'),
+      String(m['deployment'] ?? '--'),
       String(m['contextWindow'] ?? '--'),
-      String(m['maxOutputTokens'] ?? '--'),
-      m['supportsThinking'] ? 'yes' : 'no',
-      m['supportsStreaming'] ? 'yes' : 'no',
+      String(m['source'] ?? '--'),
+      m['isDefault'] ? 'yes' : 'no',
       ];
     });
 
     printTable(
-      ['Model ID', 'Display Name', 'Context', 'Max Output', 'Thinking', 'Streaming'],
+      ['Model ID', 'Display Name', 'Provider', 'Protocol', 'Deploy', 'Context', 'Source', 'Default'],
       rows,
     );
     return ExitCode.SUCCESS;
@@ -134,11 +164,89 @@ async function modelsInfo(
 async function modelsRefresh(client: AgentMuxClient, agent: string, jsonMode: boolean): Promise<number> {
   try {
     await client.models.refresh(agent);
+    const models = client.models.catalog(agent);
+    const lastUpdated = client.models.lastUpdated(agent).toISOString();
 
     if (jsonMode) {
-      printJsonOk({ refreshed: agent });
+      printJsonOk({ refreshed: agent, count: models.length, lastUpdated });
     } else {
-      process.stdout.write(`Model list refreshed for ${agent}.\n`);
+      process.stdout.write(`Model list refreshed for ${agent} (${models.length} entries, ${lastUpdated}).\n`);
+    }
+    return ExitCode.SUCCESS;
+  } catch (err: unknown) {
+    return handleError(err, jsonMode);
+  }
+}
+
+async function modelsCurrent(client: AgentMuxClient, agent: string, jsonMode: boolean): Promise<number> {
+  try {
+    const selection = client.config.getModelSelection(agent);
+    const effective = selection.effectiveModel
+      ? client.models.model(agent, selection.effectiveModel)
+      : null;
+    const payload = {
+      agent,
+      configuredModel: selection.configuredModel,
+      configuredProvider: selection.configuredProvider,
+      defaultModel: selection.defaultModel,
+      effectiveModel: effective?.modelId ?? selection.effectiveModel,
+      effectiveModelDetails: effective,
+    };
+
+    if (jsonMode) {
+      printJsonOk(payload);
+    } else {
+      printKeyValue([
+        ['Agent', agent],
+        ['Configured Model', selection.configuredModel ?? '--'],
+        ['Configured Provider', selection.configuredProvider ?? '--'],
+        ['Default Model', selection.defaultModel ?? '--'],
+        ['Effective Model', effective?.modelId ?? selection.effectiveModel ?? '--'],
+        ['Provider', effective?.provider ?? '--'],
+        ['Protocol', effective?.protocol ?? '--'],
+        ['Deployment', effective?.deployment ?? '--'],
+      ]);
+    }
+    return ExitCode.SUCCESS;
+  } catch (err: unknown) {
+    return handleError(err, jsonMode);
+  }
+}
+
+async function modelsSet(
+  client: AgentMuxClient,
+  agent: string,
+  modelId: string,
+  provider: string | undefined,
+  jsonMode: boolean,
+): Promise<number> {
+  try {
+    const validation = client.models.validate(agent, modelId);
+    if (!validation.valid || !validation.model) {
+      if (jsonMode) {
+        printJsonError('VALIDATION_ERROR', validation.message);
+      } else {
+        printError(validation.message);
+      }
+      return ExitCode.USAGE_ERROR;
+    }
+
+    const resolvedModelId = validation.resolvedModelId ?? validation.model.modelId;
+    await client.config.setModelSelection(agent, { model: resolvedModelId, provider });
+    const selection = client.config.getModelSelection(agent);
+    const payload = {
+      agent,
+      requestedModel: modelId,
+      configuredModel: selection.configuredModel,
+      configuredProvider: selection.configuredProvider,
+      status: validation.status,
+      effectiveModel: selection.effectiveModel,
+    };
+
+    if (jsonMode) {
+      printJsonOk(payload);
+    } else {
+      process.stdout.write(`Set model for ${agent} to ${resolvedModelId}${provider ? ` (${provider})` : ''}.\n`);
     }
     return ExitCode.SUCCESS;
   } catch (err: unknown) {

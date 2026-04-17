@@ -22,6 +22,7 @@ import type {
 } from '@a5c-ai/agent-mux-core';
 
 import { BaseAgentAdapter } from './base-adapter.js';
+import { createVirtualRuntimeHookCapabilities } from './shared/runtime-hooks-virtual.js';
 import { mcpListPlugins, mcpInstallPlugin, mcpUninstallPlugin } from './mcp-plugins.js';
 import { readAuthConfigIdentity } from './auth-config.js';
 import {
@@ -53,19 +54,13 @@ export class OpenCodeAdapter extends BaseAgentAdapter {
     supportsParallelToolCalls: true,
     requiresToolApproval: true,
     approvalModes: ['yolo', 'prompt'],
-    runtimeHooks: {
-      preToolUse: 'unsupported',
-      postToolUse: 'unsupported',
-      sessionStart: 'unsupported',
-      sessionEnd: 'unsupported',
-      stop: 'unsupported',
-      userPromptSubmit: 'unsupported',
-    },
+    runtimeHooks: createVirtualRuntimeHookCapabilities(),
     supportsThinking: false,
     thinkingEffortLevels: [],
     supportsThinkingBudgetTokens: false,
     supportsJsonMode: true,
     supportsStructuredOutput: true,
+    structuredSessionTransport: 'restart-per-turn',
     supportsSkills: true,
     supportsAgentsMd: true,
     skillsFormat: 'file',

@@ -105,6 +105,12 @@ export interface BaseEvent {
   timestamp: number;
 
   /**
+   * Origin of the event inside agent-mux.
+   * Omitted for legacy agent-originated events.
+   */
+  source?: string;
+
+  /**
    * The raw, unparsed line from the agent's output.
    * Present only when the client is created with `debug: true`
    * or the run is started with `debug: true`.

@@ -107,12 +107,34 @@ suite('built CLI — functional audit', () => {
     const parsed = parseJson(res);
     expect(parsed.ok).toBe(true);
     expect(Array.isArray(parsed.data)).toBe(true);
+    expect((parsed.data as Array<Record<string, unknown>>)[0]).toHaveProperty('provider');
   });
 
   it('models list --json (no agent) → VALIDATION_ERROR', () => {
     const res = run('models', 'list', '--json');
     expect(res.status).not.toBe(0);
     expect(parseJson(res).error?.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('models current claude --json returns configured/default/effective model data', () => {
+    const res = run('models', 'current', 'claude', '--json');
+    expect(res.status).toBe(0);
+    const parsed = parseJson(res);
+    expect(parsed.ok).toBe(true);
+    expect(parsed.data).toHaveProperty('defaultModel');
+    expect(parsed.data).toHaveProperty('effectiveModel');
+  });
+
+  it('models set claude sonnet --json resolves aliases and writes config', () => {
+    const res = run('models', 'set', 'claude', 'sonnet', '--json');
+    expect(res.status).toBe(0);
+    const parsed = parseJson(res);
+    expect(parsed.ok).toBe(true);
+    expect(parsed.data).toMatchObject({
+      agent: 'claude',
+      requestedModel: 'sonnet',
+      configuredModel: 'claude-sonnet-4-20250514',
+    });
   });
 
   // ── auth ────────────────────────────────────────────────────────

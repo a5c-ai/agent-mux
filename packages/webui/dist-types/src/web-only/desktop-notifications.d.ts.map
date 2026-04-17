@@ -1,0 +1,1 @@
+{"version":3,"file":"desktop-notifications.d.ts","sourceRoot":"","sources":["../../../src/web-only/desktop-notifications.ts"],"names":[],"mappings":"AAAA,wBAAsB,oCAAoC,IAAI,OAAO,CAAC,IAAI,CAAC,CAK1E;AAED,wBAAgB,2BAA2B,CAAC,KAAK,EAAE;IAAE,KAAK,EAAE,MAAM,CAAC;IAAC,IAAI,EAAE,MAAM,CAAC;IAAC,OAAO,IAAI,IAAI,CAAA;CAAE,GAAG,IAAI,CAUzG"}

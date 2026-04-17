@@ -19,12 +19,13 @@ import type { RunOptions } from './run-options.js';
 import { AgentMuxError } from './errors.js';
 
 import { RunHandleImpl } from './run-handle-impl.js';
+import { createSpawnRuntimeHookBridge } from './spawn-runtime-hooks.js';
 import { StreamAssembler } from './stream-assembler.js';
 import { processTracker } from './process-tracker.js';
 import { DEFAULT_RETRY_POLICY } from './retry.js';
 import type { ErrorCode, RetryPolicy } from './types.js';
 import type { InvocationMode } from './invocation.js';
-import { ActiveSpawn, computeDelay, isWindows, resolveSpawnArgs } from './spawn-runner-utils.js';
+import { ActiveSpawn, computeDelay, isWindows, resolveExitOutcome, resolveSpawnArgs } from './spawn-runner-utils.js';
 import { buildInvocationCommand, runCleanupDetached, type InvocationCommandWithCleanup } from './spawn-invocation.js';
 export { buildInvocationCommand, type InvocationCommand, type InvocationCommandWithCleanup, type K8sCleanup } from './spawn-invocation.js';
 
@@ -101,7 +102,11 @@ async function runOnce(
   options: RunOptions,
   finalize: FinalizeFn,
 ): Promise<void> {
-  const spawnArgs = await resolveSpawnArgs(adapter, adapter.buildSpawnArgs(options));
+  const runtimeHooks = await createSpawnRuntimeHookBridge(handle, adapter, options);
+  const resolvedSpawnArgs = await resolveSpawnArgs(adapter, adapter.buildSpawnArgs(options));
+  const spawnArgs = runtimeHooks.setup?.env
+    ? { ...resolvedSpawnArgs, env: { ...resolvedSpawnArgs.env, ...runtimeHooks.setup.env } }
+    : resolvedSpawnArgs;
   const now = Date.now();
 
   // Transform the spawnArgs according to the configured invocation mode.
@@ -179,7 +184,7 @@ async function runOnce(
   const makeParseCtx = (source: 'stdout' | 'stderr'): ParseContext => ({
     runId: handle.runId,
     agent: handle.agent,
-    sessionId: options.sessionId,
+    sessionId: runtimeHooks.sessionId,
     turnIndex: 0,
     debug: false,
     outputFormat: options.outputFormat ?? 'text',
@@ -230,7 +235,7 @@ async function runOnce(
       for (const ev of events) {
         eventCount += 1;
         lastEventType = ev.type;
-        handle.emit(ev);
+        runtimeHooks.enqueue(ev);
       }
     } catch (err) {
       handle.emit({
@@ -281,6 +286,7 @@ async function runOnce(
   });
 
   handle.bindInputTransport(async (text: string) => {
+    runtimeHooks.dispatchPrompt(text);
     if (!adapter.capabilities.supportsStdinInjection) {
       throw new AgentMuxError('STDIN_NOT_AVAILABLE', `${adapter.agent} does not support stdin injection`, false);
     }
@@ -294,10 +300,18 @@ async function runOnce(
     }
   });
 
+  const initialPromptText = Array.isArray(options.prompt) ? options.prompt.join('\n') : options.prompt;
+
   // Optional initial stdin from SpawnArgs.
   if (spawnArgs.stdin && child.stdin) {
+    runtimeHooks.dispatchPrompt(initialPromptText);
     child.stdin.write(spawnArgs.stdin);
     if (options.nonInteractive === true) {
+      child.stdin.end();
+    }
+  } else {
+    runtimeHooks.dispatchPrompt(initialPromptText);
+    if (spawnArgs.closeStdinAfterSpawn === true && child.stdin && !child.stdin.destroyed) {
       child.stdin.end();
     }
   }
@@ -308,6 +322,7 @@ async function runOnce(
   let aborted = false;
 
   const killChild = (signal: NodeJS.Signals): void => {
+    runtimeHooks.abort();
     try {
       if (!isWindows && typeof child.pid === 'number') {
         try { process.kill(-child.pid, signal); } catch { child.kill(signal); }
@@ -396,6 +411,7 @@ async function runOnce(
   child.on('error', (err: NodeJS.ErrnoException) => {
     if (errorFired) return;
     errorFired = true;
+    runtimeHooks.abort();
     const code: ErrorCode =
       err.code === 'ENOENT' ? 'AGENT_NOT_FOUND' : 'SPAWN_ERROR';
     handle.emit({
@@ -407,14 +423,26 @@ async function runOnce(
       message: err.message,
       recoverable: false,
     });
-    cleanupAndFinalize(code, 'crashed', null, null);
+    void cleanupAndFinalize(code, 'crashed', null, null);
   });
 
-  const cleanupAndFinalize: FinalizeFn = (terminalCode, exitReason, exitCode, signal) => {
+  const cleanupAndFinalize = async (
+    terminalCode: ErrorCode | null,
+    exitReason: import('./run-handle.js').RunResult['exitReason'],
+    exitCode: number | null,
+    signal: string | null,
+  ): Promise<void> => {
+    runtimeHooks.abort();
+    await runtimeHooks.finalize(exitReason, exitCode, signal);
     if (runTimer) clearTimeout(runTimer);
     if (inactivityTimer) clearTimeout(inactivityTimer);
     if (active.killTimer) clearTimeout(active.killTimer);
     if (typeof child.pid === 'number') processTracker.unregister(child.pid);
+    try {
+      await runtimeHooks.setup?.cleanup?.();
+    } catch {
+      // Best-effort cleanup only.
+    }
     // Best-effort k8s ephemeral pod teardown — safety net if `kubectl run --rm`
     // didn't fire because our local kubectl client was killed mid-flight.
     if (invocationCmd.cleanup) runCleanupDetached(invocationCmd.cleanup);
@@ -424,26 +452,14 @@ async function runOnce(
   child.on('exit', (code, signal) => {
     if (errorFired) return;
 
-    let exitReason: import('./run-handle.js').RunResult['exitReason'];
-    let terminalCode: ErrorCode | null = null;
-
-    if (runTimeoutHit) {
-      exitReason = 'timeout';
-      terminalCode = 'TIMEOUT';
-    } else if (inactivityTimeoutHit) {
-      exitReason = 'inactivity';
-      terminalCode = 'INACTIVITY_TIMEOUT';
-    } else if (aborted) {
-      exitReason = 'aborted';
-      terminalCode = 'ABORTED';
-    } else if (code === 0) {
-      exitReason = 'completed';
-    } else if (signal) {
-      exitReason = 'killed';
-      terminalCode = 'AGENT_CRASH';
-    } else {
-      exitReason = 'crashed';
-      terminalCode = 'AGENT_CRASH';
+    const { exitReason, terminalCode, emitCrash } = resolveExitOutcome({
+      runTimeoutHit,
+      inactivityTimeoutHit,
+      aborted,
+      code,
+      signal: signal ?? null,
+    });
+    if (emitCrash) {
       handle.emit({
         type: 'crash',
         runId: handle.runId,
@@ -454,6 +470,6 @@ async function runOnce(
       });
     }
 
-    cleanupAndFinalize(terminalCode, exitReason, code, signal ?? null);
+    void cleanupAndFinalize(terminalCode, exitReason, code, signal ?? null);
   });
 }

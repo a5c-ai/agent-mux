@@ -1,0 +1,1 @@
+{"version":3,"file":"useGatewaySelector.d.ts","sourceRoot":"","sources":["../../../src/hooks/useGatewaySelector.ts"],"names":[],"mappings":"AAEA,OAAO,EAAE,UAAU,EAAE,MAAM,sBAAsB,CAAC;AAElD,wBAAgB,kBAAkB,CAAC,CAAC,EAClC,QAAQ,EAAE,CAAC,KAAK,EAAE,UAAU,CAAC,UAAU,CAAC,OAAO,UAAU,CAAC,CAAC,OAAO,CAAC,CAAC,UAAU,CAAC,CAAC,KAAK,CAAC,GACrF,CAAC,CAOH"}

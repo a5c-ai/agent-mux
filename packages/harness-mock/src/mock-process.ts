@@ -100,10 +100,9 @@ export class MockProcess extends EventEmitter implements MockHarnessHandle {
     this._schedule(startDelay, () => {
       this.emit('spawn');
       this._validateExpectations();
-      this._emitOutputChunks();
       this._applyFileOperations();
       this._emitSimulatedTelemetry();
-      this._scheduleExit();
+      this._emitOutputChunks();
     });
 
     if (this.scenario.process.hang) {
@@ -127,12 +126,18 @@ export class MockProcess extends EventEmitter implements MockHarnessHandle {
   // Private
   // -----------------------------------------------------------------------
 
-  private _emitOutputChunks(): void {
-    let cumulativeDelay = 0;
-    for (const chunk of this.scenario.output) {
-      cumulativeDelay += (chunk.delayMs ?? 0);
-      this._schedule(cumulativeDelay, () => {
-        if (this._exited) return;
+  private _emitOutputChunks(index = 0): void {
+    if (!this.scenario.output || index >= this.scenario.output.length) {
+      this._scheduleExit();
+      return;
+    }
+
+    const chunk = this.scenario.output[index]!;
+    this._schedule(chunk.delayMs ?? 0, () => {
+      if (this._exited) return;
+
+      const hookStep = this.scenario.runtimeHooks?.steps.find((step) => step.chunkIndex === index);
+      const proceed = () => {
         if (chunk.stream === 'stdout') {
           this._stdout += chunk.data;
           this.emit('stdout', chunk.data);
@@ -141,8 +146,33 @@ export class MockProcess extends EventEmitter implements MockHarnessHandle {
           this.emit('stderr', chunk.data);
         }
         this._checkInteractions(chunk);
+        this._emitOutputChunks(index + 1);
+      };
+
+      if (!hookStep) {
+        proceed();
+        return;
+      }
+
+      this.emit('runtime-hook', hookStep);
+
+      if (hookStep.decision === 'timeout') {
+        return;
+      }
+
+      this._schedule(hookStep.delayMs ?? 0, () => {
+        if (this._exited) return;
+        this.emit('runtime-hook-result', hookStep);
+        if (hookStep.decision === 'deny') {
+          const line = `${hookStep.errorMessage ?? `Runtime hook denied ${hookStep.kind}`}\n`;
+          this._stderr += line;
+          this.emit('stderr', line);
+          this._exit(2);
+          return;
+        }
+        proceed();
       });
-    }
+    });
   }
 
   private _applyFileOperations(): void {
@@ -204,14 +234,8 @@ export class MockProcess extends EventEmitter implements MockHarnessHandle {
   private _scheduleExit(): void {
     if (this.scenario.process.hang) return;
     if (this.scenario.process.crashAfterMs !== undefined) return;
-
-    // Calculate total output time
-    let totalOutputTime = 0;
-    for (const chunk of this.scenario.output) {
-      totalOutputTime += (chunk.delayMs ?? 0);
-    }
     const shutdownDelay = this.scenario.process.shutdownDelayMs ?? 0;
-    this._schedule(totalOutputTime + shutdownDelay, () => {
+    this._schedule(shutdownDelay, () => {
       if (!this._exited) {
         this._exit(this.scenario.process.exitCode);
       }

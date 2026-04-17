@@ -9,6 +9,10 @@ import type { AgentCapabilities, ModelCapabilities } from './capabilities.js';
 import type { RunOptions } from './run-options.js';
 import type { AgentEvent } from './events.js';
 import type { StreamAssembler } from './stream-assembler.js';
+import type {
+  RuntimeHookDispatcher,
+  RuntimeHookSetup,
+} from './runtime-hooks.js';
 
 // ---------------------------------------------------------------------------
 // Re-export types from dedicated type modules (Phase 5)
@@ -108,6 +112,13 @@ export interface SpawnArgs {
 
   /** Standard input to pipe into the subprocess after spawn. */
   stdin?: string;
+
+  /**
+   * Close stdin immediately after launch setup completes.
+   * Useful for CLIs that inspect stdin and block until EOF even when the
+   * primary prompt is supplied via command-line arguments.
+   */
+  closeStdinAfterSpawn?: boolean;
 
   /** Timeout in milliseconds for entire subprocess execution. */
   timeout?: number;
@@ -324,6 +335,9 @@ export interface AgentAdapter {
   readConfig(cwd?: string): Promise<AgentConfig>;
   writeConfig(config: Partial<AgentConfig>, cwd?: string): Promise<void>;
 
+  /** Optional adapter-native model discovery hook used by ModelRegistry.refresh(). */
+  discoverModels?(cwd?: string): Promise<ModelCapabilities[]>;
+
   // ── Host detection (optional) ─────────────────────────────────────
 
   /** Env-var names that indicate the current process is running under this harness. */
@@ -356,6 +370,12 @@ export interface AgentAdapter {
 
   /** Remove a hook installed by `installHook`. */
   uninstallHook?(id: string, opts?: { scope?: 'global' | 'project' }): Promise<boolean>;
+
+  /**
+   * Optional per-run native runtime-hook bridge setup for harnesses that can
+   * invoke external hook commands before or after internal actions.
+   */
+  setupRuntimeHooks?(options: RunOptions, dispatcher: RuntimeHookDispatcher): Promise<RuntimeHookSetup | void>;
 
   // ── Plugin operations (optional) ──────────────────────────────────
 

@@ -83,6 +83,7 @@ export default [
   {
     ignores: [
       '**/dist/**',
+      '**/dist-types/**',
       '**/node_modules/**',
       '**/.a5c/**',
       '**/.codex/**',

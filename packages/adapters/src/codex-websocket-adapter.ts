@@ -25,9 +25,10 @@ import type {
 } from '@a5c-ai/agent-mux-core';
 
 import { BaseRemoteAdapter } from './remote-adapter-base.js';
+import { createVirtualRuntimeHookCapabilities } from './shared/runtime-hooks-virtual.js';
 import {
   listJsonlFiles,
-  parseJsonlSessionFile,
+  parseCodexSessionFile,
   readJsonFile,
   writeJsonFileAtomic,
 } from './session-fs.js';
@@ -56,19 +57,13 @@ export class CodexWebSocketAdapter extends BaseRemoteAdapter {
     supportsParallelToolCalls: true,
     requiresToolApproval: true,
     approvalModes: ['yolo', 'prompt', 'deny'],
-    runtimeHooks: {
-      preToolUse: 'unsupported',
-      postToolUse: 'unsupported',
-      sessionStart: 'unsupported',
-      sessionEnd: 'unsupported',
-      stop: 'unsupported',
-      userPromptSubmit: 'unsupported',
-    },
+    runtimeHooks: createVirtualRuntimeHookCapabilities(),
     supportsThinking: false,
     thinkingEffortLevels: [],
     supportsThinkingBudgetTokens: false,
     supportsJsonMode: true,
     supportsStructuredOutput: true,
+    structuredSessionTransport: 'persistent',
     supportsSkills: false,
     supportsAgentsMd: false,
     skillsFormat: null,
@@ -300,7 +295,7 @@ export class CodexWebSocketAdapter extends BaseRemoteAdapter {
   }
 
   async parseSessionFile(filePath: string): Promise<Session> {
-    const parsed = await parseJsonlSessionFile(filePath, 'codex-websocket');
+    const parsed = await parseCodexSessionFile(filePath, 'codex-websocket');
     return { ...parsed, agent: 'codex-websocket' };
   }
 

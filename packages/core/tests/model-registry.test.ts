@@ -95,6 +95,7 @@ function createMockAdapter(
   agent: string,
   models: ModelCapabilities[],
   defaultModelId?: string,
+  discoverModels?: () => Promise<ModelCapabilities[]>,
 ): AgentAdapter {
   return {
     agent,
@@ -125,6 +126,7 @@ function createMockAdapter(
     listSessionFiles: async () => [],
     readConfig: async () => ({}),
     writeConfig: async () => {},
+    discoverModels,
   };
 }
 
@@ -181,6 +183,21 @@ describe('ModelRegistryImpl', () => {
 
     it('returns empty array for unknown agent', () => {
       expect(models.models('unknown')).toEqual([]);
+    });
+
+    it('applies normalized provider/protocol metadata defaults', () => {
+      const result = models.models('claude');
+      expect(result[0]?.provider).toBe('anthropic');
+      expect(result[0]?.protocol).toBe('messages');
+      expect(result[0]?.deployment).toBe('hosted');
+    });
+  });
+
+  describe('catalog()', () => {
+    it('marks the default model entry', () => {
+      const result = models.catalog('claude');
+      expect(result.find((m) => m.modelId === 'claude-sonnet-4-20250514')?.isDefault).toBe(true);
+      expect(result.find((m) => m.modelId === 'claude-opus-4-20250514')?.isDefault).toBe(false);
     });
   });
 
@@ -314,6 +331,26 @@ describe('ModelRegistryImpl', () => {
       await models.refresh('claude');
       const after = models.lastUpdated('claude');
       expect(after.getTime()).toBeGreaterThanOrEqual(before.getTime());
+    });
+
+    it('uses adapter discovery when available', async () => {
+      adapters.register(
+        createMockAdapter(
+          'codex',
+          [createModel('codex', 'o4-mini')],
+          'o4-mini',
+          async () => [createModel('codex', 'codex-mini-latest', { source: 'remote' })],
+        ),
+      );
+
+      await models.refresh('codex');
+
+      const result = models.models('codex');
+      expect(result).toHaveLength(1);
+      expect(result[0]?.modelId).toBe('codex-mini-latest');
+      expect(result[0]?.source).toBe('remote');
+      expect(result[0]?.provider).toBe('openai');
+      expect(result[0]?.protocol).toBe('responses');
     });
   });
 

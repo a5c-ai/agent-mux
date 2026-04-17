@@ -1,6 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import * as fs from 'node:fs/promises';
+import * as os from 'node:os';
+import * as path from 'node:path';
+import { spawn } from 'node:child_process';
 import { StreamAssembler } from '@a5c-ai/agent-mux-core';
 import type { ParseContext } from '@a5c-ai/agent-mux-core';
+import { RuntimeHookDispatcher } from '../../core/src/runtime-hook-dispatcher.js';
 import { ClaudeAdapter } from '../src/claude-adapter.js';
 
 function makeContext(overrides?: Partial<ParseContext>): ParseContext {
@@ -18,6 +23,36 @@ function makeContext(overrides?: Partial<ParseContext>): ParseContext {
     adapterState: {},
     ...overrides,
   };
+}
+
+async function runNodeScript(
+  scriptPath: string,
+  args: string[],
+  env: NodeJS.ProcessEnv,
+  input: string,
+): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+  return await new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, [scriptPath, ...args], {
+      env,
+      stdio: ['pipe', 'pipe', 'pipe'],
+      windowsHide: true,
+    });
+    let stdout = '';
+    let stderr = '';
+    child.stdout.setEncoding('utf8');
+    child.stderr.setEncoding('utf8');
+    child.stdout.on('data', (chunk) => {
+      stdout += chunk;
+    });
+    child.stderr.on('data', (chunk) => {
+      stderr += chunk;
+    });
+    child.on('error', reject);
+    child.on('exit', (code) => {
+      resolve({ stdout, stderr, exitCode: code ?? 1 });
+    });
+    child.stdin.end(input);
+  });
 }
 
 describe('ClaudeAdapter', () => {
@@ -209,6 +244,68 @@ describe('ClaudeAdapter', () => {
       });
 
       expect(result.timeout).toBe(30000);
+    });
+  });
+
+  describe('runtime hooks', () => {
+    const previousHome = process.env['HOME'];
+    const previousUserProfile = process.env['USERPROFILE'];
+
+    afterEach(() => {
+      process.env['HOME'] = previousHome;
+      process.env['USERPROFILE'] = previousUserProfile;
+    });
+
+    it('creates an isolated CLAUDE_CONFIG_DIR and routes shim requests through the dispatcher', async () => {
+      const fakeHome = await fs.mkdtemp(path.join(os.tmpdir(), 'claude-runtime-home-'));
+      const globalConfigDir = path.join(fakeHome, '.claude');
+      const globalConfigPath = path.join(globalConfigDir, 'settings.json');
+      await fs.mkdir(globalConfigDir, { recursive: true });
+      await fs.writeFile(globalConfigPath, '{"unchanged":true}\n', 'utf8');
+      const beforeStat = await fs.stat(globalConfigPath);
+      process.env['HOME'] = fakeHome;
+      process.env['USERPROFILE'] = fakeHome;
+
+      const emitted: unknown[] = [];
+      const dispatcher = new RuntimeHookDispatcher({
+        hooks: {
+          preToolUse: () => ({ decision: 'deny', reason: 'blocked in test' }),
+        },
+        runId: 'run-claude-runtime',
+        agent: 'claude',
+        emit: (event) => {
+          emitted.push(event);
+        },
+      });
+
+      const setup = await adapter.setupRuntimeHooks!(
+        { agent: 'claude', prompt: 'test', hooks: { preToolUse: async () => ({ decision: 'allow' }) } },
+        dispatcher,
+      );
+
+      expect(setup?.env?.CLAUDE_CONFIG_DIR).toContain('amux-run-run-claude-runtime');
+      const configDir = setup!.env!.CLAUDE_CONFIG_DIR!;
+      const settingsPath = path.join(configDir, 'settings.json');
+      const shimPath = path.join(configDir, 'hook-shim.mjs');
+      const settings = JSON.parse(await fs.readFile(settingsPath, 'utf8'));
+      expect(settings.hooks.PreToolUse[0].hooks[0].command).toContain('hook-shim.mjs');
+
+      const shimResult = await runNodeScript(
+        shimPath,
+        ['PreToolUse'],
+        { ...process.env, ...setup!.env },
+        JSON.stringify({ tool_name: 'Write', tool_input: { path: 'blocked.txt' } }),
+      );
+      expect(shimResult.exitCode).toBe(2);
+      expect(shimResult.stdout).toContain('"decision":"deny"');
+
+      await setup!.cleanup?.();
+
+      const afterStat = await fs.stat(globalConfigPath);
+      expect(await fs.readFile(globalConfigPath, 'utf8')).toBe('{"unchanged":true}\n');
+      expect(afterStat.mtimeMs).toBe(beforeStat.mtimeMs);
+      expect(emitted).toEqual([]);
+      await fs.rm(fakeHome, { recursive: true, force: true });
     });
   });
 

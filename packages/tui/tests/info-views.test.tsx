@@ -56,11 +56,10 @@ describe('ModelsView', () => {
     const client = {
       adapters: { list: () => [{ agent: 'claude-code' }] },
       models: {
-        models: () => [
-          { modelId: 'opus' },
-          { modelId: 'sonnet' },
+        catalog: () => [
+          { modelId: 'opus', provider: 'anthropic', protocol: 'messages', source: 'bundled', isDefault: false },
+          { modelId: 'sonnet', provider: 'anthropic', protocol: 'messages', source: 'bundled', isDefault: true },
         ],
-        defaultModel: () => ({ modelId: 'sonnet' }),
       },
     } as never;
     const stream = new EventStream();
@@ -69,6 +68,7 @@ describe('ModelsView', () => {
     const f = lastFrame() ?? '';
     expect(f).toContain('opus');
     expect(f).toContain('sonnet');
+    expect(f).toContain('anthropic/messages/bundled');
     expect(f).toContain('default');
   });
 });

@@ -22,6 +22,7 @@ import type {
 } from '@a5c-ai/agent-mux-core';
 
 import { BaseAgentAdapter } from './base-adapter.js';
+import { createVirtualRuntimeHookCapabilities } from './shared/runtime-hooks-virtual.js';
 import { mcpListPlugins, mcpInstallPlugin, mcpUninstallPlugin } from './mcp-plugins.js';
 import {
   listJsonlFiles,
@@ -52,19 +53,13 @@ export class OpenClawAdapter extends BaseAgentAdapter {
     supportsParallelToolCalls: true,
     requiresToolApproval: true,
     approvalModes: ['yolo', 'prompt'],
-    runtimeHooks: {
-      preToolUse: 'unsupported',
-      postToolUse: 'unsupported',
-      sessionStart: 'unsupported',
-      sessionEnd: 'unsupported',
-      stop: 'unsupported',
-      userPromptSubmit: 'unsupported',
-    },
+    runtimeHooks: createVirtualRuntimeHookCapabilities(),
     supportsThinking: false,
     thinkingEffortLevels: [],
     supportsThinkingBudgetTokens: false,
     supportsJsonMode: false,
     supportsStructuredOutput: false,
+    structuredSessionTransport: 'none',
     supportsSkills: false,
     supportsAgentsMd: false,
     skillsFormat: null,

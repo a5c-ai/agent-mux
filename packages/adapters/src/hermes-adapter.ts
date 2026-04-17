@@ -22,6 +22,7 @@ import type {
 import * as fs from 'node:fs/promises';
 
 import { BaseAgentAdapter } from './base-adapter.js';
+import { createVirtualRuntimeHookCapabilities } from './shared/runtime-hooks-virtual.js';
 import {
   listJsonlFiles,
   parseJsonlSessionFile,
@@ -51,19 +52,13 @@ export class HermesAdapter extends BaseAgentAdapter {
     supportsParallelToolCalls: true,
     requiresToolApproval: true,
     approvalModes: ['yolo', 'prompt'],
-    runtimeHooks: {
-      preToolUse: 'unsupported',
-      postToolUse: 'unsupported',
-      sessionStart: 'unsupported',
-      sessionEnd: 'unsupported',
-      stop: 'unsupported',
-      userPromptSubmit: 'unsupported',
-    },
+    runtimeHooks: createVirtualRuntimeHookCapabilities(),
     supportsThinking: false,
     thinkingEffortLevels: [],
     supportsThinkingBudgetTokens: false,
     supportsJsonMode: false,
     supportsStructuredOutput: false,
+    structuredSessionTransport: 'none',
     supportsSkills: false,
     supportsAgentsMd: false,
     skillsFormat: null,

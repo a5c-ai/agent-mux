@@ -1,0 +1,1 @@
+{"version":3,"file":"tabs.d.ts","sourceRoot":"","sources":["../../../src/navigation/tabs.tsx"],"names":[],"mappings":"AAAA,MAAM,MAAM,SAAS,GAAG,MAAM,GAAG,UAAU,GAAG,QAAQ,GAAG,OAAO,GAAG,UAAU,CAAC;AAE9E,eAAO,MAAM,SAAS,EAAE,aAAa,CAAC;IAAE,EAAE,EAAE,SAAS,CAAC;IAAC,KAAK,EAAE,MAAM,CAAA;CAAE,CAMrE,CAAC"}

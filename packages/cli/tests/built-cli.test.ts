@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { dirname, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 
 /**
  * Smoke tests for the *built* CLI. These spawn `node packages/cli/dist/index.js`
@@ -62,4 +64,104 @@ suite('built CLI (dist/index.js)', () => {
       'pi',
     ]));
   });
+
+  it('gateway serve starts the built server and accepts a CLI-issued token', async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'amux-built-cli-'));
+    const configPath = join(tempDir, 'gateway.config.json');
+    const tokenDbPath = join(tempDir, 'tokens.db');
+    const eventLogDir = join(tempDir, 'events');
+    writeFileSync(
+      configPath,
+      JSON.stringify({
+        host: '127.0.0.1',
+        port: 0,
+        enableWebui: false,
+        tokenStoreKind: 'sqlite',
+        tokenDbPath,
+        eventLogDir,
+      }),
+      'utf8',
+    );
+
+    const tokenResult = spawnSync(
+      process.execPath,
+      [distEntry, '--log-level', 'error', 'gateway', 'tokens', 'create', '--json', '--config', configPath, '--name', 'built-cli-e2e'],
+      {
+        encoding: 'utf8',
+      },
+    );
+    expect(tokenResult.status).toBe(0);
+    const tokenJson = JSON.parse(tokenResult.stdout);
+    const token = tokenJson.data.plaintext as string;
+    expect(typeof token).toBe('string');
+    expect(token.length).toBeGreaterThan(10);
+
+    const child = spawn(
+      process.execPath,
+      [distEntry, '--log-level', 'error', 'gateway', 'serve', '--json', '--config', configPath, '--no-webui'],
+      {
+        cwd: resolve(__dirname, '..', '..', '..'),
+        stdio: ['ignore', 'pipe', 'pipe'],
+      },
+    );
+
+    const stdoutChunks: string[] = [];
+    const stderrChunks: string[] = [];
+    child.stdout.setEncoding('utf8');
+    child.stderr.setEncoding('utf8');
+    child.stdout.on('data', (chunk) => stdoutChunks.push(chunk));
+    child.stderr.on('data', (chunk) => stderrChunks.push(chunk));
+
+    try {
+      const started = await new Promise<{ host: string; port: number }>((resolvePromise, rejectPromise) => {
+        const timeout = setTimeout(() => {
+          rejectPromise(new Error(`Timed out waiting for built gateway startup. stdout=${stdoutChunks.join('')} stderr=${stderrChunks.join('')}`));
+        }, 10_000);
+
+        const tryResolve = () => {
+          const combined = stdoutChunks.join('').trim();
+          if (!combined) {
+            return;
+          }
+          try {
+            const parsed = JSON.parse(combined) as { ok?: boolean; data?: { host?: string; port?: number } };
+            if (parsed.ok === true && parsed.data && typeof parsed.data.host === 'string' && typeof parsed.data.port === 'number') {
+              clearTimeout(timeout);
+              resolvePromise({ host: parsed.data.host, port: parsed.data.port });
+            }
+          } catch {
+            // Wait for the rest of the JSON payload.
+          }
+        };
+
+        child.stdout.on('data', tryResolve);
+        child.once('exit', (code) => {
+          clearTimeout(timeout);
+          rejectPromise(new Error(`Built gateway exited before startup with code ${code}. stdout=${stdoutChunks.join('')} stderr=${stderrChunks.join('')}`));
+        });
+      });
+
+      const healthz = await fetch(`http://${started.host}:${started.port}/healthz`);
+      expect(healthz.status).toBe(200);
+
+      const agents = await fetch(`http://${started.host}:${started.port}/api/v1/agents`, {
+        headers: {
+          authorization: `Bearer ${token}`,
+        },
+      });
+      expect(agents.status).toBe(200);
+      await expect(agents.json()).resolves.toMatchObject({
+        agents: expect.arrayContaining(['claude', 'codex', 'opencode']),
+      });
+    } finally {
+      child.kill('SIGTERM');
+      const exit = await new Promise<{ code: number | null; signal: NodeJS.Signals | null }>((resolvePromise) => {
+        child.once('exit', (code, signal) => resolvePromise({ code, signal }));
+      });
+      expect(
+        exit.code === 0 || exit.signal === 'SIGTERM' || exit.signal === 'SIGINT',
+      ).toBe(true);
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  }, 20_000);
 });

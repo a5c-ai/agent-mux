@@ -18,6 +18,8 @@ import type {
   AgentEvent,
   InstalledPlugin,
   PluginInstallOptions,
+  RuntimeHookDispatcher,
+  RuntimeHookSetup,
 } from '@a5c-ai/agent-mux-core';
 
 import { BaseAgentAdapter } from './base-adapter.js';
@@ -29,6 +31,7 @@ import {
   writeJsonFileAtomic,
   findProjectRootSync,
 } from './session-fs.js';
+import { setupClaudeRuntimeHooks } from './claude-code/runtime-hooks/lifecycle.js';
 
 export class ClaudeAdapter extends BaseAgentAdapter {
   readonly agent = 'claude' as const;
@@ -52,18 +55,19 @@ export class ClaudeAdapter extends BaseAgentAdapter {
     requiresToolApproval: true,
     approvalModes: ['yolo', 'prompt', 'deny'],
     runtimeHooks: {
-      preToolUse: 'unsupported',
-      postToolUse: 'unsupported',
-      sessionStart: 'unsupported',
-      sessionEnd: 'unsupported',
-      stop: 'unsupported',
-      userPromptSubmit: 'unsupported',
+      preToolUse: 'blocking',
+      postToolUse: 'nonblocking',
+      sessionStart: 'nonblocking',
+      sessionEnd: 'nonblocking',
+      stop: 'nonblocking',
+      userPromptSubmit: 'blocking',
     },
     supportsThinking: true,
     thinkingEffortLevels: ['low', 'medium', 'high', 'max'],
     supportsThinkingBudgetTokens: true,
     supportsJsonMode: true,
     supportsStructuredOutput: true,
+    structuredSessionTransport: 'restart-per-turn',
     supportsSkills: true,
     supportsAgentsMd: true,
     skillsFormat: 'file',
@@ -198,11 +202,9 @@ export class ClaudeAdapter extends BaseAgentAdapter {
       args.push('--system-prompt', options.systemPrompt);
     }
 
-    // Prompt
-    const { prompt, stdin } = this.buildPromptTransport(options);
-    if (stdin === undefined) {
-      args.push('--print', prompt);
-    }
+    // Claude Code only emits structured output under --print.
+    const prompt = this.normalizePrompt(options.prompt);
+    args.push('--print', prompt);
 
     return {
       command: this.cliCommand,
@@ -210,7 +212,7 @@ export class ClaudeAdapter extends BaseAgentAdapter {
       env: this.buildEnvFromOptions(options),
       cwd: options.cwd ?? process.cwd(),
       usePty: false,
-      stdin,
+      closeStdinAfterSpawn: true,
       timeout: options.timeout,
       inactivityTimeout: options.inactivityTimeout,
     };
@@ -226,6 +228,15 @@ export class ClaudeAdapter extends BaseAgentAdapter {
 
     // Claude Code JSONL events have a 'type' field
     const type = obj['type'] as string | undefined;
+
+    if (type === 'system' && obj['subtype'] === 'init' && typeof obj['session_id'] === 'string') {
+      return {
+        ...base,
+        type: 'session_start',
+        sessionId: obj['session_id'],
+        resumed: false,
+      } as AgentEvent;
+    }
 
     if (type === 'assistant' || type === 'text') {
       const content = (obj['content'] ?? obj['text'] ?? '') as string;
@@ -248,8 +259,8 @@ export class ClaudeAdapter extends BaseAgentAdapter {
       return {
         ...base,
         type: 'tool_result',
-        toolCallId: (obj['tool_use_id'] ?? obj['toolCallId'] ?? '') as string,
-        toolName: (obj['toolName'] ?? '') as string,
+        toolCallId: (obj['tool_use_id'] ?? obj['toolCallId'] ?? obj['id'] ?? '') as string,
+        toolName: (obj['toolName'] ?? obj['name'] ?? '') as string,
         output: obj['content'] ?? obj['output'] ?? '',
         durationMs: 0,
       } as AgentEvent;
@@ -446,5 +457,12 @@ export class ClaudeAdapter extends BaseAgentAdapter {
 
   override async uninstallPlugin(pluginId: string, options?: { global?: boolean }): Promise<void> {
     return mcpUninstallPlugin(this.settingsPaths(), pluginId, options);
+  }
+
+  async setupRuntimeHooks(
+    options: RunOptions,
+    dispatcher: RuntimeHookDispatcher,
+  ): Promise<RuntimeHookSetup | void> {
+    return setupClaudeRuntimeHooks(options, dispatcher);
   }
 }

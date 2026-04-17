@@ -87,6 +87,9 @@ A temp-directory sandbox under `os.tmpdir()/amux-workspace-*`. Methods:
 | `claudeCodeTimeout` | Long-running; used to exercise inactivity/overall timeouts. |
 | `claudeCodeCrash` | Non-zero exit mid-stream. |
 | `claudeCodeFileOps` | Emits file-operation events and corresponding `FileOperation`s. |
+| `runtimeHookAllowBash` | Simulates a blocking pre-tool runtime hook that allows a `Bash` tool call through. |
+| `runtimeHookDenyWrite` | Simulates a blocking pre-tool runtime hook that denies a `Write` tool call and exits early. |
+| `runtimeHookTimeout` | Simulates a runtime hook that never resolves so timeout handling can be exercised. |
 | `codexSuccess`, `codexFileOps`, `codexFailure` | Codex analogues. |
 | `emptySuccess` | Zero output, exit 0 — edge case. |
 | `slowStartup` | Delayed first byte — exercises startup-timeout. |

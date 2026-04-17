@@ -42,6 +42,7 @@ Commands:
   detect-host             Detect which agent harness we are running under
   remote                  Install / update amux on a remote host
   hooks                   Manage and dispatch unified agent hooks
+  gateway                 Run the browser/mobile gateway service
   doctor                  Run environment health check
   version                 Print version
   help [command]          Show help for a command
@@ -353,6 +354,20 @@ Examples:
   amux hooks discover
   amux hooks add --id trace-all --agent '*' --hook-type '*' --handler builtin --target trace
   amux hooks install claude PreToolUse "amux hooks handle claude PreToolUse"
+`,
+  gateway: `amux gateway - Gateway service and token management
+
+Usage:
+  amux gateway serve [--config <path>] [--host <host>] [--port <port>] [--webui <path>] [--no-webui]
+  amux gateway tokens list [--config <path>]
+  amux gateway tokens create [--config <path>] [--name <name>] [--ttl-ms <ms>] [--qr] [--url <url>]
+  amux gateway tokens revoke <id> [--config <path>]
+  amux gateway status [--url <url>]
+
+Examples:
+  amux gateway serve
+  amux gateway tokens create --name phone --qr
+  amux gateway status --url http://127.0.0.1:7878
 `,
   doctor: `amux doctor - Health check for amux environment
 

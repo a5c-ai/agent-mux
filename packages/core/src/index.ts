@@ -200,7 +200,13 @@ export type {
   UserPromptSubmitHook,
   NotificationHook,
   RuntimeHooks,
+  RuntimeHookSetup,
 } from './runtime-hooks.js';
+export { RuntimeHookDispatcher, RuntimeHookDispatcher as PerRunRuntimeHookDispatcher } from './runtime-hook-dispatcher.js';
+
+// Tool classification
+export type { ToolClassification } from './tools/index.js';
+export { classifyTool } from './tools/index.js';
 
 // Merge
 export { deepMerge, stripUndefined, resolveRunOptions } from './merge.js';
@@ -219,6 +225,8 @@ export { ProfileManagerImpl } from './profiles.js';
 // Capabilities
 export type {
   ThinkingEffortLevel,
+  ModelProtocol,
+  ModelDeployment,
   PluginRegistry,
   InstallMethod,
   AuthMethod as AuthMethodDescriptor,
@@ -264,6 +272,7 @@ export type {
   ValidationResult,
   ConfigValidationError,
   ConfigValidationWarning,
+  ModelSelection,
 } from './config-types.js';
 
 // Adapter
@@ -308,7 +317,7 @@ export type { AdapterRegistry } from './adapter-registry.js';
 export { AdapterRegistryImpl } from './adapter-registry.js';
 
 // Model Registry
-export type { ModelRegistry } from './model-registry.js';
+export type { ModelRegistry, ModelCatalogEntry } from './model-registry.js';
 export { ModelRegistryImpl } from './model-registry.js';
 
 // Session Manager

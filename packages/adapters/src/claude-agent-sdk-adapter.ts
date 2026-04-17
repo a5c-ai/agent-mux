@@ -25,6 +25,7 @@ import type {
 } from '@a5c-ai/agent-mux-core';
 
 import { BaseProgrammaticAdapter } from './programmatic-adapter-base.js';
+import { createVirtualRuntimeHookCapabilities } from './shared/runtime-hooks-virtual.js';
 import { mcpListPlugins, mcpInstallPlugin, mcpUninstallPlugin } from './mcp-plugins.js';
 import {
   listJsonlFiles,
@@ -107,19 +108,13 @@ export class ClaudeAgentSdkAdapter extends BaseProgrammaticAdapter {
     supportsParallelToolCalls: true,
     requiresToolApproval: true,
     approvalModes: ['yolo', 'prompt', 'deny'],
-    runtimeHooks: {
-      preToolUse: 'unsupported',
-      postToolUse: 'unsupported',
-      sessionStart: 'unsupported',
-      sessionEnd: 'unsupported',
-      stop: 'unsupported',
-      userPromptSubmit: 'unsupported',
-    },
+    runtimeHooks: createVirtualRuntimeHookCapabilities(),
     supportsThinking: true,
     thinkingEffortLevels: ['low', 'medium', 'high', 'max'],
     supportsThinkingBudgetTokens: true,
     supportsJsonMode: true,
     supportsStructuredOutput: true,
+    structuredSessionTransport: 'restart-per-turn',
     supportsSkills: true,
     supportsAgentsMd: true,
     skillsFormat: 'file',

@@ -7,6 +7,7 @@
  */
 
 import { BaseAgentAdapter } from './base-adapter.js';
+import { createVirtualRuntimeHookCapabilities } from './shared/runtime-hooks-virtual.js';
 import type {
   AgentCapabilities,
   ModelCapabilities,
@@ -52,14 +53,7 @@ export class AmpAdapter extends BaseAgentAdapter {
     maxParallelTasks: 8,
     requiresToolApproval: true,
     approvalModes: ['yolo', 'prompt'],
-    runtimeHooks: {
-      preToolUse: 'unsupported',
-      postToolUse: 'unsupported',
-      sessionStart: 'unsupported',
-      sessionEnd: 'unsupported',
-      stop: 'unsupported',
-      userPromptSubmit: 'unsupported',
-    },
+    runtimeHooks: createVirtualRuntimeHookCapabilities(),
     supportedPlatforms: ['darwin', 'linux', 'win32'],
     requiresGitRepo: false,
     requiresPty: false,

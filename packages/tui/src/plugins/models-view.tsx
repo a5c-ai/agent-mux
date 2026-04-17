@@ -5,6 +5,9 @@ import { definePlugin, type TuiViewProps } from '../plugin.js';
 interface Row {
   agent: string;
   modelId: string;
+  provider: string;
+  protocol: string;
+  source: string;
   isDefault: boolean;
 }
 
@@ -15,9 +18,15 @@ function ModelsView({ client, active }: TuiViewProps) {
     try {
       const all: Row[] = [];
       for (const a of client.adapters.list()) {
-        const def = client.models.defaultModel(a.agent);
-        for (const m of client.models.models(a.agent)) {
-          all.push({ agent: a.agent, modelId: m.modelId, isDefault: !!def && def.modelId === m.modelId });
+        for (const m of client.models.catalog(a.agent)) {
+          all.push({
+            agent: a.agent,
+            modelId: m.modelId,
+            provider: m.provider ?? '--',
+            protocol: m.protocol ?? '--',
+            source: m.source,
+            isDefault: m.isDefault,
+          });
         }
       }
       setRows(all);
@@ -33,6 +42,7 @@ function ModelsView({ client, active }: TuiViewProps) {
         <Text key={r.agent + ':' + r.modelId + ':' + i}>
           <Text color="cyan">{r.agent.padEnd(14)}</Text>{' '}
           <Text>{r.modelId}</Text>
+          <Text dimColor>{`  ${r.provider}/${r.protocol}/${r.source}`}</Text>
           {r.isDefault ? <Text color="green"> (default)</Text> : null}
         </Text>
       ))}

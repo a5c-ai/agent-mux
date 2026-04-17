@@ -23,6 +23,7 @@ import type {
 } from '@a5c-ai/agent-mux-core';
 
 import { BaseProgrammaticAdapter } from './programmatic-adapter-base.js';
+import { createVirtualRuntimeHookCapabilities } from './shared/runtime-hooks-virtual.js';
 import {
   listJsonlFiles,
   parseJsonlSessionFile,
@@ -84,19 +85,13 @@ export class PiSdkAdapter extends BaseProgrammaticAdapter {
     supportsParallelToolCalls: true,
     requiresToolApproval: true,
     approvalModes: ['yolo', 'prompt', 'deny'],
-    runtimeHooks: {
-      preToolUse: 'unsupported',
-      postToolUse: 'unsupported',
-      sessionStart: 'unsupported',
-      sessionEnd: 'unsupported',
-      stop: 'unsupported',
-      userPromptSubmit: 'unsupported',
-    },
+    runtimeHooks: createVirtualRuntimeHookCapabilities(),
     supportsThinking: false,
     thinkingEffortLevels: [],
     supportsThinkingBudgetTokens: false,
     supportsJsonMode: true,
     supportsStructuredOutput: true,
+    structuredSessionTransport: 'restart-per-turn',
     supportsSkills: true,
     supportsAgentsMd: true,
     skillsFormat: 'file',

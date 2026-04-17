@@ -1,0 +1,9 @@
+{
+  "name": "@a5c-ai/agent-mux-watch-wearos-app",
+  "private": true,
+  "type": "module",
+  "description": "Wear OS companion surfaces for agent-mux",
+  "scripts": {
+    "gradle": "echo Run ./gradlew assembleDebug inside packages/watch-wearos-app"
+  }
+}

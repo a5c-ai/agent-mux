@@ -5,6 +5,9 @@ import {
   claudeCodeCrash,
   claudeCodeTimeout,
   claudeCodeFileOps,
+  runtimeHookAllowBash,
+  runtimeHookDenyWrite,
+  runtimeHookTimeout,
   codexSuccess,
   codexFailure,
   emptySuccess,
@@ -45,6 +48,34 @@ describe('Pre-built scenarios', () => {
       await proc.waitForExit();
       expect(proc.fileChanges.length).toBeGreaterThan(0);
       expect(proc.fileChanges[0]!.type).toBe('create');
+    });
+
+    it('runtimeHookAllowBash pauses for hook approval and exits 0', async () => {
+      const proc = new MockProcess(runtimeHookAllowBash);
+      const seen: string[] = [];
+      proc.on('runtime-hook', (step: any) => seen.push(step.kind));
+      proc.start();
+      const result = await proc.waitForExit();
+      expect(result.exitCode).toBe(0);
+      expect(seen).toEqual(['preToolUse']);
+      expect(result.stdout).toContain('"tool_result"');
+    });
+
+    it('runtimeHookDenyWrite exits early on denial', async () => {
+      const proc = new MockProcess(runtimeHookDenyWrite);
+      proc.start();
+      const result = await proc.waitForExit();
+      expect(result.exitCode).toBe(2);
+      expect(result.stderr).toContain('Runtime hook denied Write');
+      expect(result.stdout).not.toContain('"tool_result"');
+    });
+
+    it('runtimeHookTimeout hangs until killed', async () => {
+      const proc = new MockProcess(runtimeHookTimeout);
+      proc.start();
+      setTimeout(() => proc.kill(), 50);
+      const result = await proc.waitForExit();
+      expect(result.exitCode).toBe(143);
     });
   });
 

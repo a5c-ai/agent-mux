@@ -1,0 +1,1 @@
+{"version":3,"file":"ScanQRScreen.d.ts","sourceRoot":"","sources":["../../../src/screens/ScanQRScreen.tsx"],"names":[],"mappings":"AAMA,OAAO,KAAK,EAAkB,iBAAiB,EAAE,MAAM,aAAa,CAAC;AAgDrE,wBAAgB,YAAY,CAAC,KAAK,EAAE;IAAE,MAAM,IAAI,IAAI,CAAC;IAAC,SAAS,CAAC,IAAI,EAAE,iBAAiB,GAAG,OAAO,CAAC,IAAI,CAAC,CAAA;CAAE,GAAG,GAAG,CAAC,OAAO,CAsCtH"}

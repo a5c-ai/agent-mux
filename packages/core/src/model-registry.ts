@@ -12,12 +12,20 @@ import type { AdapterRegistry } from './adapter-registry.js';
 // ModelRegistry Interface
 // ---------------------------------------------------------------------------
 
+export interface ModelCatalogEntry extends ModelCapabilities {
+  /** Whether this entry is the adapter's default model. */
+  isDefault: boolean;
+}
+
 /**
  * Per-agent model introspection registry.
  */
 export interface ModelRegistry {
   /** Return all known models for an agent. */
   models(agent: AgentName): ModelCapabilities[];
+
+  /** Return known models plus default-selection metadata for an agent. */
+  catalog(agent: AgentName): ModelCatalogEntry[];
 
   /** Return capabilities for a specific model, or null if not found. */
   model(agent: AgentName, modelId: string): ModelCapabilities | null;
@@ -57,23 +65,27 @@ export interface ModelRegistry {
 export class ModelRegistryImpl implements ModelRegistry {
   private readonly _adapters: AdapterRegistry;
   private readonly _lastUpdated = new Map<string, Date>();
+  private readonly _modelsCache = new Map<string, ModelCapabilities[]>();
 
   constructor(adapters: AdapterRegistry) {
     this._adapters = adapters;
   }
 
   models(agent: AgentName): ModelCapabilities[] {
-    const adapter = this._adapters.get(agent);
-    if (!adapter) return [];
-    return [...adapter.models];
+    return this._getModels(agent);
+  }
+
+  catalog(agent: AgentName): ModelCatalogEntry[] {
+    const defaultModelId = this._adapters.get(agent)?.defaultModelId ?? null;
+    return this._getModels(agent).map((model) => ({
+      ...model,
+      isDefault: defaultModelId === model.modelId,
+    }));
   }
 
   model(agent: AgentName, modelId: string): ModelCapabilities | null {
-    const adapter = this._adapters.get(agent);
-    if (!adapter) return null;
-
     return (
-      adapter.models.find(
+      this._getModels(agent).find(
         (m) => m.modelId === modelId || m.modelAlias === modelId,
       ) ?? null
     );
@@ -84,7 +96,7 @@ export class ModelRegistryImpl implements ModelRegistry {
     if (!adapter || !adapter.defaultModelId) return null;
 
     return (
-      adapter.models.find((m) => m.modelId === adapter.defaultModelId) ?? null
+      this._getModels(agent).find((m) => m.modelId === adapter.defaultModelId) ?? null
     );
   }
 
@@ -98,7 +110,7 @@ export class ModelRegistryImpl implements ModelRegistry {
       };
     }
 
-    const allModels = adapter.models;
+    const allModels = this._getModels(agent);
 
     // Exact modelId match
     const exact = allModels.find((m) => m.modelId === modelId);
@@ -165,7 +177,17 @@ export class ModelRegistryImpl implements ModelRegistry {
   }
 
   async refresh(_agent: AgentName): Promise<void> {
-    // No-op in current implementation — remote model fetching is Phase 10+
+    const adapter = this._adapters.get(_agent);
+    if (!adapter) {
+      this._lastUpdated.set(_agent, new Date());
+      return;
+    }
+
+    const discovered = typeof adapter.discoverModels === 'function'
+      ? await adapter.discoverModels()
+      : adapter.models;
+
+    this._modelsCache.set(_agent, this._normalizeModels(_agent, discovered));
     this._lastUpdated.set(_agent, new Date());
   }
 
@@ -220,4 +242,50 @@ export class ModelRegistryImpl implements ModelRegistry {
     scored.sort((a, b) => b.score - a.score);
     return scored.slice(0, 5).map((s) => s.id);
   }
+
+  private _getModels(agent: AgentName): ModelCapabilities[] {
+    const cached = this._modelsCache.get(agent);
+    if (cached) return [...cached];
+
+    const adapter = this._adapters.get(agent);
+    if (!adapter) return [];
+
+    const normalized = this._normalizeModels(agent, adapter.models);
+    this._modelsCache.set(agent, normalized);
+    return [...normalized];
+  }
+
+  private _normalizeModels(
+    agent: AgentName,
+    models: ModelCapabilities[],
+  ): ModelCapabilities[] {
+    const defaults = DEFAULT_MODEL_METADATA[agent] ?? DEFAULT_MODEL_METADATA.fallback;
+    return models.map((model) => ({
+      ...defaults,
+      ...model,
+      providerModelId: model.providerModelId ?? model.cliArgValue ?? model.modelId,
+    }));
+  }
 }
+
+const DEFAULT_MODEL_METADATA: Record<string, Pick<ModelCapabilities, 'provider' | 'protocol' | 'deployment' | 'supportsLocalModels'>> = {
+  claude: { provider: 'anthropic', protocol: 'messages', deployment: 'hosted', supportsLocalModels: false },
+  'claude-agent-sdk': { provider: 'anthropic', protocol: 'messages', deployment: 'hosted', supportsLocalModels: false },
+  codex: { provider: 'openai', protocol: 'responses', deployment: 'hosted', supportsLocalModels: false },
+  'codex-sdk': { provider: 'openai', protocol: 'responses', deployment: 'hosted', supportsLocalModels: false },
+  'codex-websocket': { provider: 'openai', protocol: 'responses', deployment: 'hosted', supportsLocalModels: false },
+  copilot: { provider: 'github', protocol: 'chat', deployment: 'hosted', supportsLocalModels: false },
+  cursor: { provider: 'cursor', protocol: 'chat', deployment: 'hosted', supportsLocalModels: false },
+  droid: { provider: 'openai', protocol: 'responses', deployment: 'hosted', supportsLocalModels: false },
+  gemini: { provider: 'google', protocol: 'chat', deployment: 'hosted', supportsLocalModels: false },
+  hermes: { provider: 'configurable', protocol: 'custom', deployment: 'hybrid', supportsLocalModels: true },
+  omp: { provider: 'configurable', protocol: 'chat', deployment: 'hybrid', supportsLocalModels: true },
+  opencode: { provider: 'configurable', protocol: 'chat', deployment: 'hybrid', supportsLocalModels: true },
+  'opencode-http': { provider: 'configurable', protocol: 'chat', deployment: 'gateway', supportsLocalModels: true },
+  openclaw: { provider: 'configurable', protocol: 'custom', deployment: 'hybrid', supportsLocalModels: true },
+  pi: { provider: 'configurable', protocol: 'chat', deployment: 'hybrid', supportsLocalModels: true },
+  'pi-sdk': { provider: 'configurable', protocol: 'chat', deployment: 'hybrid', supportsLocalModels: true },
+  qwen: { provider: 'alibaba', protocol: 'chat', deployment: 'hosted', supportsLocalModels: false },
+  'agent-mux-remote': { provider: 'delegated', protocol: 'custom', deployment: 'gateway', supportsLocalModels: false },
+  fallback: { provider: 'unknown', protocol: 'custom', deployment: 'hosted', supportsLocalModels: false },
+};

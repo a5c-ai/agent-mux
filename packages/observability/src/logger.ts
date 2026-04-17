@@ -211,11 +211,6 @@ export function createLogger(config: LoggerConfig = {}): Logger {
         translateTime: 'yyyy-mm-dd HH:MM:ss',
         ignore: 'pid,hostname,service',
         messageFormat: '{msg}',
-        customPrettifiers: {
-          runId: (runId: string) => `run:${runId.slice(0, 8)}`,
-          agent: (agent: string) => `agent:${agent}`,
-          component: (component: string) => `[${component}]`,
-        },
       },
     };
     baseLogger = pino(pinoOptions, pino.transport(transport));

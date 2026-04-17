@@ -537,6 +537,8 @@ List, inspect, and refresh model metadata for agents.
 amux models list <agent> [flags...]
 amux models get <agent> <model-id> [flags...]
 amux models refresh <agent> [flags...]
+amux models current <agent> [flags...]
+amux models set <agent> <model-id> [--provider <provider>] [flags...]
 ```
 
 ### 10.2 `amux models list <agent>`
@@ -555,14 +557,14 @@ List all models available for an agent.
 |---|---|
 | Model ID | The model identifier string. |
 | Display Name | Human-readable name. |
+| Provider | Normalized provider family (`anthropic`, `openai`, `configurable`, etc.). |
+| Protocol | Normalized request protocol (`messages`, `responses`, `chat`, `custom`). |
+| Deploy | Typical deployment path (`hosted`, `local`, `gateway`, `hybrid`). |
 | Context Window | Maximum context in tokens. |
-| Max Output | Maximum output tokens. |
-| Thinking | `yes` / `no` / `--`. |
-| Streaming | `yes` / `partial` / `no`. |
-| Deprecated | `yes` / `no`. |
-| Price (In/Out) | Per-million-token pricing, or `--`. |
+| Source | `bundled` or `remote`. |
+| Default | Whether this is the adapter's default model. |
 
-**API mapping:** `mux.models.models('claude')` returns `ModelCapabilities[]`.
+**API mapping:** `mux.models.catalog('claude')` returns the per-adapter model catalog with default-entry metadata.
 
 ### 10.3 `amux models get <agent> <model-id>`
 
@@ -584,7 +586,19 @@ Refresh the model list from the agent's remote source (where applicable).
 
 **API mapping:** `mux.models.refresh('claude')`.
 
-### 10.5 Error Behavior
+### 10.5 `amux models current <agent>`
+
+Show the configured model, adapter default, and effective model selection for an agent.
+
+**API mapping:** `mux.config.getModelSelection('claude')` plus `mux.models.model(...)` for effective-model details.
+
+### 10.6 `amux models set <agent> <model-id>`
+
+Validate and persist the configured model for an agent. Optional `--provider` records the selected provider for configurable/local-provider adapters.
+
+**API mapping:** `mux.models.validate('claude', 'sonnet')` followed by `mux.config.setModelSelection('claude', { model, provider })`.
+
+### 10.7 Error Behavior
 
 - Unknown agent: exit code 3 (`AGENT_NOT_FOUND`).
 - Unknown model (for `get`): exit code 1, error message listing available models.
@@ -1619,9 +1633,11 @@ Quick reference of all commands and their SDK method mappings.
 | `amux adapters` | `list` | `mux.adapters.list()` + `mux.adapters.installed()` |
 | `amux adapters` | `detect` | `mux.adapters.detect()` |
 | `amux capabilities` | -- | `mux.adapters.capabilities()` + `mux.models.model()` |
-| `amux models` | `list` | `mux.models.models()` |
+| `amux models` | `list` | `mux.models.catalog()` |
 | `amux models` | `get` | `mux.models.model()` |
 | `amux models` | `refresh` | `mux.models.refresh()` |
+| `amux models` | `current` | `mux.config.getModelSelection()` + `mux.models.model()` |
+| `amux models` | `set` | `mux.models.validate()` + `mux.config.setModelSelection()` |
 | `amux plugin` | `list` | Native CLI delegation |
 | `amux plugin` | `install` | Native CLI delegation |
 | `amux plugin` | `uninstall` | Native CLI delegation |

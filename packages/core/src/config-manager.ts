@@ -22,9 +22,10 @@ export type {
   ValidationResult,
   ConfigValidationError,
   ConfigValidationWarning,
+  ModelSelection,
 } from './config-types.js';
 
-import type { ValidationResult } from './config-types.js';
+import type { ModelSelection, ValidationResult } from './config-types.js';
 
 // ---------------------------------------------------------------------------
 // ConfigManager Interface
@@ -52,6 +53,15 @@ export interface ConfigManager {
 
   /** Returns all MCP server configurations from the agent's config. */
   getMcpServers(agent: AgentName): McpServerConfig[];
+
+  /** Returns configured/default/effective model selection for an agent. */
+  getModelSelection(agent: AgentName): ModelSelection;
+
+  /** Update model/provider selection fields in the agent config. */
+  setModelSelection(
+    agent: AgentName,
+    selection: { model?: string | null; provider?: string | null },
+  ): Promise<void>;
 
   /** Add an MCP server to the agent's config. */
   addMcpServer(agent: AgentName, server: McpServerConfig): Promise<void>;
@@ -192,6 +202,34 @@ export class ConfigManagerImpl implements ConfigManager {
   getMcpServers(agent: AgentName): McpServerConfig[] {
     const config = this.get(agent);
     return config.mcpServers ?? [];
+  }
+
+  getModelSelection(agent: AgentName): ModelSelection {
+    const adapter = this._getAdapter(agent);
+    const config = this.get(agent);
+    const configuredModel = typeof config.model === 'string' ? config.model : null;
+    const configuredProvider = typeof config.provider === 'string' ? config.provider : null;
+    const defaultModel = adapter.defaultModelId ?? null;
+    return {
+      configuredModel,
+      configuredProvider,
+      defaultModel,
+      effectiveModel: configuredModel ?? defaultModel,
+    };
+  }
+
+  async setModelSelection(
+    agent: AgentName,
+    selection: { model?: string | null; provider?: string | null },
+  ): Promise<void> {
+    const patch: Partial<AgentConfig> = {};
+    if (Object.prototype.hasOwnProperty.call(selection, 'model')) {
+      patch.model = selection.model ?? null;
+    }
+    if (Object.prototype.hasOwnProperty.call(selection, 'provider')) {
+      patch.provider = selection.provider ?? null;
+    }
+    await this.set(agent, patch);
   }
 
   // -- addMcpServer() ----------------------------------------------------------

@@ -332,6 +332,12 @@ interface ModelRegistry {
   models(agent: AgentName): ModelCapabilities[]
 
   /**
+   * Return the model catalog for an agent, including default-entry metadata.
+   * Preferred for CLI/TUI listings.
+   */
+  catalog(agent: AgentName): Array<ModelCapabilities & { isDefault: boolean }>
+
+  /**
    * Return capabilities for a specific model, or null if not found.
    * Matches on both modelId and modelAlias.
    */
@@ -487,6 +493,21 @@ interface ModelCapabilities {
 
   /** Whether this model accepts file inputs beyond images. */
   supportsFileInput: boolean
+
+  /** Normalized provider family backing this entry. */
+  provider?: string
+
+  /** Provider-native model identifier when it differs from modelId. */
+  providerModelId?: string
+
+  /** Normalized request protocol used by the adapter for this model. */
+  protocol?: 'chat' | 'responses' | 'messages' | 'custom'
+
+  /** Typical deployment path for the adapter/model combination. */
+  deployment?: 'hosted' | 'local' | 'gateway' | 'hybrid'
+
+  /** Whether the adapter can route this model entry to local backends. */
+  supportsLocalModels?: boolean
 
   /**
    * The CLI argument key used to select this model
@@ -998,4 +1019,3 @@ auth:        methods=['api-key','oauth'], authFiles=['~/.hermes/.env','~/.hermes
 ## Implementation Status (2026-04-12)
 
 No behavioural changes to capabilities or models. The `agent-mux-remote` adapter (spec 12) declares capabilities that reflect the *transport delegate* rather than a specific harness; callers must read capabilities from the adapter they nest into.
-

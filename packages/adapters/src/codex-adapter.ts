@@ -20,9 +20,10 @@ import type {
 } from '@a5c-ai/agent-mux-core';
 
 import { BaseAgentAdapter } from './base-adapter.js';
+import { createVirtualRuntimeHookCapabilities } from './shared/runtime-hooks-virtual.js';
 import {
   listJsonlFiles,
-  parseJsonlSessionFile,
+  parseCodexSessionFile,
   readJsonFile,
   writeJsonFileAtomic,
 } from './session-fs.js';
@@ -49,26 +50,20 @@ export class CodexAdapter extends BaseAgentAdapter {
     supportsParallelToolCalls: true,
     requiresToolApproval: true,
     approvalModes: ['yolo', 'prompt', 'deny'],
-    runtimeHooks: {
-      preToolUse: 'unsupported',
-      postToolUse: 'unsupported',
-      sessionStart: 'unsupported',
-      sessionEnd: 'unsupported',
-      stop: 'unsupported',
-      userPromptSubmit: 'unsupported',
-    },
+    runtimeHooks: createVirtualRuntimeHookCapabilities(),
     supportsThinking: false,
     thinkingEffortLevels: [],
     supportsThinkingBudgetTokens: false,
     supportsJsonMode: true,
     supportsStructuredOutput: true,
+    structuredSessionTransport: 'restart-per-turn',
     supportsSkills: false,
     supportsAgentsMd: false,
     skillsFormat: null,
     supportsSubagentDispatch: false,
     supportsParallelExecution: false,
     supportsInteractiveMode: true,
-    supportsStdinInjection: true,
+    supportsStdinInjection: false,
     supportsImageInput: false,
     supportsImageOutput: false,
     supportsFileAttachments: false,
@@ -154,13 +149,18 @@ export class CodexAdapter extends BaseAgentAdapter {
     // Codex requires the 'exec' subcommand for proper JSON output
     const sessionId = this.resolveSessionId(options);
     const isResume = sessionId && !options.forkSessionId;
+    const prompt = this.normalizePrompt(options.prompt);
 
     if (isResume) {
       // Resume existing session
-      args.push('exec', 'resume', '--last', '--json');
+      args.push('exec', 'resume', '--json', sessionId);
+      if (prompt.length > 0) {
+        args.push(prompt);
+      }
     } else {
       // New session
       args.push('exec', '--json');
+      args.push(prompt);
     }
 
     if (options.model) {
@@ -171,23 +171,13 @@ export class CodexAdapter extends BaseAgentAdapter {
       args.push('--full-auto');
     }
 
-    let stdin: string | undefined;
-    // For new sessions, add the prompt
-    if (!isResume) {
-      const transport = this.buildPromptTransport(options);
-      stdin = transport.stdin;
-      if (stdin === undefined) {
-        args.push(transport.prompt);
-      }
-    }
-
     return {
       command: this.cliCommand,
       args,
       env: this.buildEnvFromOptions(options),
       cwd: options.cwd ?? process.cwd(),
       usePty: false,
-      stdin,
+      closeStdinAfterSpawn: true,
       timeout: options.timeout,
       inactivityTimeout: options.inactivityTimeout,
     };
@@ -205,11 +195,49 @@ export class CodexAdapter extends BaseAgentAdapter {
 
     // Proper Codex event types from 'codex exec --json'
     if (type === 'thread.started') {
-      return { ...base, type: 'session_start', sessionId: context.sessionId || '', resumed: false } as AgentEvent;
+      const sessionId = String(obj['thread_id'] ?? context.sessionId ?? '');
+      return { ...base, type: 'session_start', sessionId, resumed: false } as AgentEvent;
     }
 
     if (type === 'turn.started') {
       return { ...base, type: 'thinking_delta', delta: '', accumulated: '' } as AgentEvent;
+    }
+
+    if (type === 'item.completed') {
+      const item = obj['item'] as Record<string, unknown> | undefined;
+      if (!item) return null;
+      if (item['type'] === 'agent_message' && typeof item['text'] === 'string' && item['text'].length > 0) {
+        return { ...base, type: 'text_delta', delta: item['text'], accumulated: item['text'] } as AgentEvent;
+      }
+      if (item['type'] === 'function_call') {
+        return {
+          ...base,
+          type: 'tool_call_start',
+          toolCallId: String(item['call_id'] ?? item['id'] ?? ''),
+          toolName: String(item['name'] ?? ''),
+          inputAccumulated: JSON.stringify(item['arguments'] ?? item['input'] ?? {}),
+        } as AgentEvent;
+      }
+      if (item['type'] === 'function_call_output') {
+        return {
+          ...base,
+          type: 'tool_result',
+          toolCallId: String(item['call_id'] ?? item['id'] ?? ''),
+          toolName: String(item['name'] ?? ''),
+          output: item['output'] ?? '',
+          durationMs: 0,
+        } as AgentEvent;
+      }
+      if (item['type'] === 'command_execution') {
+        return {
+          ...base,
+          type: 'tool_result',
+          toolCallId: String(item['id'] ?? ''),
+          toolName: String(item['command'] ?? 'command'),
+          output: item['aggregated_output'] ?? item['output'] ?? '',
+          durationMs: 0,
+        } as AgentEvent;
+      }
     }
 
     if (type === 'turn.completed') {
@@ -241,9 +269,10 @@ export class CodexAdapter extends BaseAgentAdapter {
     }
 
     if (type === 'item.started') {
-      const kind = obj['kind'] as string | undefined;
-      const name = (obj['name'] ?? '') as string;
-      const id = (obj['id'] ?? '') as string;
+      const item = obj['item'] as Record<string, unknown> | undefined;
+      const kind = (item?.['type'] ?? obj['kind']) as string | undefined;
+      const name = (item?.['name'] ?? item?.['command'] ?? obj['name'] ?? '') as string;
+      const id = (item?.['id'] ?? obj['id'] ?? '') as string;
 
       if (kind === 'command_execution' || kind === 'function_call') {
         return {
@@ -251,32 +280,15 @@ export class CodexAdapter extends BaseAgentAdapter {
           type: 'tool_call_start',
           toolCallId: id,
           toolName: name,
-          inputAccumulated: JSON.stringify(obj['arguments'] ?? obj['input'] ?? {}),
+          inputAccumulated: JSON.stringify(item?.['arguments'] ?? item?.['input'] ?? item?.['command'] ?? obj['arguments'] ?? obj['input'] ?? {}),
         } as AgentEvent;
       }
 
       if (kind === 'message') {
-        const content = (obj['content'] ?? obj['text'] ?? '') as string;
+        const content = (item?.['content'] ?? item?.['text'] ?? obj['content'] ?? obj['text'] ?? '') as string;
         if (content) {
           return { ...base, type: 'text_delta', delta: content, accumulated: content } as AgentEvent;
         }
-      }
-    }
-
-    if (type === 'item.completed') {
-      const kind = obj['kind'] as string | undefined;
-      const id = (obj['id'] ?? '') as string;
-      const name = (obj['name'] ?? '') as string;
-
-      if (kind === 'command_execution' || kind === 'function_call') {
-        return {
-          ...base,
-          type: 'tool_result',
-          toolCallId: id,
-          toolName: name,
-          output: obj['output'] ?? obj['result'] ?? '',
-          durationMs: (obj['duration_ms'] ?? 0) as number,
-        } as AgentEvent;
       }
     }
 
@@ -363,7 +375,7 @@ export class CodexAdapter extends BaseAgentAdapter {
   }
 
   async parseSessionFile(filePath: string): Promise<Session> {
-    const parsed = await parseJsonlSessionFile(filePath, 'codex');
+    const parsed = await parseCodexSessionFile(filePath, 'codex');
     return { ...parsed, agent: 'codex' };
   }
 

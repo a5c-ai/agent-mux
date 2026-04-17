@@ -23,6 +23,13 @@ describe('parseArgs', () => {
       expect(result.positionals).toEqual(['claude', 'abc123']);
     });
 
+    it('extracts gateway subcommands', () => {
+      const result = parseArgs(['gateway', 'tokens', 'create']);
+      expect(result.command).toBe('gateway');
+      expect(result.subcommand).toBe('tokens');
+      expect(result.positionals).toEqual(['create']);
+    });
+
     it('returns undefined command for non-command first arg', () => {
       const result = parseArgs(['hello', 'world']);
       expect(result.command).toBeUndefined();

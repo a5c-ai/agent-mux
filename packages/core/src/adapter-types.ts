@@ -52,6 +52,9 @@ export interface BaseAgentAdapterInterface {
   readConfig(cwd?: string): Promise<AgentConfig>;
   writeConfig(config: Partial<AgentConfig>, cwd?: string): Promise<void>;
 
+  /** Optional adapter-native model discovery hook used by ModelRegistry.refresh(). */
+  discoverModels?(cwd?: string): Promise<ModelCapabilities[]>;
+
   // ── Host Detection ────────────────────────────────────────────────
 
   /** Env-var names that indicate the current process is running under this harness. */

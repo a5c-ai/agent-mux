@@ -12,6 +12,8 @@ import type { StoragePaths } from './storage.js';
 import type { RunOptions, RunHandle } from './run-options.js';
 import { RunHandleImpl } from './run-handle-impl.js';
 import { startSpawnLoop } from './spawn-runner.js';
+import { startProgrammaticLoop } from './programmatic-runner.js';
+import { startRemoteLoop } from './remote-runner.js';
 import { ProfileManagerImpl } from './profiles.js';
 import type { ProfileManager } from './profiles.js';
 import type { AdapterRegistry } from './adapter-registry.js';
@@ -208,7 +210,18 @@ export class AgentMuxClient {
 
       telemetry.recordRunStart(merged.agent, merged.model);
 
-      startSpawnLoop(handle, adapter, merged);
+      const multiAdapter = adapter as {
+        adapterType?: 'subprocess' | 'remote' | 'programmatic';
+      };
+      if (multiAdapter.adapterType === 'programmatic') {
+        startProgrammaticLoop(handle, adapter as never, merged);
+      } else if (multiAdapter.adapterType === 'remote') {
+        startRemoteLoop(handle, adapter as never, merged);
+      } else if (multiAdapter.adapterType === 'subprocess' || multiAdapter.adapterType === undefined) {
+        startSpawnLoop(handle, adapter, merged);
+      } else {
+        throw new AgentMuxError('CAPABILITY_ERROR', `Unsupported adapter type for "${merged.agent}"`, false);
+      }
 
       return handle;
     } catch (err: any) {

@@ -128,6 +128,26 @@ export interface MockEvent {
   data: Record<string, unknown>;
 }
 
+export interface RuntimeHookScenarioStep {
+  /** Zero-based output chunk index intercepted by the runtime hook. */
+  chunkIndex: number;
+
+  /** Hook kind being simulated. */
+  kind: 'preToolUse' | 'postToolUse' | 'sessionStart' | 'sessionEnd' | 'stop' | 'userPromptSubmit';
+
+  /** Payload surfaced on the emitted runtime-hook event. */
+  payload?: Record<string, unknown>;
+
+  /** Mock runtime-hook decision. */
+  decision: 'allow' | 'deny' | 'timeout';
+
+  /** Delay before the decision resolves. */
+  delayMs?: number;
+
+  /** Optional stderr line when the hook denies the action. */
+  errorMessage?: string;
+}
+
 // ---------------------------------------------------------------------------
 // HTTP/WebSocket/SDK behavior simulation
 // ---------------------------------------------------------------------------
@@ -335,6 +355,11 @@ export interface HarnessScenario {
       attributes?: Record<string, string | number | boolean>;
       delayMs?: number;
     }>;
+  };
+
+  /** Optional runtime-hook interception points for subprocess scenarios. */
+  runtimeHooks?: {
+    steps: RuntimeHookScenarioStep[];
   };
 
   // ── HTTP-specific configuration ─────────────────────────────────────

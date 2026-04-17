@@ -1,0 +1,1 @@
+{"version":3,"file":"wearBridge.d.ts","sourceRoot":"","sources":["../../../src/native/wearBridge.ts"],"names":[],"mappings":"AAUA,wBAAgB,uBAAuB,CAAC,OAAO,EAAE,CAAC,OAAO,EAAE,MAAM,KAAK,IAAI,GAAG,MAAM,IAAI,CAUtF;AAED,wBAAsB,UAAU,CAAC,IAAI,EAAE,MAAM,EAAE,OAAO,EAAE,MAAM,GAAG,OAAO,CAAC,IAAI,CAAC,CAK7E;AAED,wBAAsB,eAAe,CAAC,OAAO,EAAE,MAAM,GAAG,OAAO,CAAC,IAAI,CAAC,CAKpE"}

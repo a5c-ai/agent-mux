@@ -1,4 +1,5 @@
 import type { AgentEvent } from './events.js';
+import type { RuntimeHookDispatcher } from './runtime-hook-dispatcher.js';
 
 /** Runtime hook kinds supported by agent-mux. */
 export type RuntimeHookKind =
@@ -65,3 +66,11 @@ export interface RuntimeHooks {
   stop?: NotificationHook;
   userPromptSubmit?: UserPromptSubmitHook;
 }
+
+/** Optional native harness bridge returned by adapters that support runtime hooks. */
+export interface RuntimeHookSetup {
+  env?: Record<string, string>;
+  cleanup?: () => Promise<void> | void;
+}
+
+export type { RuntimeHookDispatcher } from './runtime-hook-dispatcher.js';

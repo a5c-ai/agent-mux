@@ -8,6 +8,7 @@
  */
 
 import * as os from 'node:os';
+import * as fs from 'node:fs';
 
 import type {
   AgentName,
@@ -136,9 +137,12 @@ export abstract class BaseAgentAdapter implements SubprocessAdapter {
       return { installed: false };
     }
 
+    binPath = this.resolveWindowsBinaryPath(binPath);
+
     let version: string | undefined;
     try {
-      const vres = await this._spawner(this.cliCommand, ['--version']);
+      const versionCommand = this.resolveVersionProbeCommand(binPath);
+      const vres = await this._spawner(versionCommand.command, versionCommand.args);
       if (vres.code === 0) {
         version = this.parseVersionOutput(vres.stdout + '\n' + vres.stderr);
       }
@@ -158,6 +162,48 @@ export abstract class BaseAgentAdapter implements SubprocessAdapter {
   protected parseVersionOutput(raw: string): string | undefined {
     const match = raw.match(/\d+\.\d+\.\d+(?:[\w.+-]*)?/);
     return match ? match[0] : undefined;
+  }
+
+  protected resolveWindowsBinaryPath(binPath: string): string {
+    if (process.platform !== 'win32') {
+      return binPath;
+    }
+    if (/\.(cmd|bat|exe|ps1)$/i.test(binPath)) {
+      return binPath;
+    }
+    for (const extension of ['.cmd', '.bat', '.exe', '.ps1']) {
+      const candidate = `${binPath}${extension}`;
+      if (fs.existsSync(candidate)) {
+        return candidate;
+      }
+    }
+    return binPath;
+  }
+
+  protected resolveVersionProbeCommand(binPath: string): { command: string; args: string[] } {
+    if (process.platform === 'win32' && /\.(cmd|bat)$/i.test(binPath)) {
+      const powershellShim = binPath.replace(/\.(cmd|bat)$/i, '.ps1');
+      if (fs.existsSync(powershellShim)) {
+        return {
+          command: 'powershell.exe',
+          args: ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', powershellShim, '--version'],
+        };
+      }
+      return {
+        command: 'cmd.exe',
+        args: ['/d', '/s', '/c', `""${binPath}" --version"`],
+      };
+    }
+    if (process.platform === 'win32' && /\.ps1$/i.test(binPath)) {
+      return {
+        command: 'powershell.exe',
+        args: ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', binPath, '--version'],
+      };
+    }
+    return {
+      command: binPath,
+      args: ['--version'],
+    };
   }
 
   // ── install ────────────────────────────────────────────────────────
