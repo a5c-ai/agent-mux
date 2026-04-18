@@ -337,6 +337,45 @@ describe('gateway end-to-end', () => {
             ]),
           );
 
+          const unsubscribeSession = client.subscribeSession('session-e2e');
+          try {
+            const resumedRun = await client.request<{
+              type: 'run.start';
+              agent: string;
+              prompt: string;
+              sessionId: string;
+            }, {
+              run: { runId: string };
+            }>({
+              type: 'run.start',
+              agent: 'claude',
+              prompt: 'resume the same session',
+              sessionId: 'session-e2e',
+            });
+            const resumedActiveRun = await waitFor(() => fakeClient.runs.get(resumedRun.run.runId));
+            resumedActiveRun.handle.emit({
+              type: 'text_delta',
+              runId: resumedRun.run.runId,
+              agent: 'claude',
+              timestamp: Date.now(),
+              delta: 'picked up remotely',
+              accumulated: 'picked up remotely',
+            });
+
+            await waitFor(() =>
+              receivedFrames.find(
+                (frame) =>
+                  frame['type'] === 'run.event' &&
+                  frame['runId'] === resumedRun.run.runId &&
+                  typeof frame['event'] === 'object' &&
+                  frame['event'] != null &&
+                  (frame['event'] as Record<string, unknown>)['type'] === 'text_delta',
+              ) ?? null,
+            );
+          } finally {
+            unsubscribeSession();
+          }
+
           await expect(client.request({
             type: 'run.stop',
             runId,

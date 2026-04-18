@@ -819,6 +819,8 @@ export class ClaudeAgentSdkAdapter extends BaseProgrammaticAdapter {
 
     if (message.type === 'system' && message.subtype === 'session_state_changed') {
       if (message.state === 'running') {
+        textAccumulated = '';
+        thinkingAccumulated = '';
         turnIndex += 1;
         events.push({
           ...this.createBaseEvent('turn_start', runId),
@@ -826,6 +828,18 @@ export class ClaudeAgentSdkAdapter extends BaseProgrammaticAdapter {
           turnIndex,
         } as AgentEvent);
       } else if (message.state === 'idle' && turnIndex >= 0) {
+        if (thinkingAccumulated.length > 0) {
+          events.push({
+            ...this.createBaseEvent('thinking_stop', runId),
+            type: 'thinking_stop',
+            thinking: thinkingAccumulated,
+          } as AgentEvent);
+          thinkingAccumulated = '';
+        }
+        if (textAccumulated.length > 0) {
+          events.push(this.createMessageStopEvent(runId, textAccumulated));
+          textAccumulated = '';
+        }
         events.push({
           ...this.createBaseEvent('turn_end', runId),
           type: 'turn_end',

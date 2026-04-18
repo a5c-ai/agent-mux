@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Link, useSearchParams, useParams } from 'react-router-dom';
+import { useSearchParams, useParams } from 'react-router-dom';
 import { useStore } from 'zustand';
 import { useShallow } from 'zustand/react/shallow';
 import { useGateway } from '@a5c-ai/agent-mux-ui';
@@ -48,6 +48,64 @@ function formatUsd(totalUsd: number | null): string {
     minimumFractionDigits: totalUsd >= 1 ? 2 : 4,
     maximumFractionDigits: 4,
   }).format(totalUsd);
+}
+
+function resolveTransport(
+  agent: string,
+  agentRecords: Record<string, Record<string, unknown>>,
+): 'persistent' | 'restart-per-turn' | 'none' {
+  const normalizedAgent = agent.trim().toLowerCase();
+  const advertised = agentRecords[agent]?.structuredSessionTransport;
+  if (advertised === 'persistent' || advertised === 'restart-per-turn') {
+    return advertised;
+  }
+  if (
+    normalizedAgent.includes('claude-agent-sdk')
+    || normalizedAgent.includes('codex-sdk')
+    || normalizedAgent.includes('codex-websocket')
+  ) {
+    return 'persistent';
+  }
+  return 'none';
+}
+
+function accumulateEventCost(
+  runIds: string[],
+  eventBuffers: Record<string, { events: Record<string, unknown>[] } | undefined>,
+): SessionCost | null {
+  const totals: SessionCost = {
+    totalUsd: 0,
+    inputTokens: 0,
+    outputTokens: 0,
+    thinkingTokens: 0,
+    cachedTokens: 0,
+  };
+  let found = false;
+
+  for (const runId of runIds) {
+    const buffer = eventBuffers[runId];
+    if (!buffer) {
+      continue;
+    }
+    for (const event of buffer.events) {
+      if (event.type !== 'cost') {
+        continue;
+      }
+      const cost = event.cost;
+      if (!cost || typeof cost !== 'object') {
+        continue;
+      }
+      const record = cost as SessionCost;
+      totals.totalUsd = (totals.totalUsd ?? 0) + Number(record.totalUsd ?? 0);
+      totals.inputTokens = (totals.inputTokens ?? 0) + Number(record.inputTokens ?? 0);
+      totals.outputTokens = (totals.outputTokens ?? 0) + Number(record.outputTokens ?? 0);
+      totals.thinkingTokens = (totals.thinkingTokens ?? 0) + Number(record.thinkingTokens ?? 0);
+      totals.cachedTokens = (totals.cachedTokens ?? 0) + Number(record.cachedTokens ?? 0);
+      found = true;
+    }
+  }
+
+  return found ? totals : null;
 }
 
 function buildTranscript(
@@ -202,12 +260,12 @@ function buildNativeTranscript(sessionId: string, messages: NativeSessionMessage
 }
 
 export function SessionDetailPage(): JSX.Element {
-  const params = useParams<{ agent: string; sessionId: string }>();
+  const params = useParams<{ sessionId: string }>();
   const [searchParams] = useSearchParams();
   const sessionId = params.sessionId ?? '';
-  const agentParam = params.agent ?? 'agent';
   const fetchGateway = useGatewayFetch();
   const { client, store } = useGateway();
+  const agentRecords = useStore(store, (state) => state.agents.byId);
   const session = useStore(store, (state) => state.sessions.byId[sessionId] ?? null);
   const runs = useStore(
     store,
@@ -225,21 +283,47 @@ export function SessionDetailPage(): JSX.Element {
   const [nativeMessages, setNativeMessages] = useState<NativeSessionMessage[]>([]);
   const [loadingNativeTranscript, setLoadingNativeTranscript] = useState(false);
 
-  const resolvedAgent = String(session?.agent ?? runs[0]?.agent ?? agentParam);
+  const transportCandidates = useMemo(
+    () => [
+      ...(typeof session?.agent === 'string' ? [session.agent] : []),
+      ...runs
+        .map((run) => (typeof run.agent === 'string' ? run.agent : null))
+        .filter((value): value is string => value != null),
+    ],
+    [runs, session?.agent],
+  );
+  const resolvedAgent = transportCandidates[0] ?? 'unknown';
   const status = String(session?.status ?? 'inactive');
-  const sessionCost =
-    session?.cost && typeof session.cost === 'object'
-      ? session.cost as SessionCost
-      : null;
-  const canCompose = status !== 'active';
+  const transport = transportCandidates.reduce<'persistent' | 'restart-per-turn' | 'none'>(
+    (current, candidate) => {
+      const next = resolveTransport(candidate, agentRecords as Record<string, Record<string, unknown>>);
+      if (next === 'persistent') {
+        return next;
+      }
+      if (current === 'none' && next === 'restart-per-turn') {
+        return next;
+      }
+      return current;
+    },
+    'none',
+  );
   const activeRunId =
     typeof session?.activeRunId === 'string'
       ? session.activeRunId
       : typeof runs.find((run) => run.status === 'running')?.runId === 'string'
         ? String(runs.find((run) => run.status === 'running')?.runId)
         : null;
+  const canCompose = status !== 'active' || transport === 'persistent';
   const eventTranscript = useMemo(() => buildTranscript(runs, eventBuffers), [eventBuffers, runs]);
   const nativeTranscript = useMemo(() => buildNativeTranscript(sessionId, nativeMessages), [nativeMessages, sessionId]);
+  const eventCost = useMemo(
+    () => accumulateEventCost(runs.map((run) => String(run.runId ?? '')), eventBuffers),
+    [eventBuffers, runs],
+  );
+  const sessionCost =
+    session?.cost && typeof session.cost === 'object'
+      ? session.cost as SessionCost
+      : eventCost;
   const transcript =
     status === 'active'
       ? (eventTranscript.length > 0 ? eventTranscript : nativeTranscript)
@@ -247,7 +331,50 @@ export function SessionDetailPage(): JSX.Element {
 
   useEffect(() => {
     if (!sessionId) {
+      return;
+    }
+    return client.subscribeSession(sessionId);
+  }, [client, sessionId]);
+
+  useEffect(() => {
+    if (!sessionId) {
+      setError(null);
+      return;
+    }
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const response = await fetchGateway(`/api/v1/sessions/${encodeURIComponent(sessionId)}`);
+        if (!response.ok) {
+          if (response.status === 404 || cancelled) {
+            return;
+          }
+          throw new Error(`Gateway request failed: ${response.status}`);
+        }
+        const body = await response.json() as Record<string, unknown>;
+        if (!cancelled) {
+          store.getState().actions.mergeSession(sessionId, body);
+        }
+      } catch (cause) {
+        if (!cancelled) {
+          setError(cause instanceof Error ? cause.message : String(cause));
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchGateway, sessionId, store]);
+
+  useEffect(() => {
+    if (!sessionId) {
       setNativeMessages([]);
+      setLoadingNativeTranscript(false);
+      return;
+    }
+    if (status === 'active' && eventTranscript.length > 0) {
       setLoadingNativeTranscript(false);
       return;
     }
@@ -303,7 +430,7 @@ export function SessionDetailPage(): JSX.Element {
     return () => {
       cancelled = true;
     };
-  }, [fetchGateway, sessionId, store]);
+  }, [eventTranscript.length, fetchGateway, sessionId, status, store]);
 
   async function handleSend(event: React.FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -330,7 +457,6 @@ export function SessionDetailPage(): JSX.Element {
       };
       if (body.run && typeof body.run.runId === 'string') {
         store.getState().actions.mergeRun(body.run.runId, body.run);
-        client.subscribeRun(body.run.runId);
       }
       if (body.session && typeof body.session.sessionId === 'string') {
         store.getState().actions.mergeSession(body.session.sessionId, body.session);
@@ -379,7 +505,6 @@ export function SessionDetailPage(): JSX.Element {
                     : node.kind === 'thinking'
                       ? 'thinking'
                       : node.label}
-                <span className="message-run">session run {node.runId}</span>
               </div>
               <pre>{node.text}</pre>
             </article>
@@ -390,13 +515,21 @@ export function SessionDetailPage(): JSX.Element {
 
         <form className="composer" onSubmit={handleSend}>
           <label className="field">
-            <span>{status === 'active' ? 'Wait for the current live turn to finish' : 'Continue this session with a new turn'}</span>
+            <span>
+              {status === 'active' && transport !== 'persistent'
+                ? 'Wait for the current live turn to finish'
+                : 'Continue this session with a new turn'}
+            </span>
             <textarea
               autoFocus={searchParams.get('compose') === '1'}
               value={prompt}
               onChange={(event) => setPrompt(event.target.value)}
               rows={5}
-              placeholder={status === 'active' ? 'The live session is still running…' : 'Type the next message for this session…'}
+              placeholder={
+                status === 'active' && transport !== 'persistent'
+                  ? 'The live session is still running…'
+                  : 'Type the next message for this session…'
+              }
               disabled={!canCompose}
             />
           </label>
@@ -405,11 +538,6 @@ export function SessionDetailPage(): JSX.Element {
             <button type="submit" disabled={sending || !prompt.trim() || !canCompose}>
               {sending ? 'Sending…' : 'Continue session'}
             </button>
-            {activeRunId ? (
-              <Link className="ghost-link" to={`/runs/${activeRunId}`}>
-                Open live bridge
-              </Link>
-            ) : null}
           </div>
         </form>
       </article>
@@ -432,8 +560,8 @@ export function SessionDetailPage(): JSX.Element {
             <strong>{status}</strong>
           </div>
           <div className="summary-card">
-            <span className="summary-label">Live process</span>
-            <strong>{activeRunId ?? 'none running'}</strong>
+            <span className="summary-label">Execution</span>
+            <strong>{activeRunId ? 'attached' : 'idle'}</strong>
           </div>
           <div className="summary-card">
             <span className="summary-label">Session cost</span>
@@ -448,25 +576,11 @@ export function SessionDetailPage(): JSX.Element {
             {sessionCost.cachedTokens != null ? ` · cached ${sessionCost.cachedTokens}` : ''}
           </p>
         ) : null}
-
-        <div className="list-grid">
-          {runs.map((run) => (
-            <article key={String(run.runId)} className="list-card">
-              <div className="list-card-main">
-                <strong>{String(run.runId)}</strong>
-                <span className={`status-badge status-${String(run.status ?? 'unknown')}`}>
-                  {String(run.status ?? 'unknown')}
-                </span>
-              </div>
-              <div className="actions">
-                <Link className="ghost-link" to={`/runs/${run.runId}`}>
-                  Live bridge
-                </Link>
-              </div>
-            </article>
-          ))}
-          {runs.length === 0 ? <p className="muted-copy">No live processes recorded for this session yet.</p> : null}
-        </div>
+        <p className="muted-copy">
+          {runs.length > 0
+            ? `${runs.length} execution ${runs.length === 1 ? 'attempt' : 'attempts'} recorded for this session.`
+            : 'No execution attempts recorded for this session yet.'}
+        </p>
       </article>
     </section>
   );

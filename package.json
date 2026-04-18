@@ -22,11 +22,13 @@
     "packages/observability"
   ],
   "scripts": {
-    "build": "tsc --build",
+    "build": "tsc --build && npm run build:webui --silent",
+    "build:webui": "npm --workspace @a5c-ai/agent-mux-webui run build",
     "typecheck": "npm run build",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
+    "test:browser:real": "npm run build --silent && playwright test --config playwright.real.config.mjs",
     "test:coverage": "vitest run --coverage",
     "clean": "tsc --build --clean",
     "lint": "eslint packages",
@@ -43,6 +45,7 @@
   "devDependencies": {
     "@changesets/cli": "^2.27.0",
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.59.1",
     "@types/node": "^20",
     "@types/ws": "^8.18.1",
     "@vitest/coverage-v8": "^4.1.4",

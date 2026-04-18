@@ -132,41 +132,56 @@ function GatewayBootstrap(props: { gatewayUrl: string; token: string; children: 
       }
 
       const run = (async () => {
-      const [agentsResponse, runsResponse, sessionsResponse] = await Promise.all([
-        fetchAuthorized<{ agents: unknown[]; agentDescriptors?: unknown[] }>(props.gatewayUrl, props.token, '/api/v1/agents'),
-        fetchAuthorized<{ runs: Array<Record<string, unknown>> }>(props.gatewayUrl, props.token, '/api/v1/runs'),
-        fetchAuthorized<{ sessions: Array<Record<string, unknown>> }>(props.gatewayUrl, props.token, '/api/v1/sessions'),
-      ]);
+        const [agentsResponse, runsResponse, sessionsResponse] = await Promise.all([
+          fetchAuthorized<{ agents: unknown[]; agentDescriptors?: unknown[] }>(props.gatewayUrl, props.token, '/api/v1/agents'),
+          fetchAuthorized<{ runs: Array<Record<string, unknown>> }>(props.gatewayUrl, props.token, '/api/v1/runs'),
+          fetchAuthorized<{ sessions: Array<Record<string, unknown>> }>(props.gatewayUrl, props.token, '/api/v1/sessions'),
+        ]);
 
-      if (cancelled) {
-        return;
-      }
-
-      const actions = store.getState().actions;
-      actions.setAgents(normalizeAgents(agentsResponse.agentDescriptors ?? agentsResponse.agents));
-
-      for (const run of runsResponse.runs) {
-        const runId = String(run['runId'] ?? '');
-        if (!runId) continue;
-        actions.mergeRun(runId, run);
-        if (typeof run['sessionId'] === 'string') {
-          actions.mergeSession(run['sessionId'], {
-            agent: run['agent'],
-            title: run['runId'],
-          });
+        if (cancelled) {
+          return;
         }
-        if (!subscriptionsRef.current.has(runId)) {
+
+        const actions = store.getState().actions;
+        actions.setAgents(normalizeAgents(agentsResponse.agentDescriptors ?? agentsResponse.agents));
+
+        for (const run of runsResponse.runs) {
+          const runId = String(run['runId'] ?? '');
+          if (!runId) continue;
+          actions.mergeRun(runId, run);
+          if (typeof run['sessionId'] === 'string') {
+            actions.mergeSession(run['sessionId'], {
+              agent: run['agent'],
+            });
+          }
+        }
+
+        const activeRunIds = new Set<string>();
+        for (const session of sessionsResponse.sessions) {
+          const sessionId = typeof session['sessionId'] === 'string' ? session['sessionId'] : '';
+          if (!sessionId) {
+            continue;
+          }
+          actions.mergeSession(sessionId, session);
+          if (typeof session['activeRunId'] === 'string' && session['activeRunId'].length > 0) {
+            activeRunIds.add(session['activeRunId']);
+          }
+        }
+
+        for (const [runId, unsubscribe] of subscriptionsRef.current.entries()) {
+          if (activeRunIds.has(runId)) {
+            continue;
+          }
+          unsubscribe();
+          subscriptionsRef.current.delete(runId);
+        }
+
+        for (const runId of activeRunIds) {
+          if (subscriptionsRef.current.has(runId)) {
+            continue;
+          }
           subscriptionsRef.current.set(runId, client.subscribeRun(runId));
         }
-      }
-
-      for (const session of sessionsResponse.sessions) {
-        const sessionId = typeof session['sessionId'] === 'string' ? session['sessionId'] : '';
-        if (!sessionId) {
-          continue;
-        }
-        actions.mergeSession(sessionId, session);
-      }
       })().finally(() => {
         syncInFlightRef.current = null;
       });

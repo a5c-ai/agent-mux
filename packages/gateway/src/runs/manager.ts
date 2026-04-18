@@ -73,6 +73,7 @@ export class RunManager {
   private readonly activeRuns = new Map<string, ActiveRun>();
   private readonly observations = new Set<Promise<void>>();
   private readonly subscribers = new Map<string, Map<string, RunSubscriber>>();
+  private readonly sessionSubscribers = new Map<string, Map<string, ClientConn>>();
   private readonly hookBroker;
   private nativeSessionsCache: CacheEntry<SessionEntry[]> | null = null;
   private nativeSessionsPromise: Promise<SessionEntry[]> | null = null;
@@ -157,6 +158,9 @@ export class RunManager {
       recentEvents: [],
     };
     this.activeRuns.set(handle.runId, active);
+    if (input.sessionId) {
+      await this.attachSessionSubscribersToRun(input.sessionId, handle.runId);
+    }
     await this.recordGatewayEvent(handle.runId, {
       type: 'user_message',
       text: Array.isArray(input.prompt) ? input.prompt.join('\n') : input.prompt,
@@ -386,6 +390,33 @@ export class RunManager {
     subscriber.finishCatchUp();
   }
 
+  async subscribeSession(conn: ClientConn, sessionId: string): Promise<void> {
+    let subscriberMap = this.sessionSubscribers.get(sessionId);
+    if (!subscriberMap) {
+      subscriberMap = new Map();
+      this.sessionSubscribers.set(sessionId, subscriberMap);
+    }
+    subscriberMap.set(conn.id, conn);
+    conn.sessionSubscriptions.add(sessionId);
+
+    const session = await this.getSession(sessionId);
+    if (session?.activeRunId) {
+      await this.attachSessionSubscribersToRun(sessionId, session.activeRunId);
+    }
+  }
+
+  unsubscribeSession(conn: ClientConn, sessionId: string): void {
+    conn.sessionSubscriptions.delete(sessionId);
+    const subscriberMap = this.sessionSubscribers.get(sessionId);
+    if (!subscriberMap) {
+      return;
+    }
+    subscriberMap.delete(conn.id);
+    if (subscriberMap.size === 0) {
+      this.sessionSubscribers.delete(sessionId);
+    }
+  }
+
   unsubscribe(conn: ClientConn, runId: string): void {
     conn.subscriptions.delete(runId);
     const subscriberMap = this.subscribers.get(runId);
@@ -399,6 +430,9 @@ export class RunManager {
   removeConnection(conn: ClientConn): void {
     for (const runId of Array.from(conn.subscriptions)) {
       this.unsubscribe(conn, runId);
+    }
+    for (const sessionId of Array.from(conn.sessionSubscriptions)) {
+      this.unsubscribeSession(conn, sessionId);
     }
   }
 
@@ -430,6 +464,7 @@ export class RunManager {
         if (event.type === 'session_start' && 'sessionId' in event && typeof event.sessionId === 'string') {
           active.entry.sessionId = event.sessionId;
           this.eventLog.index.upsertRun(active.entry);
+          await this.attachSessionSubscribersToRun(event.sessionId, handle.runId);
         }
       }
     } finally {
@@ -503,6 +538,22 @@ export class RunManager {
 
     const replay = await this.eventLog.readSince(runId, sinceSeq, tailSeq);
     return replay.events;
+  }
+
+  private async attachSessionSubscribersToRun(sessionId: string, runId: string): Promise<void> {
+    const subscribers = this.sessionSubscribers.get(sessionId);
+    if (!subscribers || subscribers.size === 0) {
+      return;
+    }
+
+    await Promise.all(
+      Array.from(subscribers.values()).map(async (conn) => {
+        if (conn.subscriptions.has(runId)) {
+          return;
+        }
+        await this.subscribe(conn, runId, 0);
+      }),
+    );
   }
 
   private async listNativeSessions(): Promise<SessionEntry[]> {

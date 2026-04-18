@@ -10,6 +10,7 @@ export class ClientConn {
   readonly id = randomUUID();
   readonly socket: WebSocket;
   readonly subscriptions = new Set<string>();
+  readonly sessionSubscriptions = new Set<string>();
   readonly connectedAt = Date.now();
   tokenId: string | null;
   authenticated = false;

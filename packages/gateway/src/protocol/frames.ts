@@ -34,6 +34,16 @@ const unsubscribeFrameSchema = z.object({
   runId: z.string().min(1),
 });
 
+const sessionSubscribeFrameSchema = z.object({
+  type: z.literal('session.subscribe'),
+  sessionId: z.string().min(1),
+});
+
+const sessionUnsubscribeFrameSchema = z.object({
+  type: z.literal('session.unsubscribe'),
+  sessionId: z.string().min(1),
+});
+
 const pingFrameSchema = z.object({
   type: z.literal('ping'),
 });
@@ -99,6 +109,8 @@ export const gatewayFrameSchema = z.discriminatedUnion('type', [
   errorFrameSchema,
   subscribeFrameSchema,
   unsubscribeFrameSchema,
+  sessionSubscribeFrameSchema,
+  sessionUnsubscribeFrameSchema,
   pingFrameSchema,
   pongFrameSchema,
   runEventFrameSchema,

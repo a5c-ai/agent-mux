@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAgents, useGateway } from '@a5c-ai/agent-mux-ui';
 import { useStore } from 'zustand';
@@ -12,6 +12,13 @@ function firstAgent(agents: string[], preferred: string | null): string {
   return agents[0] ?? 'codex';
 }
 
+function isSessionCapable(record: Record<string, unknown> | null): boolean {
+  return (
+    record?.['supportsInteractiveMode'] === true ||
+    record?.['structuredSessionTransport'] === 'persistent'
+  );
+}
+
 export function NewRunPage(): JSX.Element {
   const navigate = useNavigate();
   const fetchGateway = useGatewayFetch();
@@ -23,19 +30,24 @@ export function NewRunPage(): JSX.Element {
   const [prompt, setPrompt] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const agentRecords = useStore(store, (state) => state.agents.byId);
   const agentRecord = useStore(store, (state) => state.agents.byId[agent] ?? null);
+  const sessionAgents = useMemo(() => {
+    const filtered = agents.filter((item) => isSessionCapable(agentRecords[item] ?? null));
+    return filtered.length > 0 ? filtered : agents;
+  }, [agentRecords, agents]);
 
   useEffect(() => {
     setAgent((current) => {
-      if (agents.length === 0) {
+      if (sessionAgents.length === 0) {
         return current;
       }
-      if (agents.includes(current)) {
+      if (sessionAgents.includes(current)) {
         return current;
       }
-      return firstAgent(agents, requestedAgent);
+      return firstAgent(sessionAgents, requestedAgent);
     });
-  }, [agents, requestedAgent]);
+  }, [requestedAgent, sessionAgents]);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -88,7 +100,7 @@ export function NewRunPage(): JSX.Element {
           <label className="field">
             <span>Agent</span>
             <select value={agent} onChange={(event) => setAgent(event.target.value)}>
-              {agents.map((item) => (
+              {sessionAgents.map((item) => (
                 <option key={item} value={item}>
                   {item}
                 </option>
@@ -103,6 +115,12 @@ export function NewRunPage(): JSX.Element {
                 : agentRecord.structuredSessionTransport === 'restart-per-turn'
                   ? 'Structured session transport: resume by starting a fresh run for each turn.'
                   : 'Structured session transport: unavailable.'}
+            </p>
+          ) : null}
+
+          {sessionAgents.length !== agents.length ? (
+            <p className="muted-copy">
+              The browser is showing only transports that can keep a session interactive or persistent.
             </p>
           ) : null}
 

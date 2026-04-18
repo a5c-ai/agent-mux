@@ -18,6 +18,13 @@ import { Sidebar } from './shell/Sidebar.js';
 import { TopBar } from './shell/TopBar.js';
 import { bindGlobalHotkeys } from './web-only/keyboard.js';
 
+function LegacySessionRouteRedirect(): JSX.Element {
+  const location = useLocation();
+  const match = location.pathname.match(/^\/sessions\/[^/]+\/([^/?#]+)/);
+  const sessionId = match?.[1];
+  return <Navigate to={sessionId ? `/sessions/${sessionId}${location.search}` : '/sessions'} replace />;
+}
+
 function RequireAuth(props: { children: React.ReactNode }): JSX.Element {
   const { isAuthenticated } = useGatewayAuth();
   const location = useLocation();
@@ -60,7 +67,8 @@ function AppChrome(): JSX.Element {
             <Route path="/agents" element={<AgentsPage />} />
             <Route path="/sessions" element={<SessionsPage />} />
             <Route path="/sessions/new" element={<NewRunPage />} />
-            <Route path="/sessions/:agent/:sessionId" element={<SessionDetailPage />} />
+            <Route path="/sessions/:sessionId" element={<SessionDetailPage />} />
+            <Route path="/sessions/:agent/:sessionId" element={<LegacySessionRouteRedirect />} />
             <Route path="/runs/new" element={<NewRunPage />} />
             <Route path="/runs/:runId" element={<RunPage />} />
             <Route path="/inbox" element={<HookInboxPage />} />

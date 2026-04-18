@@ -8,7 +8,7 @@ export function RunPage(): JSX.Element {
   const run = useRun(runId);
 
   if (typeof run?.sessionId === 'string' && typeof run?.agent === 'string') {
-    return <Navigate to={`/sessions/${run.agent}/${run.sessionId}`} replace />;
+    return <Navigate to={`/sessions/${run.sessionId}`} replace />;
   }
 
   return (

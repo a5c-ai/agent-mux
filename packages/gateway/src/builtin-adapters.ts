@@ -127,7 +127,20 @@ export async function listRunnableGatewayAgents(client?: GatewayRunClient): Prom
   });
 
   if (runnable.length > 0) {
-    return runnable;
+    return runnable.sort((left, right) => {
+      const score = (candidate: RunnableGatewayAgent): number => {
+        if (candidate.structuredSessionTransport === 'persistent' && candidate.supportsInteractiveMode) return 4;
+        if (candidate.supportsInteractiveMode) return 3;
+        if (candidate.structuredSessionTransport === 'persistent') return 2;
+        if (candidate.canResume) return 1;
+        return 0;
+      };
+      const delta = score(right) - score(left);
+      if (delta !== 0) {
+        return delta;
+      }
+      return left.displayName.localeCompare(right.displayName);
+    });
   }
 
   return listBuiltInAgentNames().map((agent) => ({

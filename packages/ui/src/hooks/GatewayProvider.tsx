@@ -26,7 +26,9 @@ function bindClientToStore(client: GatewayClient, store: GatewayStore): () => vo
           store.getState().actions.mergeRun(runId, { sessionId: event['sessionId'] });
           store.getState().actions.mergeSession(event['sessionId'], {
             agent: event['agent'],
-            title: runId,
+            activeRunId: runId,
+            latestRunId: runId,
+            status: 'active',
           });
         }
         if (event['type'] === 'run.finalized') {
@@ -38,6 +40,15 @@ function bindClientToStore(client: GatewayClient, store: GatewayStore): () => vo
                 ? 'aborted'
                 : 'failed';
           store.getState().actions.mergeRun(runId, { status, exitReason });
+          const run = store.getState().runs.byId[runId];
+          const sessionId = typeof run?.sessionId === 'string' ? run.sessionId : null;
+          if (sessionId) {
+            store.getState().actions.mergeSession(sessionId, {
+              status: 'inactive',
+              activeRunId: null,
+              latestRunId: runId,
+            });
+          }
         }
       }
       if (type === 'hook.request') {

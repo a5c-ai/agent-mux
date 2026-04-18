@@ -8,6 +8,8 @@
     { "type": "object", "properties": { "type": { "const": "error" }, "code": { "type": "string" }, "message": { "type": "string" } }, "required": ["type", "code", "message"] },
     { "type": "object", "properties": { "type": { "const": "subscribe" }, "runId": { "type": "string" }, "sinceSeq": { "type": "integer" } }, "required": ["type", "runId"] },
     { "type": "object", "properties": { "type": { "const": "unsubscribe" }, "runId": { "type": "string" } }, "required": ["type", "runId"] },
+    { "type": "object", "properties": { "type": { "const": "session.subscribe" }, "sessionId": { "type": "string" } }, "required": ["type", "sessionId"] },
+    { "type": "object", "properties": { "type": { "const": "session.unsubscribe" }, "sessionId": { "type": "string" } }, "required": ["type", "sessionId"] },
     { "type": "object", "properties": { "type": { "const": "ping" } }, "required": ["type"] },
     { "type": "object", "properties": { "type": { "const": "pong" } }, "required": ["type"] },
     { "type": "object", "properties": { "type": { "const": "run.event" }, "runId": { "type": "string" }, "seq": { "type": "integer" }, "source": { "type": "string" }, "event": { "type": "object" } }, "required": ["type", "runId", "seq", "source", "event"] },

@@ -31,6 +31,16 @@ export interface UnsubscribeFrame {
   runId: string;
 }
 
+export interface SessionSubscribeFrame {
+  type: 'session.subscribe';
+  sessionId: string;
+}
+
+export interface SessionUnsubscribeFrame {
+  type: 'session.unsubscribe';
+  sessionId: string;
+}
+
 export interface PingFrame {
   type: 'ping';
 }
@@ -94,6 +104,8 @@ export type ClientFrame =
   | AuthFrame
   | SubscribeFrame
   | UnsubscribeFrame
+  | SessionSubscribeFrame
+  | SessionUnsubscribeFrame
   | PingFrame
   | HookDecisionFrame
   | PairingRegisterFrame

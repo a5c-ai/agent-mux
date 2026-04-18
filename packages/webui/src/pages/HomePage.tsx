@@ -77,7 +77,7 @@ export function HomePage(): JSX.Element {
                 </span>
               </div>
               <div className="actions">
-                <Link className="ghost-link" to={`/sessions/${session.agent ?? 'agent'}/${session.sessionId}`}>
+                <Link className="ghost-link" to={`/sessions/${session.sessionId}`}>
                   Open chat
                 </Link>
               </div>

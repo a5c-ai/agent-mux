@@ -405,6 +405,16 @@ export function createGatewayServer(
           return;
         }
 
+        if (frame.type === 'session.subscribe') {
+          void runManager.subscribeSession(conn, frame.sessionId);
+          return;
+        }
+
+        if (frame.type === 'session.unsubscribe') {
+          runManager.unsubscribeSession(conn, frame.sessionId);
+          return;
+        }
+
         if (frame.type === 'hook.decision') {
           const accepted = runManager.submitHookDecision(conn, frame);
           if (requestId) {
@@ -528,6 +538,7 @@ export function createGatewayServer(
         return record ? { id, type: 'pairing.consumed', ...record } : { id, error: 'not_found' };
       }
       case 'session.subscribe':
+        return { id, ok: true };
       case 'session.unsubscribe':
         return { id, ok: true };
       default:
