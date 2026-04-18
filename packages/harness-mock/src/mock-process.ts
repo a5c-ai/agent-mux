@@ -1,4 +1,3 @@
-// @ts-nocheck -- TODO(harness-mock): implement full MockHarnessHandle interface
 /**
  * MockProcess — simulates a harness subprocess with configurable behavior.
  *
@@ -9,10 +8,11 @@
 import { EventEmitter } from 'node:events';
 import type {
   HarnessScenario,
-  MockHarnessHandle,
+  MockExecutionResult,
   OutputChunk,
   FileOperation,
-  StdinInteraction,
+  SubprocessMockHandle,
+  SubprocessResult,
 } from './types.js';
 
 // ---------------------------------------------------------------------------
@@ -20,28 +20,31 @@ import type {
 // ---------------------------------------------------------------------------
 
 let nextPid = 10000;
+let nextHandleId = 1;
 
 // ---------------------------------------------------------------------------
 // MockProcess
 // ---------------------------------------------------------------------------
 
-export class MockProcess extends EventEmitter implements MockHarnessHandle {
+export class MockProcess extends EventEmitter implements SubprocessMockHandle {
   readonly scenario: HarnessScenario;
   readonly pid: number;
+  readonly id: number;
 
   private _exited = false;
   private _exitCode: number | undefined;
   private _stdout = '';
   private _stderr = '';
   private _fileChanges: FileOperation[] = [];
-  private _killed = false;
   private _timers: ReturnType<typeof setTimeout>[] = [];
   private _stdinBuffer = '';
+  private readonly _startedAt = Date.now();
 
   constructor(scenario: HarnessScenario) {
     super();
     this.scenario = scenario;
     this.pid = nextPid++;
+    this.id = nextHandleId++;
   }
 
   // -----------------------------------------------------------------------
@@ -54,6 +57,15 @@ export class MockProcess extends EventEmitter implements MockHarnessHandle {
   get stderr(): string { return this._stderr; }
   get fileChanges(): FileOperation[] { return [...this._fileChanges]; }
 
+  async stop(): Promise<void> {
+    this.kill('SIGTERM');
+    await this.waitForExit();
+  }
+
+  forceStop(): void {
+    this.kill('SIGKILL');
+  }
+
   write(data: string): void {
     if (this._exited) throw new Error('Cannot write to exited process');
     this._stdinBuffer += data;
@@ -62,7 +74,6 @@ export class MockProcess extends EventEmitter implements MockHarnessHandle {
 
   kill(signal = 'SIGTERM'): void {
     if (this._exited) return;
-    this._killed = true;
     this._cleanup();
     this._exit(signal === 'SIGKILL' ? 137 : 143);
   }
@@ -86,6 +97,27 @@ export class MockProcess extends EventEmitter implements MockHarnessHandle {
     });
   }
 
+  async waitForCompletion(): Promise<MockExecutionResult> {
+    const result = await this.waitForExit();
+    const subprocess: SubprocessResult = {
+      type: 'subprocess',
+      exitCode: result.exitCode,
+      stdout: result.stdout,
+      stderr: result.stderr,
+    };
+    return {
+      success: result.exitCode === 0,
+      durationMs: Date.now() - this._startedAt,
+      error: result.exitCode === 0
+        ? undefined
+        : {
+          code: 'PROCESS_EXIT',
+          message: result.stderr.trim() || `Process exited with code ${result.exitCode}`,
+        },
+      results: subprocess,
+    };
+  }
+
   // -----------------------------------------------------------------------
   // Lifecycle
   // -----------------------------------------------------------------------
@@ -94,8 +126,9 @@ export class MockProcess extends EventEmitter implements MockHarnessHandle {
    * Start the mock process. Call this after setting up event listeners.
    * Returns the handle for chaining.
    */
-  start(): MockHarnessHandle {
-    const startDelay = this.scenario.process.startupDelayMs ?? 0;
+  start(): SubprocessMockHandle {
+    const process = this.scenario.process ?? { exitCode: 0 };
+    const startDelay = process.startupDelayMs ?? 0;
 
     this._schedule(startDelay, () => {
       this.emit('spawn');
@@ -105,15 +138,15 @@ export class MockProcess extends EventEmitter implements MockHarnessHandle {
       this._emitOutputChunks();
     });
 
-    if (this.scenario.process.hang) {
+    if (process.hang) {
       // Don't schedule exit — process hangs
       return this;
     }
 
-    if (this.scenario.process.crashAfterMs !== undefined) {
-      this._schedule(this.scenario.process.crashAfterMs, () => {
+    if (process.crashAfterMs !== undefined) {
+      this._schedule(process.crashAfterMs, () => {
         if (!this._exited) {
-          const signal = this.scenario.process.crashSignal ?? 'SIGTERM';
+          const signal = process.crashSignal ?? 'SIGTERM';
           this._exit(signal === 'SIGKILL' ? 137 : 143);
         }
       });
@@ -184,6 +217,7 @@ export class MockProcess extends EventEmitter implements MockHarnessHandle {
         this._fileChanges.push(op);
         this.emit('file-operation', op);
       });
+      cumulativeDelay += 1;
     }
   }
 
@@ -232,12 +266,13 @@ export class MockProcess extends EventEmitter implements MockHarnessHandle {
   }
 
   private _scheduleExit(): void {
-    if (this.scenario.process.hang) return;
-    if (this.scenario.process.crashAfterMs !== undefined) return;
-    const shutdownDelay = this.scenario.process.shutdownDelayMs ?? 0;
+    const process = this.scenario.process ?? { exitCode: 0 };
+    if (process.hang) return;
+    if (process.crashAfterMs !== undefined) return;
+    const shutdownDelay = process.shutdownDelayMs ?? 0;
     this._schedule(shutdownDelay, () => {
       if (!this._exited) {
-        this._exit(this.scenario.process.exitCode);
+        this._exit(process.exitCode);
       }
     });
   }

@@ -14,8 +14,6 @@ export default defineConfig({
         'packages/observability/src/**',
         'packages/adapters/src/amp-adapter.ts',
         'packages/adapters/src/droid-adapter.ts',
-        'packages/harness-mock/src/http-mock.ts',
-        'packages/harness-mock/src/websocket-mock.ts',
         'packages/harness-mock/src/multi-execution.ts',
       ],
       reporter: ['text', 'json-summary', 'html'],

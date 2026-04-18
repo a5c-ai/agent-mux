@@ -38,6 +38,41 @@ export function claudeThinking(text: string): string {
   return JSON.stringify({ type: 'thinking', content: text }) + '\n';
 }
 
+export function claudeStreamEventText(text: string): string {
+  return JSON.stringify({
+    type: 'stream_event',
+    event: {
+      type: 'content_block_delta',
+      delta: {
+        type: 'text_delta',
+        text,
+      },
+    },
+  }) + '\n';
+}
+
+export function claudeStreamEventThinking(text: string): string {
+  return JSON.stringify({
+    type: 'stream_event',
+    event: {
+      type: 'content_block_delta',
+      delta: {
+        type: 'thinking_delta',
+        thinking: text,
+      },
+    },
+  }) + '\n';
+}
+
+export function claudeMessageStop(): string {
+  return JSON.stringify({
+    type: 'stream_event',
+    event: {
+      type: 'message_stop',
+    },
+  }) + '\n';
+}
+
 export function claudeResult(sessionId: string, text?: string, cost?: Record<string, unknown>): string {
   const obj: Record<string, unknown> = { type: 'result', subtype: 'success', session_id: sessionId };
   if (text !== undefined) obj['result'] = text;
@@ -75,6 +110,33 @@ export function codexError(message: string): string {
   return JSON.stringify({ type: 'error', message }) + '\n';
 }
 
+export function codexThreadStarted(threadId: string): string {
+  return JSON.stringify({ type: 'thread.started', thread_id: threadId }) + '\n';
+}
+
+export function codexTurnStarted(id = 'turn_1'): string {
+  return JSON.stringify({ type: 'turn.started', turn_id: id }) + '\n';
+}
+
+export function codexItemStarted(item: Record<string, unknown>): string {
+  return JSON.stringify({ type: 'item.started', item }) + '\n';
+}
+
+export function codexItemCompleted(item: Record<string, unknown>): string {
+  return JSON.stringify({ type: 'item.completed', item }) + '\n';
+}
+
+export function codexTurnCompleted(text?: string, usage?: Record<string, unknown>): string {
+  const payload: Record<string, unknown> = { type: 'turn.completed' };
+  if (text !== undefined) payload['text'] = text;
+  if (usage !== undefined) payload['usage'] = usage;
+  return JSON.stringify(payload) + '\n';
+}
+
+export function codexTurnFailed(message: string): string {
+  return JSON.stringify({ type: 'turn.failed', message }) + '\n';
+}
+
 // ---------------------------------------------------------------------------
 // Gemini / generic JSONL
 // ---------------------------------------------------------------------------
@@ -109,6 +171,74 @@ export function genericToolCall(call: ToolCall): string {
 
 export function genericError(message: string): string {
   return JSON.stringify({ type: 'error', message }) + '\n';
+}
+
+export function genericSessionStart(sessionId: string, resumed = false): string {
+  return JSON.stringify({ type: 'session_start', session_id: sessionId, resumed }) + '\n';
+}
+
+export function genericSessionEnd(finalMessage?: string, usage?: Record<string, unknown>): string {
+  const payload: Record<string, unknown> = { type: 'session_end' };
+  if (finalMessage !== undefined) payload['final_message'] = finalMessage;
+  if (usage !== undefined) payload['usage'] = usage;
+  return JSON.stringify(payload) + '\n';
+}
+
+export function agentTextDelta(text: string, accumulated?: string): string {
+  return JSON.stringify({
+    type: 'text_delta',
+    content: text,
+    accumulated: accumulated ?? text,
+  }) + '\n';
+}
+
+export function agentToolCallStart(id: string, name: string, input?: Record<string, unknown>): string {
+  return JSON.stringify({
+    type: 'tool_call_start',
+    id,
+    tool: name,
+    name,
+    input,
+    arguments: input,
+    args: input,
+  }) + '\n';
+}
+
+export function agentToolCallReady(id: string, name: string, input?: Record<string, unknown>): string {
+  const serialized = JSON.stringify(input ?? {});
+  return JSON.stringify({
+    type: 'tool_call_ready',
+    id,
+    tool: name,
+    name,
+    input: serialized,
+  }) + '\n';
+}
+
+export function agentToolResult(id: string, name: string, output: string, durationMs = 0): string {
+  return JSON.stringify({
+    type: 'tool_result',
+    id,
+    tool: name,
+    name,
+    result: output,
+    output,
+    duration: durationMs,
+    durationMs,
+  }) + '\n';
+}
+
+export function agentCost(totalUsd: number, inputTokens: number, outputTokens: number): string {
+  return JSON.stringify({
+    type: 'cost',
+    totalUsd,
+    inputTokens,
+    outputTokens,
+  }) + '\n';
+}
+
+export function agentMessageStop(text: string): string {
+  return JSON.stringify({ type: 'message_stop', text }) + '\n';
 }
 
 // ---------------------------------------------------------------------------

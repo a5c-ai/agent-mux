@@ -21,6 +21,7 @@ describe('MockProcess', () => {
       const result = await proc.waitForExit();
       expect(result.exitCode).toBe(0);
       expect(proc.exited).toBe(true);
+      expect(proc.id).toBeGreaterThan(0);
     });
 
     it('emits stdout data', async () => {
@@ -95,6 +96,24 @@ describe('MockProcess', () => {
       }, 10);
       const result = await proc.waitForExit();
       expect(result.exitCode).toBe(143);
+    });
+
+    it('stop and forceStop satisfy the generic mock handle contract', async () => {
+      const proc = new MockProcess(simpleScenario({
+        process: { exitCode: 0, hang: true },
+      }));
+      proc.start();
+      const stopPromise = proc.stop();
+      await stopPromise;
+      expect(proc.exitCode).toBe(143);
+
+      const proc2 = new MockProcess(simpleScenario({
+        process: { exitCode: 0, hang: true },
+      }));
+      proc2.start();
+      proc2.forceStop();
+      const result = await proc2.waitForExit();
+      expect(result.exitCode).toBe(137);
     });
   });
 
@@ -225,6 +244,20 @@ describe('MockProcess', () => {
       // Second call should also resolve
       const result = await proc.waitForExit();
       expect(result.exitCode).toBe(0);
+    });
+  });
+
+  describe('waitForCompletion', () => {
+    it('returns subprocess execution metadata', async () => {
+      const proc = new MockProcess(simpleScenario());
+      proc.start();
+      const result = await proc.waitForCompletion();
+      expect(result.success).toBe(true);
+      expect(result.results.type).toBe('subprocess');
+      if (result.results.type !== 'subprocess') {
+        throw new Error('expected subprocess result');
+      }
+      expect(result.results.stdout).toContain('hello');
     });
   });
 });

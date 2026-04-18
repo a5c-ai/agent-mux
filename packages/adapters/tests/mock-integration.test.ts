@@ -17,6 +17,9 @@ import { PiAdapter } from '../src/pi-adapter.js';
 import { OmpAdapter } from '../src/omp-adapter.js';
 import { OpenClawAdapter } from '../src/openclaw-adapter.js';
 import { HermesAdapter } from '../src/hermes-adapter.js';
+import { AmpAdapter } from '../src/amp-adapter.js';
+import { DroidAdapter } from '../src/droid-adapter.js';
+import { QwenAdapter } from '../src/qwen-adapter.js';
 
 import {
   AGENT_SCENARIOS,
@@ -60,30 +63,75 @@ function feed(adapter: { parseEvent: (line: string, ctx: ParseContext) => AgentE
 }
 
 describe('adapter × mock scenarios', () => {
-  const cases: Array<{ agent: string; adapter: { parseEvent: (l: string, c: ParseContext) => AgentEvent | AgentEvent[] | null }; scenarios: string[] }> = [
-    { agent: 'claude', adapter: new ClaudeAdapter(), scenarios: ['claude:basic-text', 'claude:tool-call'] },
-    { agent: 'codex', adapter: new CodexAdapter(), scenarios: ['codex:basic-text', 'codex:code-generation'] },
-    { agent: 'gemini', adapter: new GeminiAdapter(), scenarios: ['gemini:basic-text', 'gemini:streaming'] },
-    { agent: 'copilot', adapter: new CopilotAdapter(), scenarios: ['copilot:basic-text'] },
-    { agent: 'cursor', adapter: new CursorAdapter(), scenarios: ['cursor:basic-text', 'cursor:tool-call'] },
-    { agent: 'opencode', adapter: new OpenCodeAdapter(), scenarios: ['opencode:basic-text', 'opencode:tool-call'] },
-    { agent: 'pi', adapter: new PiAdapter(), scenarios: ['pi:basic-text', 'pi:tool-call'] },
-    { agent: 'omp', adapter: new OmpAdapter(), scenarios: ['omp:basic-text', 'omp:tool-call'] },
-    { agent: 'openclaw', adapter: new OpenClawAdapter(), scenarios: ['openclaw:basic-text', 'openclaw:tool-call'] },
-    { agent: 'hermes', adapter: new HermesAdapter(), scenarios: ['hermes:basic-text', 'hermes:tool-call'] },
+  const cases: Array<{
+    agent: string;
+    adapter: { parseEvent: (l: string, c: ParseContext) => AgentEvent | AgentEvent[] | null };
+    scenarios: Array<{
+      name: string;
+      expected: Array<'text_delta' | 'thinking_delta' | 'session_start' | 'tool_call_start' | 'tool_result' | 'message_stop' | 'cost' | 'error'>;
+    }>;
+  }> = [
+    { agent: 'claude', adapter: new ClaudeAdapter(), scenarios: [
+      { name: 'claude:stream-json', expected: ['session_start', 'thinking_delta', 'text_delta', 'message_stop', 'cost'] },
+      { name: 'claude:tool-call', expected: ['session_start', 'text_delta', 'tool_call_start', 'tool_result', 'message_stop'] },
+    ] },
+    { agent: 'codex', adapter: new CodexAdapter(), scenarios: [
+      { name: 'codex:exec-turn', expected: ['session_start', 'thinking_delta', 'text_delta', 'message_stop', 'cost'] },
+      { name: 'codex:code-generation', expected: ['session_start', 'thinking_delta', 'tool_call_start', 'tool_result', 'message_stop'] },
+    ] },
+    { agent: 'gemini', adapter: new GeminiAdapter(), scenarios: [
+      { name: 'gemini:thinking-stream', expected: ['thinking_delta', 'text_delta'] },
+      { name: 'gemini:tool-call', expected: ['text_delta', 'tool_call_start', 'tool_result'] },
+    ] },
+    { agent: 'copilot', adapter: new CopilotAdapter(), scenarios: [
+      { name: 'copilot:plain-text', expected: ['text_delta'] },
+    ] },
+    { agent: 'cursor', adapter: new CursorAdapter(), scenarios: [
+      { name: 'cursor:basic-text', expected: ['text_delta'] },
+      { name: 'cursor:tool-call', expected: ['text_delta', 'tool_call_start'] },
+    ] },
+    { agent: 'opencode', adapter: new OpenCodeAdapter(), scenarios: [
+      { name: 'opencode:session', expected: ['session_start', 'text_delta', 'message_stop', 'cost'] },
+      { name: 'opencode:tool-call', expected: ['session_start', 'tool_call_start', 'tool_result'] },
+    ] },
+    { agent: 'pi', adapter: new PiAdapter(), scenarios: [
+      { name: 'pi:basic-text', expected: ['text_delta'] },
+      { name: 'pi:tool-call', expected: ['text_delta', 'tool_call_start'] },
+    ] },
+    { agent: 'omp', adapter: new OmpAdapter(), scenarios: [
+      { name: 'omp:basic-text', expected: ['text_delta'] },
+      { name: 'omp:tool-call', expected: ['text_delta', 'tool_call_start'] },
+    ] },
+    { agent: 'openclaw', adapter: new OpenClawAdapter(), scenarios: [
+      { name: 'openclaw:basic-text', expected: ['text_delta'] },
+      { name: 'openclaw:tool-call', expected: ['text_delta', 'tool_call_start'] },
+    ] },
+    { agent: 'hermes', adapter: new HermesAdapter(), scenarios: [
+      { name: 'hermes:basic-text', expected: ['text_delta'] },
+      { name: 'hermes:tool-call', expected: ['text_delta', 'tool_call_start'] },
+    ] },
+    { agent: 'amp', adapter: new AmpAdapter(), scenarios: [
+      { name: 'amp:session', expected: ['session_start', 'text_delta', 'cost'] },
+      { name: 'amp:tool-call', expected: ['session_start', 'tool_call_start', 'tool_result'] },
+    ] },
+    { agent: 'droid', adapter: new DroidAdapter(), scenarios: [
+      { name: 'droid:session', expected: ['session_start', 'text_delta', 'message_stop', 'cost'] },
+      { name: 'droid:tool-call', expected: ['session_start', 'tool_call_start', 'tool_result'] },
+    ] },
+    { agent: 'qwen', adapter: new QwenAdapter(), scenarios: [
+      { name: 'qwen:basic-text', expected: ['text_delta'] },
+      { name: 'qwen:tool-call', expected: ['text_delta', 'tool_call_start', 'tool_result'] },
+    ] },
   ];
 
   for (const c of cases) {
-    for (const sid of c.scenarios) {
-      it(`${c.agent} parses ${sid}`, () => {
-        const scen = AGENT_SCENARIOS[sid]!;
+    for (const scenarioCase of c.scenarios) {
+      it(`${c.agent} parses ${scenarioCase.name}`, () => {
+        const scen = AGENT_SCENARIOS[scenarioCase.name]!;
         const events = feed(c.adapter, scen, c.agent);
         expect(events.length).toBeGreaterThan(0);
-        // At least one text_delta
-        expect(events.some((e) => e.type === 'text_delta')).toBe(true);
-        // If scenario name mentions tool, expect a tool_call_start
-        if (sid.includes('tool') || sid.includes('code-generation')) {
-          expect(events.some((e) => e.type === 'tool_call_start')).toBe(true);
+        for (const eventType of scenarioCase.expected) {
+          expect(events.some((e) => e.type === eventType), `${scenarioCase.name} -> ${eventType}`).toBe(true);
         }
       });
     }

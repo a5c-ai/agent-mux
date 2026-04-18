@@ -1,28 +1,15 @@
-/**
- * Mock implementations for remote adapters (HTTP/WebSocket).
- *
- * Provides realistic simulation of remote server/connection behavior for:
- * - OpenCode HTTP
- * - Codex WebSocket
- * - Generic HTTP/WebSocket adapters
- */
-
 import { EventEmitter } from 'node:events';
-import type { AgentEvent, RunOptions } from '@a5c-ai/agent-mux-core';
+import type { AgentEvent } from '@a5c-ai/agent-mux-core';
 import type {
-  RemoteMockConfig,
   MockConnection,
   MockServerInfo,
-  RemoteMockBuilder,
   MockStreamEvent,
+  RemoteMockBuilder,
+  RemoteMockConfig,
 } from './mock-types.js';
 
-// ---------------------------------------------------------------------------
-// Utilities
-// ---------------------------------------------------------------------------
-
 function delay(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function generateId(): string {
@@ -38,14 +25,10 @@ function createBaseEvent(type: string, runId: string, agent = 'mock-agent') {
   };
 }
 
-// ---------------------------------------------------------------------------
-// Mock Server Implementation
-// ---------------------------------------------------------------------------
-
 export class MockServer extends EventEmitter {
   private info: MockServerInfo;
-  private config: RemoteMockConfig;
-  private connections = new Map<string, MockConnection>();
+  private readonly config: RemoteMockConfig;
+  private readonly connections = new Map<string, MockConnection>();
   private _started = false;
 
   constructor(config: RemoteMockConfig) {
@@ -64,24 +47,17 @@ export class MockServer extends EventEmitter {
     if (this._started) {
       throw new Error('Server already started');
     }
-
     this.info.status = 'starting';
-
-    // Simulate startup delay
     if (this.config.server?.startupDelayMs) {
       await delay(this.config.server.startupDelayMs);
     }
-
-    // Simulate startup failure
     if (this.config.server?.startupFails) {
       this.info.status = 'error';
       throw new Error('Mock server startup failed');
     }
-
     this._started = true;
     this.info.status = 'running';
     this.emit('started', this.info);
-
     return this.info;
   }
 
@@ -89,16 +65,12 @@ export class MockServer extends EventEmitter {
     if (!this._started) {
       return;
     }
-
     this.info.status = 'stopped';
     this._started = false;
-
-    // Close all connections
     for (const connection of this.connections.values()) {
       await connection.close();
     }
     this.connections.clear();
-
     this.emit('stopped');
   }
 
@@ -106,16 +78,9 @@ export class MockServer extends EventEmitter {
     if (!this._started) {
       throw new Error('Server not started');
     }
-
-    const connection = new MockConnectionImpl(
-      connectionType,
-      this.info.endpoint,
-      this.config
-    );
-
+    const connection = new MockConnectionImpl(connectionType, this.info.endpoint, this.config);
     this.connections.set(connection.connectionId, connection);
     this.emit('connection', connection);
-
     return connection;
   }
 
@@ -128,39 +93,32 @@ export class MockServer extends EventEmitter {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Mock Connection Implementation
-// ---------------------------------------------------------------------------
-
 class MockConnectionImpl extends EventEmitter implements MockConnection {
   readonly connectionId: string;
   readonly connectionType: 'http' | 'websocket';
   readonly endpoint: string;
 
-  private config: RemoteMockConfig;
+  private readonly config: RemoteMockConfig;
   private _state: 'connecting' | 'connected' | 'disconnected' | 'error' = 'connecting';
-  private stats = {
+  private readonly stats = {
     eventsReceived: 0,
     eventsSent: 0,
     connectTime: new Date(),
     lastActivity: new Date(),
   };
-  private eventQueue: AgentEvent[] = [];
-  private eventIterator: AsyncIterableIterator<AgentEvent> | null = null;
+  private readonly eventQueue: AgentEvent[] = [];
 
   constructor(
     connectionType: 'http' | 'websocket',
     endpoint: string,
-    config: RemoteMockConfig
+    config: RemoteMockConfig,
   ) {
     super();
     this.connectionId = generateId();
     this.connectionType = connectionType;
     this.endpoint = endpoint;
     this.config = config;
-
-    // Start connection process
-    this.connect();
+    void this.connect();
   }
 
   get state(): 'connecting' | 'connected' | 'disconnected' | 'error' {
@@ -169,25 +127,18 @@ class MockConnectionImpl extends EventEmitter implements MockConnection {
 
   private async connect(): Promise<void> {
     try {
-      // Simulate connection delay
       if (this.config.connection?.connectDelayMs) {
         await delay(this.config.connection.connectDelayMs);
       }
-
-      // Simulate connection failure
       if (this.config.connection?.connectFails) {
         this._state = 'error';
         this.emit('error', new Error('Mock connection failed'));
         return;
       }
-
       this._state = 'connected';
       this.stats.connectTime = new Date();
       this.emit('connected');
-
-      // Start event generation
-      this.startEventGeneration();
-
+      void this.startEventGeneration();
     } catch (error) {
       this._state = 'error';
       this.emit('error', error);
@@ -196,27 +147,20 @@ class MockConnectionImpl extends EventEmitter implements MockConnection {
 
   private async startEventGeneration(): Promise<void> {
     const runId = generateId();
-
     try {
-      // Generate events from config
       for (const [index, mockEvent] of this.config.events.entries()) {
         if (this._state !== 'connected') break;
-
         if (mockEvent.delayMs) {
           await delay(mockEvent.delayMs);
         }
-
         const event: AgentEvent = {
           ...createBaseEvent(mockEvent.type, runId),
           ...mockEvent.data,
         } as unknown as AgentEvent;
-
         this.eventQueue.push(event);
-        this.stats.eventsReceived++;
+        this.stats.eventsReceived += 1;
         this.stats.lastActivity = new Date();
         this.emit('event', event);
-
-        // Simulate disconnection after N events
         if (
           this.config.connection?.disconnectAfterEvents &&
           index >= this.config.connection.disconnectAfterEvents - 1
@@ -234,8 +178,6 @@ class MockConnectionImpl extends EventEmitter implements MockConnection {
   private async simulateDisconnection(): Promise<void> {
     this._state = 'disconnected';
     this.emit('disconnected');
-
-    // Simulate reconnection if configured
     if (this.config.websocket?.dropConnection?.reconnectDelayMs) {
       await delay(this.config.websocket.dropConnection.reconnectDelayMs);
       await this.connect();
@@ -246,47 +188,38 @@ class MockConnectionImpl extends EventEmitter implements MockConnection {
     if (this._state !== 'connected') {
       throw new Error(`Cannot send data: connection state is ${this._state}`);
     }
-
-    this.stats.eventsSent++;
+    this.stats.eventsSent += 1;
     this.stats.lastActivity = new Date();
-
-    // Simulate send delay for WebSocket
     if (this.connectionType === 'websocket' && this.config.websocket?.pingIntervalMs) {
-      await delay(10); // Small delay for WebSocket send
+      await delay(10);
     }
-
     this.emit('sent', data);
   }
 
   async *receive(): AsyncIterableIterator<AgentEvent> {
     while (this._state === 'connected' || this.eventQueue.length > 0) {
       if (this.eventQueue.length === 0) {
-        await delay(10); // Small polling delay
+        await delay(10);
         continue;
       }
-
       const event = this.eventQueue.shift();
       if (event) {
         yield event;
       }
     }
-
-    // If connection ended with error, emit error event
     if (this._state === 'error') {
-      const errorEvent: AgentEvent = {
+      yield {
         ...createBaseEvent('error', generateId()),
         code: 'CONNECTION_ERROR',
         message: 'Mock connection error',
         fatal: false,
         recoverable: true,
       } as unknown as AgentEvent;
-      yield errorEvent;
     }
   }
 
   async close(): Promise<void> {
     if (this._state === 'disconnected') return;
-
     this._state = 'disconnected';
     this.eventQueue.length = 0;
     this.emit('closed');
@@ -296,10 +229,6 @@ class MockConnectionImpl extends EventEmitter implements MockConnection {
     return { ...this.stats };
   }
 }
-
-// ---------------------------------------------------------------------------
-// Remote Mock Builder Implementation
-// ---------------------------------------------------------------------------
 
 export class RemoteMockBuilderImpl implements RemoteMockBuilder {
   private config: Partial<RemoteMockConfig> = {
@@ -349,10 +278,6 @@ export class RemoteMockBuilderImpl implements RemoteMockBuilder {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Adapter-Specific Mock Factories
-// ---------------------------------------------------------------------------
-
 export class OpenCodeHttpMock {
   static basicSuccess(): RemoteMockConfig {
     return new RemoteMockBuilderImpl()
@@ -364,26 +289,10 @@ export class OpenCodeHttpMock {
         endpointDelays: { '/execute': 200, '/status': 50 },
       })
       .addEvents([
-        {
-          type: 'session_start',
-          data: { sessionId: 'mock_session' },
-          delayMs: 100,
-        },
-        {
-          type: 'text_delta',
-          data: { delta: 'Starting OpenCode execution...', accumulated: 'Starting OpenCode execution...' },
-          delayMs: 200,
-        },
-        {
-          type: 'text_delta',
-          data: { delta: '\nCode executed successfully!', accumulated: 'Starting OpenCode execution...\nCode executed successfully!' },
-          delayMs: 300,
-        },
-        {
-          type: 'message_stop',
-          data: {},
-          delayMs: 100,
-        },
+        { type: 'session_start', data: { sessionId: 'mock_session' }, delayMs: 100 },
+        { type: 'text_delta', data: { delta: 'Starting OpenCode execution...', accumulated: 'Starting OpenCode execution...' }, delayMs: 200 },
+        { type: 'text_delta', data: { delta: '\nCode executed successfully!', accumulated: 'Starting OpenCode execution...\nCode executed successfully!' }, delayMs: 300 },
+        { type: 'message_stop', data: {}, delayMs: 100 },
       ])
       .build();
   }
@@ -411,31 +320,12 @@ export class CodexWebSocketMock {
       .name('codex-websocket-basic')
       .withServer({ startupDelayMs: 150, port: 8080 })
       .withConnection({ connectDelayMs: 30 })
-      .withWebSocket({
-        channels: ['code', 'output'],
-        pingIntervalMs: 5000,
-      })
+      .withWebSocket({ channels: ['code', 'output'], pingIntervalMs: 5000 })
       .addEvents([
-        {
-          type: 'session_start',
-          data: { sessionId: 'mock_ws_session' },
-          delayMs: 50,
-        },
-        {
-          type: 'text_delta',
-          data: { delta: '# Generated Code\n', accumulated: '# Generated Code\n' },
-          delayMs: 100,
-        },
-        {
-          type: 'text_delta',
-          data: { delta: 'def hello():\n    return "Hello, World!"', accumulated: '# Generated Code\ndef hello():\n    return "Hello, World!"' },
-          delayMs: 200,
-        },
-        {
-          type: 'message_stop',
-          data: {},
-          delayMs: 50,
-        },
+        { type: 'session_start', data: { sessionId: 'mock_ws_session' }, delayMs: 50 },
+        { type: 'text_delta', data: { delta: '# Generated Code\n', accumulated: '# Generated Code\n' }, delayMs: 100 },
+        { type: 'text_delta', data: { delta: 'def hello():\n    return "Hello, World!"', accumulated: '# Generated Code\ndef hello():\n    return "Hello, World!"' }, delayMs: 200 },
+        { type: 'message_stop', data: {}, delayMs: 50 },
       ])
       .build();
   }
@@ -445,59 +335,27 @@ export class CodexWebSocketMock {
       .name('codex-websocket-drop')
       .withServer({ startupDelayMs: 100 })
       .withConnection({ disconnectAfterEvents: 2 })
-      .withWebSocket({
-        dropConnection: {
-          afterMs: 1000,
-          reconnectDelayMs: 500,
-        },
-      })
+      .withWebSocket({ dropConnection: { afterMs: 1000, reconnectDelayMs: 500 } })
       .addEvents([
-        {
-          type: 'session_start',
-          data: { sessionId: 'mock_session' },
-          delayMs: 50,
-        },
-        {
-          type: 'text_delta',
-          data: { delta: 'Starting...', accumulated: 'Starting...' },
-          delayMs: 100,
-        },
-        {
-          type: 'text_delta',
-          data: { delta: ' reconnecting...', accumulated: 'Starting... reconnecting...' },
-          delayMs: 200,
-        },
+        { type: 'session_start', data: { sessionId: 'mock_session' }, delayMs: 50 },
+        { type: 'text_delta', data: { delta: 'Starting...', accumulated: 'Starting...' }, delayMs: 100 },
+        { type: 'text_delta', data: { delta: ' reconnecting...', accumulated: 'Starting... reconnecting...' }, delayMs: 200 },
       ])
       .build();
   }
 
   static highThroughput(): RemoteMockConfig {
     const events: MockStreamEvent[] = [
-      {
-        type: 'session_start',
-        data: { sessionId: 'high_throughput_session' },
-        delayMs: 10,
-      },
+      { type: 'session_start', data: { sessionId: 'high_throughput_session' }, delayMs: 10 },
     ];
-
-    // Generate many rapid events
     for (let i = 0; i < 50; i++) {
       events.push({
         type: 'text_delta',
-        data: {
-          delta: `chunk_${i} `,
-          accumulated: `chunk_0 ${'chunk_'.repeat(i)}${i} `,
-        },
-        delayMs: 5, // Very rapid
+        data: { delta: `chunk_${i} `, accumulated: `chunk_0 ${'chunk_'.repeat(i)}${i} ` },
+        delayMs: 5,
       });
     }
-
-    events.push({
-      type: 'message_stop',
-      data: {},
-      delayMs: 10,
-    });
-
+    events.push({ type: 'message_stop', data: {}, delayMs: 10 });
     return new RemoteMockBuilderImpl()
       .name('codex-websocket-high-throughput')
       .withWebSocket({ pingIntervalMs: 1000 })
@@ -505,10 +363,6 @@ export class CodexWebSocketMock {
       .build();
   }
 }
-
-// ---------------------------------------------------------------------------
-// Factory Functions
-// ---------------------------------------------------------------------------
 
 export function createRemoteMockBuilder(): RemoteMockBuilder {
   return new RemoteMockBuilderImpl();

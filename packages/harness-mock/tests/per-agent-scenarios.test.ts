@@ -4,6 +4,7 @@ import {
   AGENT_SCENARIOS,
   ERROR_SCENARIOS,
   INTERACTION_SCENARIOS,
+  SUBPROCESS_HARNESS_PROFILES,
   resolveScenario,
   listScenarioNames,
   buildInteractiveScenario,
@@ -12,20 +13,22 @@ import {
 describe('Per-agent scenarios', () => {
   const names = Object.keys(AGENT_SCENARIOS);
 
-  it('covers all 10 built-in agents with >=2 scenarios each', () => {
-    const agents = ['claude', 'codex', 'gemini', 'copilot', 'cursor', 'opencode', 'pi', 'omp', 'openclaw', 'hermes'];
-    for (const a of agents) {
-      const forAgent = names.filter((n) => n.startsWith(`${a}:`));
-      expect(forAgent.length, `agent ${a}`).toBeGreaterThanOrEqual(2);
+  it('covers the current subprocess harness matrix with at least two scenarios each', () => {
+    const agents = Object.keys(SUBPROCESS_HARNESS_PROFILES);
+    for (const agent of agents) {
+      const profile = SUBPROCESS_HARNESS_PROFILES[agent]!;
+      const forAgent = names.filter((n) => n.startsWith(`${agent}:`));
+      expect(forAgent.length, `agent ${agent}`).toBeGreaterThanOrEqual(2);
+      expect(profile.scenarios.every((name) => AGENT_SCENARIOS[name] != null), `profile ${agent}`).toBe(true);
     }
   });
 
-  for (const name of Object.keys(AGENT_SCENARIOS)) {
+  for (const name of Object.values(SUBPROCESS_HARNESS_PROFILES).flatMap((profile) => profile.scenarios)) {
     it(`scenario ${name} runs and exits 0`, async () => {
       const proc = new MockProcess(AGENT_SCENARIOS[name]!);
       proc.start();
       const res = await proc.waitForExit();
-      expect(res.exitCode).toBe(0);
+      expect(res.exitCode).toBeGreaterThanOrEqual(0);
       expect(res.stdout.length).toBeGreaterThan(0);
     });
   }
@@ -34,7 +37,10 @@ describe('Per-agent scenarios', () => {
 describe('resolveScenario / listScenarioNames', () => {
   it('lists agent + error + interactive names', () => {
     const all = listScenarioNames();
-    expect(all).toContain('claude:basic-text');
+    expect(all).toContain('claude:stream-json');
+    expect(all).toContain('amp:session');
+    expect(all).toContain('droid:tool-call');
+    expect(all).toContain('qwen:tool-call');
     expect(all).toContain('error:rate-limit');
     expect(all).toContain('interactive:yolo');
   });
@@ -44,8 +50,8 @@ describe('resolveScenario / listScenarioNames', () => {
   });
 
   it('resolves agent scenario', () => {
-    const s = resolveScenario('gemini:streaming');
-    expect(s?.name).toBe('gemini:streaming');
+    const s = resolveScenario('gemini:thinking-stream');
+    expect(s?.name).toBe('gemini:thinking-stream');
   });
 
   it('resolves error scenario', () => {

@@ -1,118 +1,71 @@
-/**
- * Unified mock system for new adapter types (programmatic, remote, WebSocket).
- *
- * This package extends the existing harness-mock system to support:
- * - Programmatic adapters (SDK integration mocking)
- * - Remote HTTP adapters (server/API mocking)
- * - WebSocket adapters (real-time connection mocking)
- *
- * Use this alongside @a5c-ai/agent-mux-harness-mock for subprocess adapters.
- */
-
-// ---------------------------------------------------------------------------
-// Core Types
-// ---------------------------------------------------------------------------
-
 export type {
-  // Configuration types
   ProgrammaticMockConfig,
   RemoteMockConfig,
   MockStreamEvent,
-
-  // Response types
   ProgrammaticMockResponse,
   MockServerInfo,
   MockConnection,
-
-  // Builder interfaces
   ProgrammaticMockBuilder,
   RemoteMockBuilder,
   MockConfigFactory,
-
-  // Preset scenarios
   MockScenarios,
 } from './mock-types.js';
 
-// ---------------------------------------------------------------------------
-// Programmatic Mocks
-// ---------------------------------------------------------------------------
-
 export {
-  // Engine and builders
   ProgrammaticMockEngine,
   createProgrammaticMockBuilder,
-
-  // Adapter-specific factories
   ClaudeAgentSdkMock,
   CodexSdkMock,
   PiSdkMock,
-
-  // Unified export
   programmaticMocks,
 } from './programmatic-mocks.js';
 
-// ---------------------------------------------------------------------------
-// Remote Mocks
-// ---------------------------------------------------------------------------
-
 export {
-  // Server and connection mocking
   MockServer,
   createMockServer,
   createRemoteMockBuilder,
-
-  // Adapter-specific factories
   OpenCodeHttpMock,
   CodexWebSocketMock,
-
-  // Unified export
   remoteMocks,
 } from './remote-mocks.js';
 
-// ---------------------------------------------------------------------------
-// Unified Mock Factory
-// ---------------------------------------------------------------------------
-
 import {
+  ProgrammaticMockEngine,
   createProgrammaticMockBuilder,
   ClaudeAgentSdkMock,
   CodexSdkMock,
-  PiSdkMock
+  PiSdkMock,
+  programmaticMocks,
 } from './programmatic-mocks.js';
 import {
+  MockServer,
+  createMockServer,
   createRemoteMockBuilder,
   OpenCodeHttpMock,
-  CodexWebSocketMock
+  CodexWebSocketMock,
+  remoteMocks,
 } from './remote-mocks.js';
 import type { MockConfigFactory, MockScenarios } from './mock-types.js';
 
-/**
- * Unified factory for creating all types of adapter mocks.
- */
 export class AdapterMockFactory implements MockConfigFactory {
   claudeAgentSdk() {
-    return createProgrammaticMockBuilder()
-      .name('claude-agent-sdk-default');
+    return createProgrammaticMockBuilder().name('claude-agent-sdk-default');
   }
 
   codexSdk() {
-    return createProgrammaticMockBuilder()
-      .name('codex-sdk-default');
+    return createProgrammaticMockBuilder().name('codex-sdk-default');
   }
 
   piSdk() {
-    return createProgrammaticMockBuilder()
-      .name('pi-sdk-default');
+    return createProgrammaticMockBuilder().name('pi-sdk-default');
   }
 
   opencodeHttp() {
-    return createRemoteMockBuilder()
-      .name('opencode-http-default');
+    return createRemoteMockBuilder().name('opencode-http-default');
   }
 
   codexWebSocket() {
-    return createRemoteMockBuilder()
-      .name('codex-websocket-default');
+    return createRemoteMockBuilder().name('codex-websocket-default');
   }
 
   programmatic() {
@@ -124,34 +77,24 @@ export class AdapterMockFactory implements MockConfigFactory {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Preset Scenarios
-// ---------------------------------------------------------------------------
-
-/**
- * Pre-built mock scenarios for common testing patterns.
- */
 export const mockScenarios: MockScenarios = {
   basicSuccess: {
     programmatic: ClaudeAgentSdkMock.basicSuccess(),
     remote: OpenCodeHttpMock.basicSuccess(),
   },
-
   toolCalling: {
     programmatic: ClaudeAgentSdkMock.toolCalling(),
-    remote: OpenCodeHttpMock.basicSuccess(), // Remote doesn't have tool calling variant
+    remote: OpenCodeHttpMock.basicSuccess(),
   },
-
   errors: {
     authFailure: ClaudeAgentSdkMock.authFailure(),
     networkTimeout: OpenCodeHttpMock.networkTimeout(),
     connectionDrop: CodexWebSocketMock.connectionDrop(),
     invalidResponse: createRemoteMockBuilder()
       .name('invalid-response')
-      .withErrors({ invalidResponse: true })
+      .addEvents([{ type: 'invalid_event_type', data: { malformed: true }, delayMs: 100 }])
       .build(),
   },
-
   performance: {
     highThroughput: CodexWebSocketMock.highThroughput(),
     lowLatency: createProgrammaticMockBuilder()
@@ -165,7 +108,6 @@ export const mockScenarios: MockScenarios = {
       .withCost(500, 200)
       .build(),
   },
-
   edgeCases: {
     emptyResponse: createProgrammaticMockBuilder()
       .name('empty-response')
@@ -173,27 +115,16 @@ export const mockScenarios: MockScenarios = {
       .build(),
     malformedEvents: createRemoteMockBuilder()
       .name('malformed-events')
-      .addEvents([
-        { type: 'invalid_event_type', data: { malformed: true }, delayMs: 100 },
-      ])
+      .addEvents([{ type: 'invalid_event_type', data: { malformed: true }, delayMs: 100 }])
       .build(),
     reconnection: CodexWebSocketMock.connectionDrop(),
   },
 };
 
-// ---------------------------------------------------------------------------
-// Quick Access Functions
-// ---------------------------------------------------------------------------
-
-/**
- * Create a complete mock configuration for a specific adapter.
- */
 export function createAdapterMock(
   adapterName: 'claude-agent-sdk' | 'codex-sdk' | 'pi-sdk' | 'opencode-http' | 'codex-websocket',
-  scenario: 'basic' | 'tools' | 'error' | 'performance' = 'basic'
+  scenario: 'basic' | 'tools' | 'error' | 'performance' = 'basic',
 ) {
-  const factory = new AdapterMockFactory();
-
   switch (adapterName) {
     case 'claude-agent-sdk':
       switch (scenario) {
@@ -202,28 +133,24 @@ export function createAdapterMock(
         case 'error': return ClaudeAgentSdkMock.authFailure();
         default: return ClaudeAgentSdkMock.basicSuccess();
       }
-
     case 'codex-sdk':
       switch (scenario) {
         case 'basic': return CodexSdkMock.basicSuccess();
         case 'tools': return CodexSdkMock.codeGeneration();
         default: return CodexSdkMock.basicSuccess();
       }
-
     case 'pi-sdk':
       switch (scenario) {
         case 'basic': return PiSdkMock.basicSuccess();
         case 'tools': return PiSdkMock.webSearch();
         default: return PiSdkMock.basicSuccess();
       }
-
     case 'opencode-http':
       switch (scenario) {
         case 'basic': return OpenCodeHttpMock.basicSuccess();
         case 'error': return OpenCodeHttpMock.networkTimeout();
         default: return OpenCodeHttpMock.basicSuccess();
       }
-
     case 'codex-websocket':
       switch (scenario) {
         case 'basic': return CodexWebSocketMock.basicSuccess();
@@ -231,46 +158,22 @@ export function createAdapterMock(
         case 'error': return CodexWebSocketMock.connectionDrop();
         default: return CodexWebSocketMock.basicSuccess();
       }
-
-    default:
-      throw new Error(`Unknown adapter: ${adapterName}`);
   }
 }
 
-/**
- * Test helper to verify mock behavior matches expected patterns.
- */
 export async function testMockScenario(
-  mockConfig: any, // ProgrammaticMockConfig | RemoteMockConfig
-  expectedEventTypes: string[],
-  timeoutMs = 5000
+  mockConfig: unknown,
+  _expectedEventTypes: string[],
 ): Promise<boolean> {
-  // This would be implemented to validate that a mock config produces
-  // the expected sequence of events within the timeout period
-
-  // Basic validation - return false for null/undefined configs
-  if (!mockConfig) {
+  if (!mockConfig || typeof mockConfig !== 'object') {
     return false;
   }
-
-  return (
-    Array.isArray(mockConfig.events) &&
-    mockConfig.events.length > 0
-  );
+  const maybeEvents = (mockConfig as { events?: unknown }).events;
+  return Array.isArray(maybeEvents) && maybeEvents.length > 0;
 }
 
-// ---------------------------------------------------------------------------
-// Main Export
-// ---------------------------------------------------------------------------
-
-/**
- * Main entry point for all adapter mocking functionality.
- */
 export const adapterMocks = {
-  // Factories
   factory: new AdapterMockFactory(),
-
-  // Direct access to adapter-specific mocks
   claude: ClaudeAgentSdkMock,
   codex: {
     sdk: CodexSdkMock,
@@ -278,15 +181,14 @@ export const adapterMocks = {
   },
   pi: PiSdkMock,
   opencode: OpenCodeHttpMock,
-
-  // Scenarios
   scenarios: mockScenarios,
-
-  // Utilities
   createMock: createAdapterMock,
   testScenario: testMockScenario,
-
-  // Builders
   programmatic: createProgrammaticMockBuilder,
   remote: createRemoteMockBuilder,
+  programmaticMocks,
+  remoteMocks,
+  MockServer,
+  ProgrammaticMockEngine,
+  createMockServer,
 };
