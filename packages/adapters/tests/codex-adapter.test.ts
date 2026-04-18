@@ -62,6 +62,11 @@ describe('CodexAdapter', () => {
     it('uses file session persistence', () => {
       expect(adapter.capabilities.sessionPersistence).toBe('file');
     });
+
+    it('does not claim live interactive subprocess support', () => {
+      expect(adapter.capabilities.supportsInteractiveMode).toBe(false);
+      expect(adapter.capabilities.supportsStdinInjection).toBe(false);
+    });
   });
 
   describe('models', () => {
@@ -132,6 +137,16 @@ describe('CodexAdapter', () => {
         '019d96a9-8685-7503-92c5-8523d6843d6b',
         'continue this session',
       ]);
+    });
+
+    it('keeps using exec --json on the subprocess transport even without an explicit non-interactive flag', () => {
+      const result = adapter.buildSpawnArgs({
+        agent: 'codex',
+        prompt: 'continue working',
+      });
+
+      expect(result.args).toEqual(['exec', '--json', 'continue working']);
+      expect(result.closeStdinAfterSpawn).toBe(true);
     });
   });
 
@@ -237,6 +252,16 @@ describe('CodexAdapter', () => {
       const event = result as { type: string; message: string };
       expect(event.type).toBe('error');
       expect(event.message).toBe('Something failed');
+    });
+
+    it('parses ANSI/plaintext interactive output as text deltas', () => {
+      const result = adapter.parseEvent(
+        '\u001b[38;5;81mWorking through the repo...\u001b[0m',
+        makeContext({ outputFormat: 'text' }),
+      );
+      const event = result as { type: string; delta: string };
+      expect(event.type).toBe('text_delta');
+      expect(event.delta).toBe('Working through the repo...');
     });
   });
 

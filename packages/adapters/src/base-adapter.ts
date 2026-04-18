@@ -102,8 +102,84 @@ export abstract class BaseAgentAdapter implements SubprocessAdapter {
     return Array.isArray(prompt) ? prompt.join('\n') : prompt;
   }
 
+  protected stripAnsi(text: string): string {
+    return text.replace(/\u001b\[[0-9;?]*[ -/]*[@-~]/g, '');
+  }
+
+  protected parsePlaintextEvent(line: string, context: ParseContext): AgentEvent | null {
+    const cleaned = this.stripAnsi(line).replace(/\r/g, '').trim();
+    if (!cleaned) return null;
+
+    const base = {
+      runId: context.runId,
+      agent: this.agent,
+      timestamp: Date.now(),
+    };
+
+    const nextToolId = (): string => {
+      const key = '__plainTextToolSeq';
+      const current = typeof context.adapterState[key] === 'number' ? context.adapterState[key] as number : 0;
+      const next = current + 1;
+      context.adapterState[key] = next;
+      return `plaintext-tool-${next}`;
+    };
+
+    if (/^(thinking|reasoning)([:.\s]|$)/i.test(cleaned)) {
+      const delta = cleaned.replace(/^(thinking|reasoning)([:.\s-]*)/i, '').trim() || cleaned;
+      return { ...base, type: 'thinking_delta', delta, accumulated: delta } as AgentEvent;
+    }
+
+    if (/^(tool|using tool|running|executing)([:.\s]|$)/i.test(cleaned)) {
+      const toolName = cleaned.replace(/^(tool|using tool|running|executing)([:.\s-]*)/i, '').trim() || 'tool';
+      const toolCallId = nextToolId();
+      context.adapterState['__lastPlainTextToolId'] = toolCallId;
+      return {
+        ...base,
+        type: 'tool_call_start',
+        toolCallId,
+        toolName,
+        inputAccumulated: toolName,
+      } as AgentEvent;
+    }
+
+    if (/^(tool result|result|completed)([:.\s]|$)/i.test(cleaned)) {
+      const output = cleaned.replace(/^(tool result|result|completed)([:.\s-]*)/i, '').trim() || cleaned;
+      const toolCallId = typeof context.adapterState['__lastPlainTextToolId'] === 'string'
+        ? context.adapterState['__lastPlainTextToolId'] as string
+        : nextToolId();
+      return {
+        ...base,
+        type: 'tool_result',
+        toolCallId,
+        toolName: 'tool',
+        output,
+        durationMs: 0,
+      } as AgentEvent;
+    }
+
+    if ((context.source === 'stderr' || /^error([:.\s]|$)/i.test(cleaned)) && /^error([:.\s]|$)/i.test(cleaned)) {
+      return {
+        ...base,
+        type: 'error',
+        code: 'INTERNAL' as const,
+        message: cleaned.replace(/^error([:.\s-]*)/i, '').trim() || cleaned,
+        recoverable: false,
+      } as AgentEvent;
+    }
+
+    return {
+      ...base,
+      type: 'text_delta',
+      delta: cleaned,
+      accumulated: cleaned,
+    } as AgentEvent;
+  }
+
   protected buildPromptTransport(options: RunOptions): { prompt: string; stdin?: string } {
     const prompt = this.normalizePrompt(options.prompt);
+    if (prompt.trim().length === 0) {
+      return { prompt: '' };
+    }
     if (options.nonInteractive === true || !this.capabilities.supportsStdinInjection) {
       return { prompt };
     }

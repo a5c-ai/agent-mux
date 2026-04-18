@@ -1,47 +1,40 @@
-/**
- * CodexWebSocketAdapter — WebSocket-based Codex adapter for real-time communication.
- *
- * Uses the Codex app-server architecture with WebSocket connections for
- * bidirectional real-time communication and enhanced streaming capabilities.
- */
-
+import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { spawn, type ChildProcess } from 'node:child_process';
 
 import type {
   AgentCapabilities,
-  ModelCapabilities,
-  AgentConfigSchema,
-  AuthState,
-  AuthSetupGuidance,
-  Session,
-  RunOptions,
-  AgentEvent,
   AgentConfig,
+  AgentConfigSchema,
+  AuthSetupGuidance,
+  AuthState,
+  ModelCapabilities,
   RemoteConnection,
-  WebSocketConnection,
+  RunOptions,
+  ServerHealth,
   ServerInfo,
-  CostRecord,
+  Session,
 } from '@a5c-ai/agent-mux-core';
 
+import { readAuthConfigIdentity } from './auth-config.js';
 import { BaseRemoteAdapter } from './remote-adapter-base.js';
-import { createVirtualRuntimeHookCapabilities } from './shared/runtime-hooks-virtual.js';
+import { CodexWebSocketConnection } from './codex-websocket-connection.js';
 import {
   listJsonlFiles,
   parseCodexSessionFile,
   readJsonFile,
   writeJsonFileAtomic,
 } from './session-fs.js';
-import { readAuthConfigIdentity } from './auth-config.js';
-import { CodexWebSocketConnection } from './codex-websocket-connection.js';
+
 export { CodexWebSocketConnection } from './codex-websocket-connection.js';
 
 export class CodexWebSocketAdapter extends BaseRemoteAdapter {
   readonly agent = 'codex-websocket' as const;
-  readonly displayName = 'Codex (WebSocket)';
+  readonly displayName = 'Codex (App Server)';
   readonly connectionType = 'websocket' as const;
-  readonly minVersion = '0.1.0';
-  readonly hostEnvSignals = ['CODEX_APP_SERVER', 'OPENAI_API_KEY'] as const;
+  readonly minVersion = '0.121.0';
+  readonly hostEnvSignals = ['CODEX_APP_SERVER', 'OPENAI_API_KEY', 'CODEX_CLI'] as const;
 
   readonly capabilities: AgentCapabilities = {
     agent: 'codex-websocket',
@@ -51,41 +44,49 @@ export class CodexWebSocketAdapter extends BaseRemoteAdapter {
     sessionPersistence: 'file',
     supportsTextStreaming: true,
     supportsToolCallStreaming: true,
-    supportsThinkingStreaming: false,
+    supportsThinkingStreaming: true,
     supportsNativeTools: true,
-    supportsMCP: false,
+    supportsMCP: true,
     supportsParallelToolCalls: true,
     requiresToolApproval: true,
     approvalModes: ['yolo', 'prompt', 'deny'],
-    runtimeHooks: createVirtualRuntimeHookCapabilities(),
-    supportsThinking: false,
-    thinkingEffortLevels: [],
+    runtimeHooks: {
+      preToolUse: 'unsupported',
+      postToolUse: 'unsupported',
+      sessionStart: 'unsupported',
+      sessionEnd: 'unsupported',
+      stop: 'unsupported',
+      userPromptSubmit: 'unsupported',
+    },
+    supportsThinking: true,
+    thinkingEffortLevels: ['low', 'medium', 'high', 'max'],
     supportsThinkingBudgetTokens: false,
     supportsJsonMode: true,
     supportsStructuredOutput: true,
     structuredSessionTransport: 'persistent',
-    supportsSkills: false,
-    supportsAgentsMd: false,
-    skillsFormat: null,
-    supportsSubagentDispatch: false,
-    supportsParallelExecution: false,
+    supportsSkills: true,
+    supportsAgentsMd: true,
+    skillsFormat: 'directory',
+    supportsSubagentDispatch: true,
+    supportsParallelExecution: true,
     supportsInteractiveMode: true,
     supportsStdinInjection: true,
-    supportsImageInput: false,
+    supportsImageInput: true,
     supportsImageOutput: false,
-    supportsFileAttachments: false,
-    supportsPlugins: false,
-    pluginFormats: [],
-    pluginRegistries: [],
+    supportsFileAttachments: true,
+    supportsPlugins: true,
+    pluginFormats: ['mcp-server'],
+    pluginRegistries: [{ name: 'mcp', url: 'https://modelcontextprotocol.io', searchable: false }],
     supportedPlatforms: ['darwin', 'linux', 'win32'],
     requiresGitRepo: false,
     requiresPty: false,
     authMethods: [
       { type: 'api_key', name: 'API Key', description: 'OPENAI_API_KEY environment variable' },
+      { type: 'oauth', name: 'ChatGPT Login', description: 'Local Codex CLI account login' },
     ],
-    authFiles: ['.codex/config.json'],
+    authFiles: ['.codex/auth.json', '.codex/credentials.json'],
     installMethods: [
-      { platform: 'all', type: 'npm', command: 'npm install -g @openai/codex-server' },
+      { platform: 'all', type: 'npm', command: 'npm install -g @openai/codex' },
     ],
   };
 
@@ -93,7 +94,7 @@ export class CodexWebSocketAdapter extends BaseRemoteAdapter {
     {
       agent: 'codex-websocket',
       modelId: 'o4-mini',
-      displayName: 'o4-mini (WebSocket)',
+      displayName: 'o4-mini',
       deprecated: false,
       contextWindow: 200000,
       maxOutputTokens: 100000,
@@ -105,10 +106,10 @@ export class CodexWebSocketAdapter extends BaseRemoteAdapter {
       supportsJsonMode: true,
       supportsStructuredOutput: true,
       supportsTextStreaming: true,
-      supportsThinkingStreaming: false,
-      supportsImageInput: false,
+      supportsThinkingStreaming: true,
+      supportsImageInput: true,
       supportsImageOutput: false,
-      supportsFileInput: false,
+      supportsFileInput: true,
       inputPricePerMillion: 0.15,
       outputPricePerMillion: 0.6,
       cachedInputPricePerMillion: 0.075,
@@ -120,11 +121,12 @@ export class CodexWebSocketAdapter extends BaseRemoteAdapter {
     {
       agent: 'codex-websocket',
       modelId: 'codex-mini-latest',
-      displayName: 'Codex Mini (WebSocket)',
+      displayName: 'Codex Mini',
       deprecated: false,
       contextWindow: 200000,
       maxOutputTokens: 100000,
       supportsThinking: false,
+      thinkingEffortLevels: [],
       supportsToolCalling: true,
       supportsParallelToolCalls: true,
       supportsToolCallStreaming: true,
@@ -132,9 +134,9 @@ export class CodexWebSocketAdapter extends BaseRemoteAdapter {
       supportsStructuredOutput: true,
       supportsTextStreaming: true,
       supportsThinkingStreaming: false,
-      supportsImageInput: false,
+      supportsImageInput: true,
       supportsImageOutput: false,
-      supportsFileInput: false,
+      supportsFileInput: true,
       inputPricePerMillion: 0.1,
       outputPricePerMillion: 0.4,
       cachedInputPricePerMillion: 0.05,
@@ -156,77 +158,108 @@ export class CodexWebSocketAdapter extends BaseRemoteAdapter {
     supportsProjectConfig: false,
   };
 
+  private readonly serverProcesses = new Map<string, ChildProcess>();
+
   async connect(options: RunOptions): Promise<RemoteConnection> {
-    // Get or start Codex app-server
     const serverInfo = await this.ensureServer();
-
-    // Create WebSocket connection
-    const connectionId = this.generateConnectionId();
-    const websocketUrl = serverInfo.endpoint.replace('http', 'ws') + '/ws';
-
     const connection = new CodexWebSocketConnection({
-      websocketUrl,
-      connectionId,
+      websocketUrl: serverInfo.endpoint,
+      connectionId: this.generateConnectionId(),
+      prompt: Array.isArray(options.prompt) ? options.prompt.join('\n') : options.prompt ?? '',
+      cwd: options.cwd ?? process.cwd(),
+      requestedModel: options.model,
+      approvalMode: options.approvalMode ?? 'prompt',
+      sessionId: options.sessionId,
+      models: this.models,
     });
-
     await connection.connect();
-
-    // Initialize chat session
-    await connection.send({
-      type: 'chat',
-      prompt: Array.isArray(options.prompt) ? options.prompt.join('\n') : options.prompt,
-      model: options.model || this.defaultModelId,
-      stream: true,
-      max_tokens: options.maxTokens,
-      temperature: 0.1,
-    });
-
     this.registerConnection(connection);
     return connection;
   }
 
   async disconnect(connection: RemoteConnection): Promise<void> {
-    if (connection.connectionType === 'websocket') {
-      await (connection as CodexWebSocketConnection).close();
-      this.unregisterConnection(connection.connectionId);
-    }
+    await connection.close();
+    this.unregisterConnection(connection.connectionId);
   }
 
   async startServer(): Promise<ServerInfo> {
-    const serverId = this.generateServerId();
-    const port = await this.findAvailablePort(8765);
+    const external = process.env['CODEX_APP_SERVER'];
+    if (external) {
+      return {
+        serverId: 'codex-app-server-external',
+        serverType: 'codex-websocket',
+        endpoint: this.normalizeEndpoint(external),
+        port: this.extractPort(external),
+        startedAt: new Date(),
+      };
+    }
 
-    // In real implementation, this would start the actual Codex app-server
-    // const serverProcess = spawn('codex-server', ['--port', port.toString(), '--host', '127.0.0.1']);
+    const resolved = this.resolveCodexCommand();
+    if (!resolved) {
+      throw new Error('Could not locate the Codex CLI needed for app-server transport');
+    }
+
+    const port = await this.findAvailablePort(32150);
+    const serverId = this.generateServerId();
+    const endpoint = `ws://127.0.0.1:${port}`;
+    const child = spawn(resolved.command, [...resolved.args, 'app-server', '--listen', endpoint], {
+      cwd: process.cwd(),
+      env: process.env,
+      stdio: ['ignore', 'ignore', 'pipe'],
+    });
+
+    let startupError = '';
+    child.stderr?.on('data', (chunk) => {
+      startupError += String(chunk);
+    });
+    child.once('error', (error) => {
+      startupError += error.message;
+    });
+    child.once('exit', (code) => {
+      if (code !== 0 && this.serverProcesses.has(serverId)) {
+        this.serverProcesses.delete(serverId);
+      }
+    });
 
     const serverInfo: ServerInfo = {
       serverId,
       serverType: 'codex-websocket',
-      endpoint: `http://127.0.0.1:${port}`,
+      endpoint,
+      pid: child.pid,
       port,
       startedAt: new Date(),
     };
-
-    // Simulate server startup delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
+    this.serverProcesses.set(serverId, child);
     this.registerServer(serverInfo);
+
+    const started = await this.waitForHealthy(serverInfo, 10_000);
+    if (!started) {
+      this.serverProcesses.delete(serverId);
+      this.unregisterServer(serverId);
+      child.kill();
+      throw new Error(startupError.trim() || 'Timed out waiting for codex app-server to become ready');
+    }
+
     return serverInfo;
   }
 
   async stopServer(serverInfo: ServerInfo): Promise<void> {
-    // In real implementation, this would stop the Codex app-server process
+    const processHandle = this.serverProcesses.get(serverInfo.serverId);
+    if (processHandle && !processHandle.killed) {
+      processHandle.kill();
+    }
+    this.serverProcesses.delete(serverInfo.serverId);
     this.unregisterServer(serverInfo.serverId);
   }
 
-  async healthCheck(serverInfo: ServerInfo): Promise<{ status: 'healthy' | 'unhealthy' | 'starting'; lastCheck: Date; details?: string }> {
+  async healthCheck(serverInfo: ServerInfo): Promise<ServerHealth> {
+    const readyUrl = `${serverInfo.endpoint.replace(/^ws/, 'http')}/readyz`;
     try {
-      // In real implementation, this would check WebSocket connectivity
-      // const ws = new WebSocket(serverInfo.endpoint.replace('http', 'ws') + '/health');
-
+      const response = await fetch(readyUrl);
       return {
-        status: 'healthy',
+        status: response.ok ? 'healthy' : 'unhealthy',
         lastCheck: new Date(),
+        details: response.ok ? undefined : `HTTP ${response.status}`,
       };
     } catch (error) {
       return {
@@ -247,7 +280,6 @@ export class CodexWebSocketAdapter extends BaseRemoteAdapter {
       };
     }
 
-    // Check config files
     const codexHome = process.env['CODEX_HOME'] ?? path.join(os.homedir(), '.codex');
     const found = await readAuthConfigIdentity([
       path.join(codexHome, 'auth.json'),
@@ -267,26 +299,27 @@ export class CodexWebSocketAdapter extends BaseRemoteAdapter {
       steps: [
         {
           step: 1,
-          description: 'Get an API key from https://platform.openai.com/api-keys',
-          url: 'https://platform.openai.com/api-keys'
+          description: 'Install the Codex CLI',
+          command: 'npm install -g @openai/codex',
         },
         {
           step: 2,
-          description: 'Set the OPENAI_API_KEY environment variable',
-          command: 'export OPENAI_API_KEY=sk-...'
+          description: 'Authenticate with either OPENAI_API_KEY or the Codex login flow',
+          command: 'codex',
         },
         {
           step: 3,
-          description: 'Install the Codex app-server',
-          command: 'npm install -g @openai/codex-server'
+          description: 'Verify the app-server surface is available',
+          command: 'codex app-server --help',
         },
       ],
       envVars: [
-        { name: 'OPENAI_API_KEY', description: 'OpenAI API key', required: true, exampleFormat: 'sk-...' },
-        { name: 'CODEX_APP_SERVER', description: 'Codex app-server endpoint URL', required: false, exampleFormat: 'http://localhost:8765' },
+        { name: 'OPENAI_API_KEY', description: 'OpenAI API key', required: false, exampleFormat: 'sk-...' },
+        { name: 'CODEX_APP_SERVER', description: 'Optional external Codex app-server WebSocket endpoint', required: false, exampleFormat: 'ws://127.0.0.1:32150' },
       ],
-      documentationUrls: ['https://developers.openai.com/codex/app-server'],
-      verifyCommand: 'codex-server --version',
+      documentationUrls: ['https://developers.openai.com/codex/sdk'],
+      loginCommand: 'codex',
+      verifyCommand: 'codex app-server --help',
     };
   }
 
@@ -314,28 +347,102 @@ export class CodexWebSocketAdapter extends BaseRemoteAdapter {
     const filePath = this.configSchema.configFilePaths?.[0];
     if (!filePath) return;
     const existing = (await readJsonFile<Record<string, unknown>>(filePath)) ?? {};
-    const { agent: _a, source: _s, filePaths: _fp, ...rest } = config as Record<string, unknown>;
-    void _a; void _s; void _fp;
+    const { agent: _agent, source: _source, filePaths: _filePaths, ...rest } = config as Record<string, unknown>;
+    void _agent;
+    void _source;
+    void _filePaths;
     await writeJsonFileAtomic(filePath, { ...existing, ...rest });
   }
 
-  // ── Private helper methods ──────────────────────────────────────────
-
-  /**
-   * Ensure a Codex app-server is running, starting one if needed.
-   */
   protected async ensureServer(): Promise<ServerInfo> {
-    // Check if we already have a running server
     for (const server of this.managedServers.values()) {
-      if (server.serverType === 'codex-websocket') {
-        const health = await this.healthCheck?.(server);
-        if (health?.status === 'healthy') {
-          return server;
+      if (server.serverType !== 'codex-websocket') {
+        continue;
+      }
+      const health = await this.healthCheck?.(server);
+      if (health?.status === 'healthy') {
+        return server;
+      }
+    }
+    return this.startServer();
+  }
+
+  private async waitForHealthy(serverInfo: ServerInfo, timeoutMs: number): Promise<boolean> {
+    const startedAt = Date.now();
+    while (Date.now() - startedAt < timeoutMs) {
+      const health = await this.healthCheck(serverInfo);
+      if (health.status === 'healthy') {
+        return true;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+    return false;
+  }
+
+  private resolveCodexCommand(): { command: string; args: string[] } | null {
+    const resolved = this.findCommandInPath('codex');
+    if (!resolved) {
+      return null;
+    }
+
+    if (process.platform === 'win32' && /\.(cmd|bat)$/i.test(resolved)) {
+      const powershellShim = resolved.replace(/\.(cmd|bat)$/i, '.ps1');
+      if (fs.existsSync(powershellShim)) {
+        return {
+          command: 'powershell.exe',
+          args: ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', powershellShim],
+        };
+      }
+      return {
+        command: 'cmd.exe',
+        args: ['/d', '/s', '/c', resolved],
+      };
+    }
+
+    if (process.platform === 'win32' && /\.ps1$/i.test(resolved)) {
+      return {
+        command: 'powershell.exe',
+        args: ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', resolved],
+      };
+    }
+
+    return { command: resolved, args: [] };
+  }
+
+  private findCommandInPath(command: string): string | null {
+    const pathEnv = process.env['PATH'];
+    if (!pathEnv) {
+      return null;
+    }
+    const extensions = process.platform === 'win32'
+      ? ['.exe', '.cmd', '.bat', '.ps1', '']
+      : [''];
+    for (const directory of pathEnv.split(path.delimiter)) {
+      for (const extension of extensions) {
+        const candidate = path.join(directory, `${command}${extension}`);
+        if (fs.existsSync(candidate)) {
+          return candidate;
         }
       }
     }
+    return null;
+  }
 
-    // Start a new server
-    return await this.startServer();
+  private normalizeEndpoint(endpoint: string): string {
+    if (endpoint.startsWith('http://')) {
+      return endpoint.replace(/^http/, 'ws');
+    }
+    if (endpoint.startsWith('https://')) {
+      return endpoint.replace(/^https/, 'wss');
+    }
+    return endpoint;
+  }
+
+  private extractPort(endpoint: string): number {
+    try {
+      return Number(new URL(endpoint).port || 0);
+    } catch {
+      return 0;
+    }
   }
 }

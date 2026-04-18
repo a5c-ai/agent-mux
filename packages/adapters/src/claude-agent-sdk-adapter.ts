@@ -1,13 +1,7 @@
-/**
- * ClaudeAgentSdkAdapter — Direct Claude Agent SDK integration.
- *
- * Uses the Claude Agent SDK directly instead of the Claude Code CLI for
- * better performance, more granular control, and native programmatic access
- * to Claude's advanced agent capabilities.
- */
-
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { promises as fs } from 'node:fs';
+import { createRequire } from 'node:module';
 
 import type {
   AgentCapabilities,
@@ -22,7 +16,18 @@ import type {
   InstalledPlugin,
   PluginInstallOptions,
   CostRecord,
+  DetectInstallationResult,
+  InteractionResponse,
+  ProgrammaticRun,
 } from '@a5c-ai/agent-mux-core';
+import type {
+  Options as ClaudeSdkOptions,
+  Query as ClaudeSdkQuery,
+  SDKMessage as ClaudeSdkMessage,
+  SDKUserMessage as ClaudeSdkUserMessage,
+  PermissionResult as ClaudePermissionResult,
+  ElicitationResult as ClaudeElicitationResult,
+} from '@anthropic-ai/claude-agent-sdk';
 
 import { BaseProgrammaticAdapter } from './programmatic-adapter-base.js';
 import { createVirtualRuntimeHookCapabilities } from './shared/runtime-hooks-virtual.js';
@@ -34,65 +39,104 @@ import {
   writeJsonFileAtomic,
 } from './session-fs.js';
 
-// Claude Agent SDK types (would normally be imported from @anthropic-ai/agent-sdk)
-interface ClaudeMessage {
-  role: 'user' | 'assistant';
-  content: string | Array<{
-    type: 'text' | 'image';
-    text?: string;
-    source?: {
-      type: 'base64';
-      media_type: string;
-      data: string;
-    };
-  }>;
-}
+const require = createRequire(import.meta.url);
 
-interface ClaudeStreamChunk {
-  type: 'message_start' | 'content_block_start' | 'content_block_delta' | 'content_block_stop' | 'message_delta' | 'message_stop';
-  message?: {
-    id: string;
-    type: 'message';
-    role: 'assistant';
-    content: any[];
-    model: string;
-    stop_reason: string | null;
-    stop_sequence: string | null;
-    usage: {
-      input_tokens: number;
-      output_tokens: number;
-    };
-  };
-  content_block?: {
-    type: 'text' | 'tool_use';
-    text?: string;
-    id?: string;
-    name?: string;
-    input?: any;
-  };
-  delta?: {
-    type: 'text_delta' | 'input_json_delta';
-    text?: string;
-    partial_json?: string;
-  };
-  index?: number;
-}
+type ClaudeSdkModule = {
+  query(params: {
+    prompt: string | AsyncIterable<ClaudeSdkUserMessage>;
+    options?: ClaudeSdkOptions;
+  }): ClaudeSdkQuery;
+};
 
-interface ClaudeTool {
+type PendingApproval = {
+  resolve: (value: ClaudePermissionResult) => void;
+  reject: (reason?: unknown) => void;
+};
+
+type PendingInput = {
+  resolve: (value: ClaudeElicitationResult) => void;
+  reject: (reason?: unknown) => void;
+};
+
+type ToolState = {
+  id: string;
   name: string;
-  description: string;
-  input_schema: {
-    type: 'object';
-    properties: Record<string, any>;
-    required?: string[];
-  };
+  rawInput: string;
+  thinking?: string;
+};
+
+class AsyncQueue<T> implements AsyncIterableIterator<T> {
+  private readonly values: T[] = [];
+  private readonly waiters: Array<{
+    resolve: (value: IteratorResult<T>) => void;
+    reject: (reason?: unknown) => void;
+  }> = [];
+  private closed = false;
+  private failure: unknown = null;
+
+  enqueue(value: T): void {
+    if (this.closed) {
+      throw new Error('Queue is closed');
+    }
+    const waiter = this.waiters.shift();
+    if (waiter) {
+      waiter.resolve({ value, done: false });
+      return;
+    }
+    this.values.push(value);
+  }
+
+  fail(error: unknown): void {
+    if (this.closed) {
+      return;
+    }
+    this.closed = true;
+    this.failure = error;
+    for (const waiter of this.waiters.splice(0)) {
+      waiter.reject(error);
+    }
+  }
+
+  close(): void {
+    if (this.closed) {
+      return;
+    }
+    this.closed = true;
+    for (const waiter of this.waiters.splice(0)) {
+      waiter.resolve({ value: undefined as T, done: true });
+    }
+  }
+
+  async next(): Promise<IteratorResult<T>> {
+    if (this.values.length > 0) {
+      return { value: this.values.shift()!, done: false };
+    }
+    if (this.failure != null) {
+      throw this.failure;
+    }
+    if (this.closed) {
+      return { value: undefined as T, done: true };
+    }
+    return new Promise<IteratorResult<T>>((resolve, reject) => {
+      this.waiters.push({ resolve, reject });
+    });
+  }
+
+  async return(): Promise<IteratorResult<T>> {
+    this.close();
+    return { value: undefined as T, done: true };
+  }
+
+  [Symbol.asyncIterator](): AsyncIterableIterator<T> {
+    return this;
+  }
 }
 
 export class ClaudeAgentSdkAdapter extends BaseProgrammaticAdapter {
   readonly agent = 'claude-agent-sdk' as const;
   readonly displayName = 'Claude (Agent SDK)';
-  readonly minVersion = '0.1.0';
-  readonly hostEnvSignals = ['ANTHROPIC_API_KEY', 'CLAUDE_AGENT_API_KEY'] as const;
+  readonly minVersion = '0.2.0';
+  readonly hostEnvSignals = ['ANTHROPIC_API_KEY', 'CLAUDE_AGENT_API_KEY', 'CLAUDE_CODE_ENTRYPOINT'] as const;
 
   readonly capabilities: AgentCapabilities = {
     agent: 'claude-agent-sdk',
@@ -114,7 +158,7 @@ export class ClaudeAgentSdkAdapter extends BaseProgrammaticAdapter {
     supportsThinkingBudgetTokens: true,
     supportsJsonMode: true,
     supportsStructuredOutput: true,
-    structuredSessionTransport: 'restart-per-turn',
+    structuredSessionTransport: 'persistent',
     supportsSkills: true,
     supportsAgentsMd: true,
     skillsFormat: 'file',
@@ -125,7 +169,7 @@ export class ClaudeAgentSdkAdapter extends BaseProgrammaticAdapter {
     supportsStdinInjection: true,
     supportsImageInput: true,
     supportsImageOutput: false,
-    supportsFileAttachments: true,
+    supportsFileAttachments: false,
     supportsPlugins: true,
     pluginFormats: ['mcp-server'],
     pluginRegistries: [{ name: 'mcp', url: 'https://modelcontextprotocol.io', searchable: false }],
@@ -134,11 +178,11 @@ export class ClaudeAgentSdkAdapter extends BaseProgrammaticAdapter {
     requiresPty: false,
     authMethods: [
       { type: 'api_key', name: 'API Key', description: 'ANTHROPIC_API_KEY environment variable' },
-      { type: 'oauth', name: 'OAuth', description: 'OAuth-based authentication' },
+      { type: 'oauth', name: 'Claude Login', description: 'Claude Code browser login or stored credentials' },
     ],
-    authFiles: ['.claude.json', '.claude/settings.json'],
+    authFiles: ['.claude.json', '.claude/.credentials.json', '.claude/settings.json'],
     installMethods: [
-      { platform: 'all', type: 'npm', command: 'npm install -g @anthropic-ai/agent-sdk' },
+      { platform: 'all', type: 'npm', command: 'npm install -g @anthropic-ai/claude-agent-sdk' },
     ],
   };
 
@@ -167,7 +211,7 @@ export class ClaudeAgentSdkAdapter extends BaseProgrammaticAdapter {
       supportsThinkingStreaming: true,
       supportsImageInput: true,
       supportsImageOutput: false,
-      supportsFileInput: true,
+      supportsFileInput: false,
       cliArgKey: 'model',
       cliArgValue: 'claude-sonnet-4-20250514',
       lastUpdated: '2025-05-14',
@@ -197,7 +241,7 @@ export class ClaudeAgentSdkAdapter extends BaseProgrammaticAdapter {
       supportsThinkingStreaming: true,
       supportsImageInput: true,
       supportsImageOutput: false,
-      supportsFileInput: true,
+      supportsFileInput: false,
       cliArgKey: 'model',
       cliArgValue: 'claude-opus-4-20250514',
       lastUpdated: '2025-05-14',
@@ -217,245 +261,205 @@ export class ClaudeAgentSdkAdapter extends BaseProgrammaticAdapter {
     supportsProjectConfig: true,
   };
 
-  async *execute(options: RunOptions): AsyncIterableIterator<AgentEvent> {
+  execute(options: RunOptions): ProgrammaticRun {
     this.validateRunOptions(options);
 
     const runId = this.generateRunId();
     const modelId = this.resolveModel(options);
-    const prompt = this.normalizePrompt(options.prompt!);
+    const events = new AsyncQueue<AgentEvent>();
+    const prompts = new AsyncQueue<ClaudeSdkUserMessage>();
+    const pendingApprovals = new Map<string, PendingApproval>();
+    const pendingInputs = new Map<string, PendingInput>();
+    const toolsByIndex = new Map<number, ToolState>();
+    const toolsById = new Map<string, ToolState>();
 
-    // Check authentication
-    const authState = await this.detectAuth();
-    if (authState.status !== 'authenticated') {
-      yield this.createErrorEvent(runId, 'AUTH_MISSING', 'Anthropic API key not found', false);
-      return;
-    }
+    let queryHandle: ClaudeSdkQuery | null = null;
+    let closed = false;
+    let turnIndex = -1;
+    let textAccumulated = '';
+    let thinkingAccumulated = '';
+    let sessionId: string | undefined;
 
-    try {
-      // Emit session start
-      yield {
-        ...this.createBaseEvent('session_start', runId),
-        type: 'session_start',
-        sessionId: options.sessionId || runId,
-        resumed: Boolean(options.sessionId),
-      } as AgentEvent;
+    const queueError = (code: string, message: string): void => {
+      events.enqueue(this.createErrorEvent(runId, code, message, false));
+    };
 
-      // Create Claude Agent SDK client (in real implementation)
-      const client = this.createClaudeAgentClient();
-
-      // Build messages array
-      const messages: ClaudeMessage[] = [
-        {
-          role: 'user',
-          content: prompt,
-        },
-      ];
-
-      // Add system prompt if provided
-      const systemPrompt = options.systemPrompt || this.buildDefaultSystemPrompt(options);
-
-      // Define available tools for Claude agent capabilities
-      const tools: ClaudeTool[] = [
-        {
-          name: 'read_file',
-          description: 'Read the contents of a file',
-          input_schema: {
-            type: 'object',
-            properties: {
-              path: {
-                type: 'string',
-                description: 'Path to the file to read',
-              },
-            },
-            required: ['path'],
-          },
-        },
-        {
-          name: 'write_file',
-          description: 'Write content to a file',
-          input_schema: {
-            type: 'object',
-            properties: {
-              path: {
-                type: 'string',
-                description: 'Path to the file to write',
-              },
-              content: {
-                type: 'string',
-                description: 'Content to write to the file',
-              },
-            },
-            required: ['path', 'content'],
-          },
-        },
-        {
-          name: 'execute_bash',
-          description: 'Execute a bash command',
-          input_schema: {
-            type: 'object',
-            properties: {
-              command: {
-                type: 'string',
-                description: 'Bash command to execute',
-              },
-            },
-            required: ['command'],
-          },
-        },
-        {
-          name: 'spawn_subagent',
-          description: 'Spawn a subagent to handle a specific task',
-          input_schema: {
-            type: 'object',
-            properties: {
-              task: {
-                type: 'string',
-                description: 'Task description for the subagent',
-              },
-              agent_type: {
-                type: 'string',
-                description: 'Type of agent to spawn',
-                enum: ['claude', 'codex', 'opencode'],
-              },
-            },
-            required: ['task'],
-          },
-        },
-      ];
-
-      // Make streaming API call with thinking enabled
-      const stream = await this.createClaudeStream({
-        model: modelId,
-        messages,
-        system: systemPrompt,
-        tools,
-        max_tokens: options.maxTokens || 8192,
-        temperature: 0.1,
-        stream: true,
-        thinking_enabled: true,
-        thinking_effort: options.thinkingEffort || 'medium',
-        thinking_budget_tokens: options.thinkingBudgetTokens,
-      });
-
-      let textAccumulated = '';
-      let thinkingAccumulated = '';
-      let currentToolCall: { id: string; name: string; input: string } | null = null;
-      let inThinking = false;
-
-      for await (const chunk of stream) {
-        switch (chunk.type) {
-          case 'message_start':
-            // Message started - no specific action needed
-            break;
-
-          case 'content_block_start':
-            if (chunk.content_block?.type === 'text') {
-              // Text content block started
-            } else if (chunk.content_block?.type === 'tool_use') {
-              // Tool use block started
-              currentToolCall = {
-                id: chunk.content_block.id!,
-                name: chunk.content_block.name!,
-                input: '',
-              };
-
-              yield this.createToolCallStartEvent(
-                runId,
-                currentToolCall.id,
-                currentToolCall.name,
-                ''
-              );
-            }
-            break;
-
-          case 'content_block_delta':
-            if (chunk.delta?.type === 'text_delta' && chunk.delta.text) {
-              // Check if this is thinking content
-              if (chunk.delta.text.includes('<thinking>')) {
-                inThinking = true;
-              }
-
-              if (inThinking) {
-                // Thinking content
-                thinkingAccumulated += chunk.delta.text;
-                yield {
-                  ...this.createBaseEvent('thinking_delta', runId),
-                  type: 'thinking_delta',
-                  delta: chunk.delta.text,
-                  accumulated: thinkingAccumulated,
-                } as AgentEvent;
-
-                if (chunk.delta.text.includes('</thinking>')) {
-                  inThinking = false;
-                }
-              } else {
-                // Regular text content
-                textAccumulated += chunk.delta.text;
-                yield this.createTextDeltaEvent(runId, chunk.delta.text, textAccumulated);
-              }
-            } else if (chunk.delta?.type === 'input_json_delta' && currentToolCall) {
-              // Tool input streaming
-              currentToolCall.input += chunk.delta.partial_json || '';
-              yield {
-                ...this.createBaseEvent('tool_input_delta', runId),
-                type: 'tool_input_delta',
-                toolCallId: currentToolCall.id,
-                delta: chunk.delta.partial_json || '',
-                inputAccumulated: currentToolCall.input,
-              } as AgentEvent;
-            }
-            break;
-
-          case 'content_block_stop':
-            if (currentToolCall) {
-              // Tool call ready
-              yield {
-                ...this.createBaseEvent('tool_call_ready', runId),
-                type: 'tool_call_ready',
-                toolCallId: currentToolCall.id,
-                toolName: currentToolCall.name,
-                input: currentToolCall.input,
-              } as AgentEvent;
-
-              // Execute the tool (mock execution)
-              const toolResult = await this.executeMockTool(
-                currentToolCall.name,
-                currentToolCall.input
-              );
-
-              yield this.createToolResultEvent(
-                runId,
-                currentToolCall.id,
-                currentToolCall.name,
-                toolResult,
-                150 // mock duration
-              );
-
-              currentToolCall = null;
-            }
-            break;
-
-          case 'message_delta':
-            // Handle message-level changes
-            break;
-
-          case 'message_stop':
-            // Message completed
-            if (chunk.message?.usage) {
-              const cost = this.extractCostFromUsage(chunk.message.usage, modelId);
-              if (cost) {
-                yield this.createCostEvent(runId, cost);
-              }
-            }
-
-            yield this.createMessageStopEvent(runId, textAccumulated);
-            break;
-        }
+    const rejectPending = (reason: unknown): void => {
+      for (const pending of pendingApprovals.values()) {
+        pending.reject(reason);
       }
+      pendingApprovals.clear();
+      for (const pending of pendingInputs.values()) {
+        pending.reject(reason);
+      }
+      pendingInputs.clear();
+    };
 
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      yield this.createErrorEvent(runId, 'INTERNAL', `SDK error: ${message}`, false);
+    const closeRun = async (): Promise<void> => {
+      if (closed) {
+        return;
+      }
+      closed = true;
+      prompts.close();
+      rejectPending(new Error('Claude Agent SDK session closed'));
+      queryHandle?.close();
+    };
+
+    const sdkPromise = (async () => {
+      try {
+        const authState = await this.detectAuth();
+        if (authState.status !== 'authenticated') {
+          queueError('AUTH_MISSING', 'Anthropic authentication not found');
+          return;
+        }
+
+        if (options.attachments?.some((attachment) => !this.isImageAttachment(attachment.mimeType, attachment.filePath, attachment.url))) {
+          queueError('CAPABILITY_ERROR', 'claude-agent-sdk currently supports only image attachments through agent-mux');
+          return;
+        }
+
+        const initialMessage = await this.buildUserMessage(this.normalizePrompt(options.prompt), options.attachments);
+        prompts.enqueue(initialMessage);
+        if (options.nonInteractive) {
+          prompts.close();
+        }
+
+        const sdk = await this.loadSdkModule();
+        queryHandle = sdk.query({
+          prompt: prompts,
+          options: this.buildSdkOptions(options, modelId, async (toolName, input, ctx) => {
+            const interactionId = ctx.toolUseID || `approval-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+            events.enqueue({
+              ...this.createBaseEvent('approval_request', runId),
+              type: 'approval_request',
+              interactionId,
+              action: ctx.title || `Allow ${toolName}`,
+              detail: ctx.description || JSON.stringify(input),
+              toolName,
+              riskLevel: this.estimateRiskLevel(toolName),
+            } as AgentEvent);
+
+            return await new Promise<ClaudePermissionResult>((resolve, reject) => {
+              pendingApprovals.set(interactionId, { resolve, reject });
+            });
+          }, async (request) => {
+            const interactionId = request.elicitationId || `input-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+            events.enqueue({
+              ...this.createBaseEvent('input_required', runId),
+              type: 'input_required',
+              interactionId,
+              question: request.title || request.message,
+              context: request.description || request.url,
+              source: 'tool',
+            } as AgentEvent);
+
+            return await new Promise<ClaudeElicitationResult>((resolve, reject) => {
+              pendingInputs.set(interactionId, { resolve, reject });
+            });
+          }),
+        });
+
+        for await (const message of queryHandle) {
+          const translated = this.translateSdkMessage({
+            runId,
+            options,
+            message,
+            modelId,
+            textAccumulated,
+            thinkingAccumulated,
+            toolsByIndex,
+            toolsById,
+            turnIndex,
+            sessionId,
+          });
+
+          textAccumulated = translated.textAccumulated;
+          thinkingAccumulated = translated.thinkingAccumulated;
+          turnIndex = translated.turnIndex;
+          sessionId = translated.sessionId;
+
+          for (const event of translated.events) {
+            events.enqueue(event);
+          }
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        queueError('INTERNAL', `Claude Agent SDK error: ${message}`);
+      } finally {
+        await closeRun();
+        events.close();
+      }
+    })();
+
+    void sdkPromise;
+
+    return Object.assign(events, {
+      send: async (text: string) => {
+        if (closed) {
+          throw new Error('Claude Agent SDK session is closed');
+        }
+        prompts.enqueue(await this.buildUserMessage(text, []));
+      },
+      respond: async (interactionId: string, response: InteractionResponse) => {
+        const pendingApproval = pendingApprovals.get(interactionId);
+        if (pendingApproval) {
+          pendingApprovals.delete(interactionId);
+          if (response.type === 'approve') {
+            events.enqueue({
+              ...this.createBaseEvent('approval_granted', runId),
+              type: 'approval_granted',
+              interactionId,
+            } as AgentEvent);
+            pendingApproval.resolve({ behavior: 'allow' });
+            return;
+          }
+          if (response.type === 'deny') {
+            events.enqueue({
+              ...this.createBaseEvent('approval_denied', runId),
+              type: 'approval_denied',
+              interactionId,
+              reason: response.reason,
+            } as AgentEvent);
+            pendingApproval.resolve({ behavior: 'deny', message: response.reason || 'Denied by user' });
+            return;
+          }
+          throw new Error('Approval requests require approve/deny responses');
+        }
+
+        const pendingInput = pendingInputs.get(interactionId);
+        if (pendingInput) {
+          pendingInputs.delete(interactionId);
+          if (response.type !== 'text') {
+            pendingInput.resolve({ action: 'decline' });
+            return;
+          }
+          pendingInput.resolve({ action: 'accept', content: { response: response.text } });
+          return;
+        }
+
+        throw new Error(`No pending Claude SDK interaction with id '${interactionId}'`);
+      },
+      interrupt: async () => {
+        await queryHandle?.interrupt();
+      },
+      close: async () => {
+        await closeRun();
+      },
+    } satisfies Partial<ProgrammaticRun>);
+  }
+
+  async detectInstallation(): Promise<DetectInstallationResult> {
+    try {
+      const sdkEntry = require.resolve('@anthropic-ai/claude-agent-sdk');
+      const pkgPath = path.join(path.dirname(sdkEntry), 'package.json');
+      const pkg = await readJsonFile<{ version?: string }>(pkgPath);
+      return {
+        installed: true,
+        version: pkg?.version ?? undefined,
+        path: sdkEntry,
+      };
+    } catch {
+      return { installed: false };
     }
   }
 
@@ -469,21 +473,31 @@ export class ClaudeAgentSdkAdapter extends BaseProgrammaticAdapter {
       };
     }
 
-    // Check Claude settings file
-    const claudeHome = path.join(os.homedir(), '.claude');
-    const settingsPath = path.join(claudeHome, 'settings.json');
-
-    try {
-      const settings = await readJsonFile<{ user?: { id?: string } }>(settingsPath);
-      if (settings?.user?.id) {
-        return {
-          status: 'authenticated',
-          method: 'oauth',
-          identity: `claude:${settings.user.id}`,
-        };
+    for (const credentialsPath of [
+      path.join(os.homedir(), '.claude', '.credentials.json'),
+      path.join(os.homedir(), '.claude.json'),
+      path.join(os.homedir(), '.claude', 'settings.json'),
+    ]) {
+      try {
+        const data = await readJsonFile<Record<string, unknown>>(credentialsPath);
+        if (data) {
+          const email = typeof data['email'] === 'string' ? data['email'] : undefined;
+          const userId = typeof data['userId'] === 'string'
+            ? data['userId']
+            : typeof (data['user'] as Record<string, unknown> | undefined)?.['id'] === 'string'
+              ? ((data['user'] as Record<string, unknown>)['id'] as string)
+              : undefined;
+          if (email || userId || Object.keys(data).length > 0) {
+            return {
+              status: 'authenticated',
+              method: 'oauth',
+              identity: email ? `claude:${email}` : `claude:${userId ?? 'local'}`,
+            };
+          }
+        }
+      } catch {
+        // Ignore missing or invalid auth files.
       }
-    } catch {
-      // Settings file not found or invalid
     }
 
     return { status: 'unauthenticated' };
@@ -496,32 +510,32 @@ export class ClaudeAgentSdkAdapter extends BaseProgrammaticAdapter {
       steps: [
         {
           step: 1,
-          description: 'Get an API key from https://console.anthropic.com/',
-          url: 'https://console.anthropic.com/'
+          description: 'Get an API key from https://console.anthropic.com/settings/keys',
+          url: 'https://console.anthropic.com/settings/keys',
         },
         {
           step: 2,
           description: 'Set the ANTHROPIC_API_KEY environment variable',
-          command: 'export ANTHROPIC_API_KEY=sk-ant-...'
+          command: 'export ANTHROPIC_API_KEY=sk-ant-...',
         },
         {
           step: 3,
-          description: 'Alternatively, authenticate via Claude CLI',
-          command: 'claude auth'
+          description: 'Or sign in through Claude Code and let the SDK reuse the stored credentials',
+          command: 'claude',
         },
       ],
       envVars: [
-        { name: 'ANTHROPIC_API_KEY', description: 'Anthropic API key', required: true, exampleFormat: 'sk-ant-...' },
-        { name: 'CLAUDE_AGENT_API_KEY', description: 'Claude Agent SDK API key', required: false, exampleFormat: 'sk-ant-...' },
+        { name: 'ANTHROPIC_API_KEY', description: 'Anthropic API key', required: false, exampleFormat: 'sk-ant-...' },
+        { name: 'CLAUDE_AGENT_API_KEY', description: 'Alternate Anthropic API key env var', required: false, exampleFormat: 'sk-ant-...' },
       ],
-      documentationUrls: ['https://docs.anthropic.com/claude/docs'],
-      loginCommand: 'claude auth',
-      verifyCommand: 'claude --version',
+      documentationUrls: ['https://platform.claude.com/docs/en/agent-sdk/overview'],
+      loginCommand: 'claude',
+      verifyCommand: 'node -e "import(\'@anthropic-ai/claude-agent-sdk\').then(() => console.log(\'OK\'))"',
     };
   }
 
   sessionDir(_cwd?: string): string {
-    return path.join(os.homedir(), '.claude', 'sessions');
+    return path.join(os.homedir(), '.claude', 'projects');
   }
 
   async parseSessionFile(filePath: string): Promise<Session> {
@@ -544,12 +558,12 @@ export class ClaudeAgentSdkAdapter extends BaseProgrammaticAdapter {
     const filePath = this.configSchema.configFilePaths?.[0];
     if (!filePath) return;
     const existing = (await readJsonFile<Record<string, unknown>>(filePath)) ?? {};
-    const { agent: _a, source: _s, filePaths: _fp, ...rest } = config as Record<string, unknown>;
-    void _a; void _s; void _fp;
+    const { agent: _agent, source: _source, filePaths: _filePaths, ...rest } = config as Record<string, unknown>;
+    void _agent;
+    void _source;
+    void _filePaths;
     await writeJsonFileAtomic(filePath, { ...existing, ...rest });
   }
-
-  // ── MCP Plugin Support ─────────────────────────────────────────────
 
   async listPlugins(): Promise<InstalledPlugin[]> {
     return mcpListPlugins(this.agent);
@@ -559,204 +573,421 @@ export class ClaudeAgentSdkAdapter extends BaseProgrammaticAdapter {
     return mcpInstallPlugin(this.agent, pluginId, options);
   }
 
-  async uninstallPlugin(pluginId: string, options?: { global?: boolean }): Promise<void> {
+  async uninstallPlugin(pluginId: string, _options?: { global?: boolean }): Promise<void> {
     return mcpUninstallPlugin(this.agent, pluginId);
   }
 
-  // ── Private implementation methods ─────────────────────────────────
-
-  /**
-   * Create Claude Agent SDK client (mock implementation).
-   * In real implementation, this would return an actual Claude Agent SDK client.
-   */
-  private createClaudeAgentClient() {
-    // Mock client - in real implementation, this would be:
-    // return new ClaudeAgent({ apiKey: process.env.ANTHROPIC_API_KEY });
-    return {};
+  private async loadSdkModule(): Promise<ClaudeSdkModule> {
+    return await import('@anthropic-ai/claude-agent-sdk') as ClaudeSdkModule;
   }
 
-  /**
-   * Create Claude stream (mock implementation).
-   * In real implementation, this would use the Claude Agent SDK.
-   */
-  private async createClaudeStream(params: {
-    model: string;
-    messages: ClaudeMessage[];
-    system: string;
-    tools: ClaudeTool[];
-    max_tokens: number;
-    temperature: number;
-    stream: boolean;
-    thinking_enabled: boolean;
-    thinking_effort: string;
-    thinking_budget_tokens?: number;
-  }): Promise<AsyncIterable<ClaudeStreamChunk>> {
-    // Mock streaming response with thinking
-    const mockChunks: ClaudeStreamChunk[] = [
-      {
-        type: 'message_start',
-        message: {
-          id: 'msg_123',
-          type: 'message',
-          role: 'assistant',
-          content: [],
-          model: params.model,
-          stop_reason: null,
-          stop_sequence: null,
-          usage: { input_tokens: 0, output_tokens: 0 },
-        },
-      },
-      // Thinking stream
-      {
-        type: 'content_block_start',
-        content_block: { type: 'text' },
-        index: 0,
-      },
-      {
-        type: 'content_block_delta',
-        delta: { type: 'text_delta', text: '<thinking>\nLet me think about this task. ' },
-        index: 0,
-      },
-      {
-        type: 'content_block_delta',
-        delta: { type: 'text_delta', text: 'I need to analyze the request and determine the best approach.\n</thinking>\n\n' },
-        index: 0,
-      },
-      // Regular response
-      {
-        type: 'content_block_delta',
-        delta: { type: 'text_delta', text: 'I\'ll help you with that task. ' },
-        index: 0,
-      },
-      {
-        type: 'content_block_delta',
-        delta: { type: 'text_delta', text: 'Let me read a file to understand the context better.' },
-        index: 0,
-      },
-      // Tool use
-      {
-        type: 'content_block_start',
-        content_block: {
-          type: 'tool_use',
-          id: 'call_123',
-          name: 'read_file',
-          input: {}
-        },
-        index: 1,
-      },
-      {
-        type: 'content_block_delta',
-        delta: { type: 'input_json_delta', partial_json: '{"path": ' },
-        index: 1,
-      },
-      {
-        type: 'content_block_delta',
-        delta: { type: 'input_json_delta', partial_json: '"README.md"}' },
-        index: 1,
-      },
-      {
-        type: 'content_block_stop',
-        index: 1,
-      },
-      {
-        type: 'message_stop',
-        message: {
-          id: 'msg_123',
-          type: 'message',
-          role: 'assistant',
-          content: [],
-          model: params.model,
-          stop_reason: 'tool_use',
-          stop_sequence: null,
-          usage: { input_tokens: 200, output_tokens: 150 },
-        },
-      },
-    ];
-
-    return {
-      async *[Symbol.asyncIterator]() {
-        for (const chunk of mockChunks) {
-          await new Promise(resolve => setTimeout(resolve, 100)); // Simulate streaming delay
-          yield chunk;
+  private buildSdkOptions(
+    options: RunOptions,
+    modelId: string,
+    canUseTool: NonNullable<ClaudeSdkOptions['canUseTool']>,
+    onElicitation: NonNullable<ClaudeSdkOptions['onElicitation']>,
+  ): ClaudeSdkOptions {
+    const permissionMode = this.mapPermissionMode(options.approvalMode);
+    const sdkOptions: ClaudeSdkOptions = {
+      model: modelId,
+      cwd: options.cwd ?? process.cwd(),
+      env: options.env ? { ...process.env, ...options.env } : undefined,
+      resume: options.sessionId ?? options.forkSessionId,
+      forkSession: options.forkSessionId != null,
+      persistSession: options.noSession ? false : true,
+      permissionMode,
+      allowDangerouslySkipPermissions: permissionMode === 'bypassPermissions',
+      canUseTool,
+      onElicitation,
+      includePartialMessages: true,
+      includeHookEvents: true,
+      settingSources: ['user', 'project', 'local'],
+      mcpServers: this.buildMcpServers(options),
+      maxTurns: options.maxTurns,
+      systemPrompt: this.buildSystemPrompt(options),
+      stderr: (data) => {
+        if (data.trim().length > 0) {
+          // Surface stderr as a debug event via the regular SDK stream handling.
         }
       },
     };
-  }
 
-  /**
-   * Build default system prompt with agent capabilities.
-   */
-  private buildDefaultSystemPrompt(options: RunOptions): string {
-    let systemPrompt = 'You are Claude, an AI assistant created by Anthropic. You have access to various tools and capabilities:\n\n';
-
-    systemPrompt += '- read_file: Read file contents\n';
-    systemPrompt += '- write_file: Write content to files\n';
-    systemPrompt += '- execute_bash: Run bash commands\n';
-    systemPrompt += '- spawn_subagent: Delegate tasks to specialized agents\n\n';
-
-    if (options.approvalMode === 'yolo') {
-      systemPrompt += 'Tool approval is disabled - you can execute tools freely.\n';
-    } else {
-      systemPrompt += 'Always ask for permission before executing potentially dangerous tools.\n';
-    }
-
-    systemPrompt += '\nProvide helpful, harmless, and honest responses while leveraging these capabilities effectively.';
-
-    return systemPrompt;
-  }
-
-  /**
-   * Execute mock tool calls.
-   */
-  private async executeMockTool(name: string, inputJson: string): Promise<string> {
-    try {
-      const input = JSON.parse(inputJson);
-
-      switch (name) {
-        case 'read_file':
-          return `Mock file contents for: ${input.path}`;
-
-        case 'write_file':
-          return `Successfully wrote ${input.content.length} characters to ${input.path}`;
-
-        case 'execute_bash':
-          return `Executed: ${input.command}\nMock output: Command completed successfully`;
-
-        case 'spawn_subagent':
-          return `Spawned ${input.agent_type || 'claude'} subagent for task: ${input.task}`;
-
-        default:
-          return `Unknown tool: ${name}`;
-      }
-    } catch (error) {
-      return `Error executing tool ${name}: ${error}`;
-    }
-  }
-
-  /**
-   * Extract cost information from Claude usage object.
-   */
-  private extractCostFromUsage(usage: {
-    input_tokens: number;
-    output_tokens: number;
-  }, modelId: string): CostRecord {
-    const model = this.models.find(m => m.modelId === modelId);
-    if (!model) {
-      return {
-        totalUsd: 0,
-        inputTokens: usage.input_tokens,
-        outputTokens: usage.output_tokens,
+    if (options.thinkingBudgetTokens != null) {
+      sdkOptions.thinking = {
+        type: 'enabled',
+        budgetTokens: options.thinkingBudgetTokens,
       };
     }
 
-    const inputCost = (usage.input_tokens / 1_000_000) * model.inputPricePerMillion!;
-    const outputCost = (usage.output_tokens / 1_000_000) * model.outputPricePerMillion!;
-    const totalCost = inputCost + outputCost;
+    if (options.thinkingEffort) {
+      sdkOptions.effort = options.thinkingEffort === 'max' ? 'max' : options.thinkingEffort;
+    }
+
+    return sdkOptions;
+  }
+
+  private buildMcpServers(options: RunOptions): ClaudeSdkOptions['mcpServers'] {
+    if (!options.mcpServers || options.mcpServers.length === 0) {
+      return undefined;
+    }
+
+    const servers: Record<string, Record<string, unknown>> = {};
+    for (const server of options.mcpServers) {
+      if (server.transport === 'stdio') {
+        servers[server.name] = {
+          type: 'stdio',
+          command: server.command,
+          args: server.args,
+          env: server.env,
+        };
+        continue;
+      }
+
+      servers[server.name] = {
+        type: server.transport === 'streamable-http' ? 'http' : 'sse',
+        url: server.url,
+        headers: server.headers,
+      };
+    }
+
+    return servers as ClaudeSdkOptions['mcpServers'];
+  }
+
+  private buildSystemPrompt(options: RunOptions): ClaudeSdkOptions['systemPrompt'] {
+    if (!options.systemPrompt) {
+      return undefined;
+    }
+    if (options.systemPromptMode === 'append' || options.systemPromptMode == null) {
+      return {
+        type: 'preset',
+        preset: 'claude_code',
+        append: options.systemPrompt,
+      };
+    }
+    if (options.systemPromptMode === 'replace') {
+      return options.systemPrompt;
+    }
+    return {
+      type: 'preset',
+      preset: 'claude_code',
+      append: options.systemPrompt,
+    };
+  }
+
+  private mapPermissionMode(mode: RunOptions['approvalMode']): ClaudeSdkOptions['permissionMode'] {
+    switch (mode) {
+      case 'yolo':
+        return 'bypassPermissions';
+      case 'deny':
+        return 'dontAsk';
+      default:
+        return 'default';
+    }
+  }
+
+  private estimateRiskLevel(toolName: string): 'low' | 'medium' | 'high' {
+    const lowered = toolName.toLowerCase();
+    if (lowered.includes('bash') || lowered.includes('delete') || lowered.includes('write') || lowered.includes('edit')) {
+      return 'high';
+    }
+    if (lowered.includes('read') || lowered.includes('grep') || lowered.includes('glob')) {
+      return 'low';
+    }
+    return 'medium';
+  }
+
+  private async buildUserMessage(prompt: string, attachments: RunOptions['attachments'] = []): Promise<ClaudeSdkUserMessage> {
+    const content: Array<Record<string, unknown>> = [{ type: 'text', text: prompt }];
+
+    for (const attachment of attachments ?? []) {
+      const mimeType = await this.resolveMimeType(attachment.mimeType, attachment.filePath, attachment.url);
+      if (!mimeType || !mimeType.startsWith('image/')) {
+        throw new Error('Only image attachments are currently supported for claude-agent-sdk');
+      }
+      const data = await this.readAttachmentAsBase64(attachment);
+      content.push({
+        type: 'image',
+        source: {
+          type: 'base64',
+          media_type: mimeType,
+          data,
+        },
+      });
+    }
 
     return {
-      totalUsd: totalCost,
-      inputTokens: usage.input_tokens,
-      outputTokens: usage.output_tokens,
+      type: 'user',
+      message: {
+        role: 'user',
+        content: attachments && attachments.length > 0 ? content as any : prompt,
+      },
+      parent_tool_use_id: null,
+    };
+  }
+
+  private isImageAttachment(
+    mimeType?: string,
+    filePath?: string,
+    url?: string,
+  ): boolean {
+    if (mimeType?.startsWith('image/')) {
+      return true;
+    }
+    const source = filePath ?? url;
+    if (!source) {
+      return false;
+    }
+    return /\.(png|jpe?g|gif|webp|bmp)$/i.test(source);
+  }
+
+  private async readAttachmentAsBase64(attachment: NonNullable<RunOptions['attachments']>[number]): Promise<string> {
+    if (attachment.base64) {
+      return attachment.base64;
+    }
+    if (attachment.filePath) {
+      const data = await fs.readFile(attachment.filePath);
+      return data.toString('base64');
+    }
+    if (attachment.url) {
+      const response = await fetch(attachment.url);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch attachment from ${attachment.url}: ${response.status}`);
+      }
+      const data = Buffer.from(await response.arrayBuffer());
+      return data.toString('base64');
+    }
+    throw new Error('Attachment must provide base64, filePath, or url');
+  }
+
+  private async resolveMimeType(mimeType?: string, filePath?: string, url?: string): Promise<string | undefined> {
+    if (mimeType) {
+      return mimeType;
+    }
+    const source = (filePath ?? url ?? '').toLowerCase();
+    if (source.endsWith('.png')) return 'image/png';
+    if (source.endsWith('.jpg') || source.endsWith('.jpeg')) return 'image/jpeg';
+    if (source.endsWith('.gif')) return 'image/gif';
+    if (source.endsWith('.webp')) return 'image/webp';
+    if (source.endsWith('.bmp')) return 'image/bmp';
+    return undefined;
+  }
+
+  private translateSdkMessage(args: {
+    runId: string;
+    options: RunOptions;
+    message: ClaudeSdkMessage;
+    modelId: string;
+    textAccumulated: string;
+    thinkingAccumulated: string;
+    toolsByIndex: Map<number, ToolState>;
+    toolsById: Map<string, ToolState>;
+    turnIndex: number;
+    sessionId?: string;
+  }): {
+    events: AgentEvent[];
+    textAccumulated: string;
+    thinkingAccumulated: string;
+    turnIndex: number;
+    sessionId?: string;
+  } {
+    const {
+      runId,
+      options,
+      message,
+      modelId,
+      toolsByIndex,
+      toolsById,
+    } = args;
+
+    let textAccumulated = args.textAccumulated;
+    let thinkingAccumulated = args.thinkingAccumulated;
+    let turnIndex = args.turnIndex;
+    let sessionId = args.sessionId;
+    const events: AgentEvent[] = [];
+
+    if (message.type === 'system' && message.subtype === 'init') {
+      sessionId = message.session_id;
+      events.push({
+        ...this.createBaseEvent('session_start', runId),
+        type: 'session_start',
+        sessionId,
+        resumed: Boolean(options.sessionId),
+        forkedFrom: options.forkSessionId,
+      } as AgentEvent);
+      return { events, textAccumulated, thinkingAccumulated, turnIndex, sessionId };
+    }
+
+    if (message.type === 'system' && message.subtype === 'session_state_changed') {
+      if (message.state === 'running') {
+        turnIndex += 1;
+        events.push({
+          ...this.createBaseEvent('turn_start', runId),
+          type: 'turn_start',
+          turnIndex,
+        } as AgentEvent);
+      } else if (message.state === 'idle' && turnIndex >= 0) {
+        events.push({
+          ...this.createBaseEvent('turn_end', runId),
+          type: 'turn_end',
+          turnIndex,
+        } as AgentEvent);
+      }
+      return { events, textAccumulated, thinkingAccumulated, turnIndex, sessionId };
+    }
+
+    if (message.type === 'stream_event') {
+      const event = message.event as Record<string, any>;
+      if (event.type === 'message_start') {
+        events.push({
+          ...this.createBaseEvent('message_start', runId),
+          type: 'message_start',
+        } as AgentEvent);
+      }
+
+      if (event.type === 'content_block_start' && event.content_block) {
+        const contentBlock = event.content_block as Record<string, any>;
+        if (contentBlock.type === 'tool_use' || contentBlock.type === 'server_tool_use' || contentBlock.type === 'mcp_tool_use') {
+          const id = String(contentBlock.id ?? `tool-${event.index}`);
+          const state: ToolState = {
+            id,
+            name: String(contentBlock.name ?? 'tool'),
+            rawInput: contentBlock.input ? JSON.stringify(contentBlock.input) : '',
+          };
+          toolsByIndex.set(Number(event.index ?? 0), state);
+          toolsById.set(id, state);
+          events.push(this.createToolCallStartEvent(runId, id, state.name, state.rawInput));
+        } else if (contentBlock.type === 'thinking') {
+          events.push({
+            ...this.createBaseEvent('thinking_start', runId),
+            type: 'thinking_start',
+          } as AgentEvent);
+        }
+      }
+
+      if (event.type === 'content_block_delta' && event.delta) {
+        const delta = event.delta as Record<string, any>;
+        if (delta.type === 'text_delta' && typeof delta.text === 'string') {
+          textAccumulated += delta.text;
+          events.push(this.createTextDeltaEvent(runId, delta.text, textAccumulated));
+        } else if (delta.type === 'thinking_delta' && typeof delta.thinking === 'string') {
+          thinkingAccumulated += delta.thinking;
+          events.push({
+            ...this.createBaseEvent('thinking_delta', runId),
+            type: 'thinking_delta',
+            delta: delta.thinking,
+            accumulated: thinkingAccumulated,
+          } as AgentEvent);
+        } else if (delta.type === 'input_json_delta' && typeof delta.partial_json === 'string') {
+          const state = toolsByIndex.get(Number(event.index ?? 0));
+          if (state) {
+            state.rawInput += delta.partial_json;
+            events.push({
+              ...this.createBaseEvent('tool_input_delta', runId),
+              type: 'tool_input_delta',
+              toolCallId: state.id,
+              delta: delta.partial_json,
+              inputAccumulated: state.rawInput,
+            } as AgentEvent);
+          }
+        }
+      }
+
+      if (event.type === 'content_block_stop') {
+        const state = toolsByIndex.get(Number(event.index ?? 0));
+        if (state) {
+          events.push({
+            ...this.createBaseEvent('tool_call_ready', runId),
+            type: 'tool_call_ready',
+            toolCallId: state.id,
+            toolName: state.name,
+            input: this.parseToolInput(state.rawInput),
+          } as AgentEvent);
+        }
+      }
+
+      return { events, textAccumulated, thinkingAccumulated, turnIndex, sessionId };
+    }
+
+    if (message.type === 'user' && message.parent_tool_use_id && message.tool_use_result !== undefined) {
+      const toolState = toolsById.get(message.parent_tool_use_id);
+      events.push(this.createToolResultEvent(
+        runId,
+        message.parent_tool_use_id,
+        toolState?.name ?? 'tool',
+        message.tool_use_result,
+      ));
+      return { events, textAccumulated, thinkingAccumulated, turnIndex, sessionId };
+    }
+
+    if (message.type === 'result') {
+      const cost = this.extractCostFromResult(message, modelId);
+      if (cost) {
+        events.push(this.createCostEvent(runId, cost));
+      }
+      if (message.is_error) {
+        events.push(this.createErrorEvent(
+          runId,
+          'INTERNAL',
+          message.subtype === 'success' ? 'Claude Agent SDK returned an error result' : message.errors.join('; ') || message.subtype,
+          false,
+        ));
+      }
+      events.push(this.createMessageStopEvent(
+        runId,
+        message.subtype === 'success' ? message.result : textAccumulated,
+      ));
+      return { events, textAccumulated, thinkingAccumulated, turnIndex, sessionId };
+    }
+
+    if (message.type === 'system' && message.subtype === 'notification') {
+      events.push({
+        ...this.createBaseEvent('debug', runId),
+        type: 'debug',
+        level: 'info',
+        message: message.text,
+      } as AgentEvent);
+      return { events, textAccumulated, thinkingAccumulated, turnIndex, sessionId };
+    }
+
+    if (message.type === 'system' && message.subtype === 'local_command_output') {
+      events.push(this.createTextDeltaEvent(runId, `${message.content}\n`, textAccumulated + `${message.content}\n`));
+      textAccumulated += `${message.content}\n`;
+      return { events, textAccumulated, thinkingAccumulated, turnIndex, sessionId };
+    }
+
+    return { events, textAccumulated, thinkingAccumulated, turnIndex, sessionId };
+  }
+
+  private parseToolInput(rawInput: string): unknown {
+    if (!rawInput) {
+      return {};
+    }
+    try {
+      return JSON.parse(rawInput);
+    } catch {
+      return rawInput;
+    }
+  }
+
+  private extractCostFromResult(result: Extract<ClaudeSdkMessage, { type: 'result' }>, modelId: string): CostRecord | null {
+    const model = this.models.find((candidate) => candidate.modelId === modelId);
+    if (!model) {
+      return null;
+    }
+    const usage = result.usage as any;
+    const inputTokens = typeof usage?.input_tokens === 'number' ? usage.input_tokens : 0;
+    const outputTokens = typeof usage?.output_tokens === 'number' ? usage.output_tokens : 0;
+    const cachedTokens = typeof usage?.cache_read_input_tokens === 'number' ? usage.cache_read_input_tokens : 0;
+    const thinkingTokens = typeof usage?.server_tool_use === 'number' ? usage.server_tool_use : 0;
+    return {
+      totalUsd: result.total_cost_usd ?? (
+        (inputTokens / 1_000_000) * (model.inputPricePerMillion ?? 0) +
+        (outputTokens / 1_000_000) * (model.outputPricePerMillion ?? 0)
+      ),
+      inputTokens,
+      outputTokens,
+      cachedTokens,
+      thinkingTokens,
     };
   }
 }

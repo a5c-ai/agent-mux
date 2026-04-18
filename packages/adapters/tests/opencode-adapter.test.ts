@@ -109,9 +109,9 @@ describe('OpenCodeAdapter', () => {
       expect(adapter.capabilities.maxParallelTasks).toBe(5);
     });
 
-    it('supports interactive mode and stdin injection', () => {
-      expect(adapter.capabilities.supportsInteractiveMode).toBe(true);
-      expect(adapter.capabilities.supportsStdinInjection).toBe(true);
+    it('keeps the subprocess adapter honest about live interactive support', () => {
+      expect(adapter.capabilities.supportsInteractiveMode).toBe(false);
+      expect(adapter.capabilities.supportsStdinInjection).toBe(false);
     });
 
     it('supports file attachments and image input', () => {

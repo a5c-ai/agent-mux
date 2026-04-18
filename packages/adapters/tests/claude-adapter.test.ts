@@ -108,6 +108,11 @@ describe('ClaudeAdapter', () => {
       expect(adapter.capabilities.supportedPlatforms).toContain('linux');
       expect(adapter.capabilities.supportedPlatforms).toContain('win32');
     });
+
+    it('does not claim live interactive subprocess support', () => {
+      expect(adapter.capabilities.supportsInteractiveMode).toBe(false);
+      expect(adapter.capabilities.supportsStdinInjection).toBe(false);
+    });
   });
 
   describe('models', () => {
@@ -244,6 +249,19 @@ describe('ClaudeAdapter', () => {
       });
 
       expect(result.timeout).toBe(30000);
+    });
+
+    it('keeps using --print stream-json on the subprocess transport even without an explicit non-interactive flag', () => {
+      const result = adapter.buildSpawnArgs({
+        agent: 'claude',
+        prompt: 'Hello world',
+      });
+
+      expect(result.command).toBe('claude');
+      expect(result.args).toContain('--print');
+      expect(result.args).toContain('--output-format');
+      expect(result.args).toContain('Hello world');
+      expect(result.closeStdinAfterSpawn).toBe(true);
     });
   });
 
@@ -430,6 +448,16 @@ describe('ClaudeAdapter', () => {
       const event = result as { runId: string; agent: string };
       expect(event.runId).toBe('run-xyz');
       expect(event.agent).toBe('claude');
+    });
+
+    it('parses ANSI/plaintext interactive output as text deltas', () => {
+      const result = adapter.parseEvent(
+        '\u001b[1mInvestigating session state...\u001b[0m',
+        makeContext({ outputFormat: 'text' }),
+      );
+      const event = result as { type: string; delta: string };
+      expect(event.type).toBe('text_delta');
+      expect(event.delta).toBe('Investigating session state...');
     });
   });
 

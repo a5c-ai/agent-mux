@@ -22,6 +22,7 @@ async function runProgrammatic(
   let aborted = false;
   let runTimeout: NodeJS.Timeout | null = null;
   let inactivityTimeout: NodeJS.Timeout | null = null;
+  let stream: ReturnType<ProgrammaticAdapter['execute']> | null = null;
 
   const clearTimers = (): void => {
     if (runTimeout) clearTimeout(runTimeout);
@@ -44,23 +45,30 @@ async function runProgrammatic(
     }, options.timeout);
   }
 
-  handle.bindInputTransport(async () => {
-    throw new AgentMuxError(
-      'STDIN_NOT_AVAILABLE',
-      `${adapter.agent} does not support live prompt injection in the current agent-mux transport`,
-      false,
-    );
-  });
-
   const originalAbort = handle.abort.bind(handle);
   handle.abort = async () => {
     aborted = true;
     clearTimers();
+    if (stream && typeof stream.close === 'function') {
+      try {
+        await stream.close();
+      } catch {
+        // Ignore cleanup errors.
+      }
+    }
     try {
       await originalAbort();
     } catch {
       // Ignore double-finalization races.
     }
+  };
+
+  const originalInterrupt = handle.interrupt.bind(handle);
+  handle.interrupt = async () => {
+    if (stream && typeof stream.interrupt === 'function') {
+      await stream.interrupt();
+    }
+    await originalInterrupt();
   };
 
   try {
@@ -71,7 +79,31 @@ async function runProgrammatic(
 
   try {
     resetInactivity();
-    for await (const event of adapter.execute(options)) {
+    stream = adapter.execute(options);
+
+    handle.bindInputTransport(async (text: string) => {
+      if (!adapter.capabilities.supportsStdinInjection || typeof stream?.send !== 'function') {
+        throw new AgentMuxError(
+          'STDIN_NOT_AVAILABLE',
+          `${adapter.agent} does not support live prompt injection in the current agent-mux transport`,
+          false,
+        );
+      }
+      await stream.send(text);
+    });
+
+    handle.bindInteractionTransport(async (interactionId, response) => {
+      if (typeof stream?.respond !== 'function') {
+        throw new AgentMuxError(
+          'STDIN_NOT_AVAILABLE',
+          `${adapter.agent} does not support live interaction responses in the current agent-mux transport`,
+          false,
+        );
+      }
+      await stream.respond(interactionId, response);
+    });
+
+    for await (const event of stream) {
       resetInactivity();
       handle.emit(event);
     }
@@ -79,6 +111,13 @@ async function runProgrammatic(
     handle.complete(aborted ? 'aborted' : 'completed', aborted ? 1 : 0, null);
   } catch (err) {
     clearTimers();
+    if (stream && typeof stream.close === 'function') {
+      try {
+        await stream.close();
+      } catch {
+        // Ignore cleanup errors after failures.
+      }
+    }
     handle.emit({
       type: 'error',
       runId: handle.runId,

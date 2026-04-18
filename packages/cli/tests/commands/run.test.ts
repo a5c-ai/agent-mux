@@ -94,6 +94,13 @@ describe('buildRunOptions', () => {
     expect(Object.prototype.hasOwnProperty.call(result.options, 'nonInteractive')).toBe(false);
   });
 
+  it('prefers explicit interactive mode over prompt-driven non-interactive mode', () => {
+    const args = parseArgs(['run', '--agent', 'claude', '--prompt', 'hello flag', '--non-interactive', '--interactive'], RUN_FLAGS);
+    const result = buildRunOptions(args, agents);
+    expect(result.prompt).toBe('hello flag');
+    expect(Object.prototype.hasOwnProperty.call(result.options, 'nonInteractive')).toBe(false);
+  });
+
   it('maps --yolo to approvalMode', () => {
     const args = parseArgs(['run', '--yolo'], RUN_FLAGS);
     const result = buildRunOptions(args, agents);
@@ -308,5 +315,41 @@ describe('runCommand', () => {
       if (originalMockBin === undefined) delete process.env['AMUX_MOCK_HARNESS_BIN'];
       else process.env['AMUX_MOCK_HARNESS_BIN'] = originalMockBin;
     }
+  });
+
+  it('permits explicit interactive runs without an initial prompt', async () => {
+    const calls: Array<Record<string, unknown>> = [];
+    const client = {
+      adapters: {
+        list: () => [{ agent: 'claude-agent-sdk' }],
+        get: () => ({ capabilities: { supportsInteractiveMode: true } }),
+      },
+      run: vi.fn((options: Record<string, unknown>) => {
+        calls.push(options);
+        return {
+          [Symbol.asyncIterator]: async function* () {},
+          result: () => Promise.resolve({ type: 'run_result', runId: 'r-interactive', agent: 'claude-agent-sdk', text: '', exitCode: 0, exitReason: 'completed', durationMs: 0, turnCount: 1 }),
+        };
+      }),
+    } as unknown as Parameters<typeof runCommand>[0];
+
+    const code = await runCommand(client, parseArgs(['run', '--agent', 'claude-agent-sdk', '--interactive'], RUN_FLAGS));
+    expect(code).toBe(ExitCode.SUCCESS);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.['prompt']).toBe(' ');
+  });
+
+  it('rejects explicit interactive mode on adapters that do not support it in the current transport', async () => {
+    const client = {
+      adapters: {
+        list: () => [{ agent: 'codex' }],
+        get: () => ({ capabilities: { supportsInteractiveMode: false } }),
+      },
+      run: vi.fn(),
+    } as unknown as Parameters<typeof runCommand>[0];
+
+    const code = await runCommand(client, parseArgs(['run', '--agent', 'codex', '--interactive', '--prompt', 'hello'], RUN_FLAGS));
+    expect(code).toBe(ExitCode.USAGE_ERROR);
+    expect(client.run).not.toHaveBeenCalled();
   });
 });

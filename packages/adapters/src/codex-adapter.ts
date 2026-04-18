@@ -62,7 +62,7 @@ export class CodexAdapter extends BaseAgentAdapter {
     skillsFormat: null,
     supportsSubagentDispatch: false,
     supportsParallelExecution: false,
-    supportsInteractiveMode: true,
+    supportsInteractiveMode: false,
     supportsStdinInjection: false,
     supportsImageInput: false,
     supportsImageOutput: false,
@@ -145,20 +145,16 @@ export class CodexAdapter extends BaseAgentAdapter {
 
   buildSpawnArgs(options: RunOptions): SpawnArgs {
     const args: string[] = [];
-
-    // Codex requires the 'exec' subcommand for proper JSON output
     const sessionId = this.resolveSessionId(options);
     const isResume = sessionId && !options.forkSessionId;
     const prompt = this.normalizePrompt(options.prompt);
-
+    // Codex requires the 'exec' subcommand for structured subprocess output.
     if (isResume) {
-      // Resume existing session
       args.push('exec', 'resume', '--json', sessionId);
       if (prompt.length > 0) {
         args.push(prompt);
       }
     } else {
-      // New session
       args.push('exec', '--json');
       args.push(prompt);
     }
@@ -185,7 +181,9 @@ export class CodexAdapter extends BaseAgentAdapter {
 
   parseEvent(line: string, context: ParseContext): AgentEvent | AgentEvent[] | null {
     const parsed = this.parseJsonLine(line);
-    if (parsed == null || typeof parsed !== 'object') return null;
+    if (parsed == null || typeof parsed !== 'object') {
+      return context.outputFormat === 'text' ? this.parsePlaintextEvent(line, context) : null;
+    }
 
     const obj = parsed as Record<string, unknown>;
     const ts = Date.now();

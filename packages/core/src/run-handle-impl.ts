@@ -152,6 +152,9 @@ export class RunHandleImpl implements RunHandle {
   /** Bound runtime input transport used by send()/queue()/steer(). */
   private _inputTransport: ((text: string) => Promise<void>) | null = null;
 
+  /** Bound interaction response transport used by approval/input dispatch. */
+  private _interactionTransport: ((id: string, response: InteractionResponse) => Promise<void>) | null = null;
+
   /** Deferred prompts waiting for a matching run boundary. */
   private readonly _deferredPrompts: DeferredPrompt[] = [];
 
@@ -575,6 +578,11 @@ export class RunHandleImpl implements RunHandle {
     this._inputTransport = writer;
   }
 
+  /** @internal Bind the active runtime interaction transport. */
+  bindInteractionTransport(writer: (id: string, response: InteractionResponse) => Promise<void>): void {
+    this._interactionTransport = writer;
+  }
+
   // ── Interaction methods ───────────────────────────────────────────────────
 
   async send(text: string): Promise<void> {
@@ -774,8 +782,11 @@ export class RunHandleImpl implements RunHandle {
   }
 
   private async _handleInteractionResponse(_id: string, _response: InteractionResponse): Promise<void> {
-    // In this phase: stub. Real adapters will write to the agent's stdin/PTY.
-    // The interaction channel already removed the interaction from pending.
+    const writer = this._interactionTransport;
+    if (!writer) {
+      return;
+    }
+    await writer(_id, _response);
   }
 
   private async _sendNow(text: string): Promise<void> {

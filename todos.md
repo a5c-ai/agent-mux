@@ -93,3 +93,4 @@ sdk only:
 - capability discovery for jsonl stream AND non-stream for interactive and non-interactive mode (matrix of 8 modes: interactive/non-interactive × jsonl supported x stream/non-stream) per adapter    
 - capability discovery for async loop tools per adapter (harness - claude-code likely to have this capability, but we should research for other harnesses as well)
 ---
+[ ] \packages\harness-mock is lacking and should actually emulate all the harnesses we support in a precise and covering way.

@@ -88,6 +88,7 @@ export function buildRunOptions(
   registeredAgents: Set<string>,
 ): { agent?: string; prompt?: string; options: Record<string, unknown> } {
   const { flags, positionals } = args;
+  const interactiveFlag = flagBool(flags, 'interactive') === true;
 
   // Resolve agent and prompt from flags/positionals.
 
@@ -168,7 +169,7 @@ export function buildRunOptions(
     agentsDoc: flagStr(flags, 'agents-doc'),
     projectId: flagStr(flags, 'project-id'),
     profile: flagStr(flags, 'profile'),
-    nonInteractive: flagBool(flags, 'non-interactive') === true && promptFlag !== undefined ? true : undefined,
+    nonInteractive: flagBool(flags, 'non-interactive') === true && promptFlag !== undefined && !interactiveFlag ? true : undefined,
   };
 
   // Remove undefined entries
@@ -186,6 +187,7 @@ export function buildRunOptions(
  */
 export async function runCommand(client: AgentMuxClient, args: ParsedArgs): Promise<number> {
   const jsonMode = flagBool(args.flags, 'json') === true;
+  const interactiveFlag = flagBool(args.flags, 'interactive') === true;
 
   // Validate mutual exclusions
   const exclusionError = validateRunFlags(args.flags);
@@ -207,13 +209,33 @@ export async function runCommand(client: AgentMuxClient, args: ParsedArgs): Prom
   const stdinPrompt = explicitPrompt === undefined && process.stdin.isTTY === false
     ? await readStdin()
     : undefined;
-  const resolvedPrompt = explicitPrompt ?? (stdinPrompt && stdinPrompt.trim() ? stdinPrompt : undefined);
+  const resolvedPrompt = explicitPrompt
+    ?? (stdinPrompt && stdinPrompt.trim() ? stdinPrompt : undefined)
+    ?? (interactiveFlag ? ' ' : undefined);
 
   if (!agent && !options['agent']) {
     if (jsonMode) {
       printJsonError('VALIDATION_ERROR', 'No agent specified. Use --agent or provide agent as first argument.');
     } else {
       printError('No agent specified. Use --agent or provide agent as first argument.');
+    }
+    return ExitCode.USAGE_ERROR;
+  }
+
+  const effectiveAgent = agent ?? (options['agent'] as string | undefined);
+  const adapterRegistry = client.adapters as unknown as {
+    get?: (name: string) => { capabilities?: { supportsInteractiveMode?: boolean } } | undefined;
+  };
+  const selectedAdapter = effectiveAgent && typeof adapterRegistry.get === 'function'
+    ? adapterRegistry.get(effectiveAgent)
+    : undefined;
+
+  if (interactiveFlag && selectedAdapter?.capabilities?.supportsInteractiveMode !== true) {
+    const message = `${effectiveAgent} does not support interactive mode in the current agent-mux transport`;
+    if (jsonMode) {
+      printJsonError('VALIDATION_ERROR', message);
+    } else {
+      printError(message);
     }
     return ExitCode.USAGE_ERROR;
   }
@@ -242,7 +264,7 @@ export async function runCommand(client: AgentMuxClient, args: ParsedArgs): Prom
 
   try {
     const runOpts = {
-      agent: agent ?? (options['agent'] as string),
+      agent: effectiveAgent as string,
       prompt: resolvedPrompt,
       ...options,
     };

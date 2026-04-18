@@ -23,3 +23,5 @@ tasks/
 amux-debug.log
 amux-debug-auto.log
 coverage/.tmp/
+.tmp-codex-app-server-ts/
+.tmp-claude-*

@@ -74,8 +74,8 @@ export class ClaudeAdapter extends BaseAgentAdapter {
     supportsSubagentDispatch: true,
     supportsParallelExecution: true,
     maxParallelTasks: 10,
-    supportsInteractiveMode: true,
-    supportsStdinInjection: true,
+    supportsInteractiveMode: false,
+    supportsStdinInjection: false,
     supportsImageInput: true,
     supportsImageOutput: false,
     supportsFileAttachments: true,
@@ -168,7 +168,6 @@ export class ClaudeAdapter extends BaseAgentAdapter {
 
   buildSpawnArgs(options: RunOptions): SpawnArgs {
     const args: string[] = [];
-
     // Output format — stream-json is the only format that emits incremental content blocks.
     args.push('--output-format', options.outputFormat ?? 'stream-json');
     args.push('--verbose');
@@ -202,8 +201,8 @@ export class ClaudeAdapter extends BaseAgentAdapter {
       args.push('--system-prompt', options.systemPrompt);
     }
 
-    // Claude Code only emits structured output under --print.
     const prompt = this.normalizePrompt(options.prompt);
+    // Claude Code only emits structured output under --print.
     args.push('--print', prompt);
 
     return {
@@ -220,7 +219,9 @@ export class ClaudeAdapter extends BaseAgentAdapter {
 
   parseEvent(line: string, context: ParseContext): AgentEvent | AgentEvent[] | null {
     const parsed = this.parseJsonLine(line);
-    if (parsed == null || typeof parsed !== 'object') return null;
+    if (parsed == null || typeof parsed !== 'object') {
+      return context.outputFormat === 'text' ? this.parsePlaintextEvent(line, context) : null;
+    }
 
     const obj = parsed as Record<string, unknown>;
     const ts = Date.now();

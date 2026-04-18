@@ -93,6 +93,16 @@ async function runRemote(
         sessionId: options.sessionId,
       });
     });
+    handle.bindInteractionTransport(async (interactionId, response) => {
+      if (!connection) {
+        throw new AgentMuxError('STDIN_NOT_AVAILABLE', 'Remote session is no longer connected', false);
+      }
+      await connection.send({
+        type: 'interaction_response',
+        interactionId,
+        response,
+      });
+    });
 
     resetInactivity();
     for await (const event of connection.receive()) {

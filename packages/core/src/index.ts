@@ -385,4 +385,4 @@ export type { AtomicWriteOptions } from './atomic-fs.js';
 export { writeFileAtomic, writeJsonAtomic } from './atomic-fs.js';
 
 // Multi-adapter architecture (direct from adapter-types to avoid conflicts)
-export type { BaseAgentAdapterInterface } from './adapter-types.js';
+export type { BaseAgentAdapterInterface, ProgrammaticRun } from './adapter-types.js';

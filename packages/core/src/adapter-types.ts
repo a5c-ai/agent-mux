@@ -11,6 +11,7 @@ import type { AgentName } from './types.js';
 import type { AgentCapabilities, ModelCapabilities } from './capabilities.js';
 import type { RunOptions } from './run-options.js';
 import type { AgentEvent } from './events.js';
+import type { InteractionResponse } from './interaction.js';
 import type { AuthState, AuthSetupGuidance, AgentConfig, AgentConfigSchema, Session } from './adapter.js';
 
 // ---------------------------------------------------------------------------
@@ -157,10 +158,17 @@ export interface WebSocketMessage {
  * Programmatic adapter for direct SDK integration.
  * No subprocess or network communication - direct function calls.
  */
+export interface ProgrammaticRun extends AsyncIterableIterator<AgentEvent> {
+  send?(text: string): Promise<void>;
+  respond?(interactionId: string, response: InteractionResponse): Promise<void>;
+  interrupt?(): Promise<void>;
+  close?(): Promise<void> | void;
+}
+
 export interface ProgrammaticAdapter extends LegacyAgentAdapter {
   readonly adapterType: 'programmatic';
 
-  execute(options: RunOptions): AsyncIterableIterator<AgentEvent>;
+  execute(options: RunOptions): ProgrammaticRun;
 }
 
 // ---------------------------------------------------------------------------
